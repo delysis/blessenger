@@ -20,6 +20,11 @@ local evidence.
 
 ## Building
 
+**Start here: [agent build/install handoff](Documentation/BUILD-AND-INSTALL.md).**
+`bash Tools/bootstrap-mac.sh` acquires the corrected speech exports; no manual
+PocketTTS conversion is required.
+
+
 The current Swift package targets macOS 26 on Apple Silicon. Use a compatible
 Xcode installation. Build the patched runtime with `Tools/build-runtime.sh`,
 Earshot with `Tools/build-earshot.sh`, and the app with `Tools/build-app.sh`.
@@ -27,10 +32,9 @@ See `ModelPatches/`, `Browser/PocketTTS/README.md`, and `Tools/PocketWASM/` for
 model/runtime preparation. The fourteen canonical native voice clips are versioned in
 `Sources/CallGemma/Resources/Voices/`, alongside their integrity manifest. Persona
 prompts, wake names, and portraits are also versioned. Browser conditioning
-states are generated from those references. Corrected Core ML exports and other
-model assets still need preparation; a fresh clone alone is not a complete
-runnable bundle. Signing is
-configured for the existing developer account; change it for another account.
+states are generated from those references. Corrected Core ML exports and browser speech assets are acquired by the pinned
+bootstrap downloader, outside Git history. The macOS project defaults to local ad-hoc signing; an Apple Development
+identity can be supplied for stable OS permissions across rebuilds.
 
 For the Cloudflare companion, run `npm ci` and `node build-assets.mjs` in `Cloud/`.
 Set deployment credentials through Wrangler/Keychain; never commit secrets.

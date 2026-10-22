@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node --test test/*.test.mjs","dev":"wrangler dev","deploy":"wrangler deploy"},"dependencies":{"ws":"8.18.3"},"devDependencies":{"miniflare":"4.20260114.0","wrangler":"4.151.3"}}

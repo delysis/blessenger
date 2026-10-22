@@ -1,0 +1,10 @@
+variant	patched
+litert_lm_commit	5f25078c9439e176615af5ba42636ed904fca847
+litert_commit	9b8c7f77e7a29e6073e614a05e1e38be7b761229
+compiler	Apple clang version 21.0.0 (clang-2100.3.34.2)
+sdk_version	27.0
+xcode_version	Xcode 27.0 Build version 27A266a 
+build_flags	--config=macos --config=macos_arm64 -c opt --override_repository=litert=$LITERT_CHECKOUT; WORKSPACE third_party label fix
+target	//swift:CLiteRTLM_mac
+dylib_sha256	5c7dd7dd6577408d806ee919e800b2c1c67e5612aec7ffbcfb52184763c58f60
+patch_manifest_sha256	0d61892ce964cf74763d2af6b00b827551fabd37c6ec6aa50315d74f12f80b0b

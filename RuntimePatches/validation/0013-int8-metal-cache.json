@@ -1,0 +1,35 @@
+{
+  "patch": "LiteRT-LM/0013-int8-metal-cache.patch",
+  "patch_sha256": "47cdfc384f5f8032c0c39b6438ec3127b822a9184774ad40d7322d59b2ae980b",
+  "files": {
+    "runtime/executor/litert/state_serialization.cc": {
+      "before_git_blob": "890c776dc990269f51ca4389198e785b9e7c29f7",
+      "before_sha256": "5bda216acf5c2625c22d76f384e5f9a3ceba2f8afb3c9d9f4eaf2d069c6c02b7",
+      "after_git_blob": "37c46e5d146232e9d77bf15e31e4e63e8680c274",
+      "after_sha256": "f3a2e165d6be0e1a9117da3a3fbb58281c48c81c73c42cfb54ab82199d8fb0fa"
+    },
+    "runtime/executor/litert/state_serialization_test.cc": {
+      "before_git_blob": "8473f0f351e0103e24dfa5eb3abee6f0879f1268",
+      "before_sha256": "e2d2bc62ace8f6047ba6aceae15ac43e91bb50354f2e18994d27d7b791ce15dc",
+      "after_git_blob": "ee6b4ba6711bce6b853cc90878a7159f0c2f54b6",
+      "after_sha256": "a433576077209b70de5028005d1bd8b535e8d93e9f09b126f9d3304d76bb77d4"
+    },
+    "c/engine.h": {
+      "before_git_blob": "4da86c11a06e2efc4d44b6f4d45eabce3b6e7fc9",
+      "before_sha256": "bd3555d03f8138a2fba005b27fb58ef1cd61d70cff7aa85805485f63d57d5c50",
+      "after_git_blob": "1916ba9c5b4cb336c1ed28629d9025ba8b82fe36",
+      "after_sha256": "6a6cd1a0ee2c86692cfb062e1b0073ad9bd4e1709f8c63eba6841051e284de0c"
+    }
+  },
+  "evidence_sha256": {
+    "e4b-shapes.json": "e9605ba67361bc1d7fa5e1d82ad93b633ed91f4b40929e457a36413132b09d32",
+    "e4b-ranges.json": "12af31fc70c25251b741f1800fb93039845f5e5c3fd4d09cec8ef6a62f9d86cf",
+    "evidence.json": "8ca82d7a5e2ca530f80a208b5284ab93b666e88d2eb0447209b8481fe497a223",
+    "syntax-check.json": "6c400b219e0f8445f9ab4447120632ff99a5d5f442669cb7b49b193767bcf535",
+    "parser-tests.json": "9fa19123a993a9a2cabff8f72bd5b3ca2a0854a3db25d7691460a7501df9c87d"
+  },
+  "git_apply_check": "PASS against exact pre-edit bytes",
+  "reconstructed_files": "PASS byte-for-byte equality with final checkout",
+  "git_diff_check": "PASS",
+  "unit_test_scope": "11 existing native metadata/parser tests passed; updated provider test source syntax/type check passed; full runtime/provider tests not run"
+}

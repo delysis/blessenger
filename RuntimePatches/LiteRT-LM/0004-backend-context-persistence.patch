@@ -1,0 +1,636 @@
+diff --git a/runtime/executor/BUILD b/runtime/executor/BUILD
+index d1561e7bba967c74b44bc70f68af81b294c02da9..46f3f8c58ce1b5b03c143d786a470bbd894abe35 100644
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -345,6 +345,7 @@ cc_library(
+     hdrs = ["llm_litert_compiled_model_executor.h"],
+     deps = [
+         ":common_utils",
++        ":context_serialization",
+         ":executor_settings_base",
+         ":executor_stats",
+         ":litert_compiled_model_executor_utils",
+@@ -401,6 +402,7 @@ cc_library(
+         "//runtime/components/constrained_decoding:constraint",
+         "//runtime/components/embedding_lookup:embedding_lookup_manager",
+         "//runtime/executor/litert:state",
++        "//runtime/executor/litert:state_serialization",
+         "//runtime/proto:executor_metadata_cc_proto",
+         "//runtime/proto:llm_metadata_cc_proto",
+         "//runtime/util:convert_tensor_buffer",
+@@ -409,6 +411,7 @@ cc_library(
+         "//runtime/util:lora_util",
+         "//runtime/util:tensor_buffer_util",
+         "@litert//tflite/types:half",
++        "@nlohmann_json//:json",
+     ],
+ )
+ 
+@@ -631,6 +634,7 @@ cc_library(
+     srcs = ["llm_litert_npu_compiled_model_executor.cc"],
+     hdrs = ["llm_litert_npu_compiled_model_executor.h"],
+     deps = [
++        ":context_serialization",
+         ":litert_compiled_model_executor_utils",
+         ":llm_executor",
+         ":llm_executor_io_types",
+@@ -643,6 +647,7 @@ cc_library(
+         "@com_google_absl//absl/log:absl_log",
+         "@com_google_absl//absl/memory",
+         "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:status_macros",
+         "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/strings",
+         "@com_google_absl//absl/strings:string_view",
+@@ -670,6 +675,7 @@ cc_library(
+         "//runtime/components:model_resources",
+         "//runtime/components/constrained_decoding:constrained_decoder",
+         "//runtime/executor/litert:legacy_map_state",
++        "//runtime/executor/litert:state_serialization",
+         "//runtime/executor/npu:llm_litert_npu_compiled_model_executor_utils",
+         "//runtime/executor/npu:llm_litert_npu_dynamism",
+         "//runtime/executor/npu:llm_litert_npu_embedder",
+@@ -682,6 +688,7 @@ cc_library(
+         "//runtime/util:convert_tensor_buffer",
+         "//runtime/util:litert_status_util",
+         "//runtime/util:tensor_buffer_util",
++        "@nlohmann_json//:json",
+     ],
+ )
+ 
+diff --git a/runtime/executor/CMakeLists.txt b/runtime/executor/CMakeLists.txt
+index f0634a7cf4e4ebe0cf4b3b47a553804df81086a3..fcd346bd88b5b17b9780b4473aa49e461cb32a19 100644
+--- a/runtime/executor/CMakeLists.txt
++++ b/runtime/executor/CMakeLists.txt
+@@ -457,6 +457,8 @@ target_include_directories(runtime_executor_llm_litert_compiled_model_executor
+ 
+ target_link_libraries(runtime_executor_llm_litert_compiled_model_executor
+   PUBLIC
++    LiteRTLM::Runtime::Executor::ContextSerialization
++    LiteRTLM::Runtime::Executor::Litert::StateSerialization
+     LiteRTLM::Runtime::Executor::ExecutorSettingsBase
+     LiteRTLM::Runtime::Executor::ExecutorStats
+     LiteRTLM::Runtime::Executor::LlmExecutorIoTypes
+@@ -498,6 +500,8 @@ target_include_directories(runtime_executor_llm_litert_npu_compiled_model_execut
+ 
+ target_link_libraries(runtime_executor_llm_litert_npu_compiled_model_executor
+   PUBLIC
++    LiteRTLM::Runtime::Executor::ContextSerialization
++    LiteRTLM::Runtime::Executor::Litert::StateSerialization
+     LiteRTLM::Runtime::Executor::ExecutorSettingsBase
+     LiteRTLM::Runtime::Executor::LlmExecutorIoTypes
+     LiteRTLM::Runtime::Executor::LlmExecutorSettings
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index 76dd6d95e21f47da013a02a362f721cdd1553e7d..4c2bc89990733794a246d6802d9b98ffc83eef0a 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -65,9 +65,11 @@
+ #include "runtime/components/model_resources.h"
+ #include "runtime/components/sampler_factory.h"
+ #include "runtime/executor/common_utils.h"
++#include "runtime/executor/context_serialization.h"
+ #include "runtime/executor/executor_settings_base.h"
+ #include "runtime/executor/executor_stats.h"
+ #include "runtime/executor/litert/state.h"
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/executor/litert_compiled_model_executor_utils.h"
+ #include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/executor/llm_executor_processed_tokens.h"
+@@ -1575,6 +1577,142 @@ LlmLiteRtCompiledModelExecutorBase::GetPrefillSignatureKey() const {
+   return prefill_signature_key;
+ }
+ 
++absl::StatusOr<SerializedLlmContext>
++LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
++  if (mtp_drafter_ != nullptr ||
++      (executor_settings_.GetAdvancedSettings().has_value() &&
++       executor_settings_.GetAdvancedSettings()->enable_speculative_decoding)) {
++    return absl::FailedPreconditionError(
++        "Disable speculative decoding for persistent sessions; verifier state "
++        "cannot be rolled back to the completed turn boundary.");
++  }
++  if (llm_context_ == nullptr) {
++    return absl::FailedPreconditionError("No context to serialize.");
++  }
++  const auto& config = llm_context_->runtime_config();
++  const auto& runtime = llm_context_->runtime_state();
++  const int heads = config.output_heads.value_or(1);
++  if (heads < 1) {
++    return absl::FailedPreconditionError("Invalid output candidate count.");
++  }
++  StateInterface* active =
++      runtime.ran_decode && heads > 1 ? decode_state_.get() : state_.get();
++  if (active == nullptr) {
++    return absl::FailedPreconditionError("No state to serialize.");
++  }
++  nlohmann::json backend = {
++      {"kind", "litert"},
++      {"output_heads", heads},
++      {"tokens_per_decode", config.tokens_per_decode.has_value()
++                                ? nlohmann::json(*config.tokens_per_decode)
++                                : nlohmann::json(nullptr)},
++      {"lora_active", llm_context_->processed_context().lora_id().has_value()},
++  };
++  SerializedLlmContext result;
++  ABSL_ASSIGN_OR_RETURN(
++      result.metadata,
++      SerializeContextMetadata(
++          executor_settings_, llm_context_->processed_context().processed_tokens(),
++          runtime.current_step, runtime.ran_decode, std::move(backend)));
++  ABSL_ASSIGN_OR_RETURN(result.state, active->Serialize());
++  return result;
++}
++
++absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
++    absl::string_view metadata, absl::string_view state) {
++  if (mtp_drafter_ != nullptr ||
++      (executor_settings_.GetAdvancedSettings().has_value() &&
++       executor_settings_.GetAdvancedSettings()->enable_speculative_decoding)) {
++    return absl::FailedPreconditionError(
++        "Disable speculative decoding for persistent sessions; verifier state "
++        "cannot be rolled back to the completed turn boundary.");
++  }
++  if (llm_context_ == nullptr || llm_context_->runtime_state().current_step != 0) {
++    return absl::FailedPreconditionError("LoadContext requires a fresh context.");
++  }
++  ABSL_ASSIGN_OR_RETURN(auto context,
++                        ParseContextMetadata(metadata, executor_settings_));
++  const auto& config = llm_context_->runtime_config();
++  const int heads = config.output_heads.value_or(1);
++  const nlohmann::json expected_backend = {
++      {"kind", "litert"},
++      {"output_heads", heads},
++      {"tokens_per_decode", config.tokens_per_decode.has_value()
++                                ? nlohmann::json(*config.tokens_per_decode)
++                                : nlohmann::json(nullptr)},
++      {"lora_active", llm_context_->processed_context().lora_id().has_value()},
++  };
++  const int active_batch = context.ran_decode ? heads : 1;
++  if (context.backend.dump() != expected_backend.dump() || heads < 1 ||
++      context.candidate_count != static_cast<size_t>(active_batch)) {
++    return absl::FailedPreconditionError("Incompatible executor context.");
++  }
++  auto embedding_size = [&](const std::optional<std::string>& name)
++      -> absl::StatusOr<size_t> {
++    if (!name.has_value()) return 0;
++    auto buffer = decode_input_buffers_.find(*name);
++    if (buffer == decode_input_buffers_.end()) {
++      return absl::FailedPreconditionError("Embedding input buffer unavailable.");
++    }
++    LITERT_ASSIGN_OR_RETURN(size_t bytes, buffer->second.PackedSize());
++    if (bytes % sizeof(float) != 0 || bytes / sizeof(float) % heads != 0) {
++      return absl::FailedPreconditionError("Invalid embedding input layout.");
++    }
++    return bytes / heads / sizeof(float);
++  };
++  ABSL_ASSIGN_OR_RETURN(size_t embedding_elements,
++                        embedding_size(signatures_.input_embeddings));
++  ABSL_ASSIGN_OR_RETURN(size_t per_layer_elements,
++                        embedding_size(signatures_.input_per_layer_embeddings));
++  ABSL_ASSIGN_OR_RETURN(int vocab_size, GetVocabSize());
++  ABSL_RETURN_IF_ERROR(ValidateContextTokens(
++      context.tokens, vocab_size, embedding_elements, per_layer_elements));
++  auto& target = active_batch > 1 ? decode_state_ : state_;
++  auto* litert_state = dynamic_cast<LitertState*>(target.get());
++  if (litert_state == nullptr) {
++    return absl::FailedPreconditionError("No compatible target state.");
++  }
++  ABSL_ASSIGN_OR_RETURN(auto parsed, ParseSerializedState(state));
++  ABSL_RETURN_IF_ERROR(litert_state->ValidateLoad(parsed, true));
++  ABSL_ASSIGN_OR_RETURN(
++      int entries, ReadContextInteger(parsed.metadata.at("num_entries")));
++  // The final logical token may still be pending and absent from the cache.
++  if (static_cast<int64_t>(context.current_step) >
++      static_cast<int64_t>(entries) + 1) {
++    return absl::InvalidArgumentError("Execution step exceeds cache capacity.");
++  }
++  if (entries != litert_state->GetNumEntries()) {
++    ABSL_ASSIGN_OR_RETURN(auto signature, GetPrefillSignatureKey());
++    if (entries < litert_state->GetNumEntries()) {
++      // Resize only grows. A fresh allocation is needed when this engine has
++      // previously hosted a larger dynamic CPU context.
++      ABSL_ASSIGN_OR_RETURN(
++          auto replacement,
++          LitertState::Create(env_, *compiled_model_, signature,
++                              executor_metadata_,
++                              LitertState::AllocationPolicy::kInplace,
++                              active_batch, false));
++      ABSL_RETURN_IF_ERROR(
++          replacement->Resize(*compiled_model_, signature, entries));
++      ABSL_RETURN_IF_ERROR(replacement->Load(parsed));
++      target = std::move(replacement);
++    } else {
++      ABSL_RETURN_IF_ERROR(
++          litert_state->Resize(*compiled_model_, signature, entries));
++      ABSL_RETURN_IF_ERROR(litert_state->Load(parsed));
++    }
++  } else {
++    ABSL_RETURN_IF_ERROR(litert_state->Load(parsed));
++  }
++  llm_context_->processed_context().processed_tokens() = std::move(context.tokens);
++  llm_context_->runtime_state().current_step = context.current_step;
++  llm_context_->runtime_state().ran_decode = context.ran_decode;
++  // The target session retains its sampling configuration and fresh RNG.
++  sampler_.reset();
++  force_prepare_needed_ = false;
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<StateInterface>>
+ LlmLiteRtCompiledModelExecutorBase::CloneState() const {
+   int output_heads = 1;
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.h b/runtime/executor/llm_litert_compiled_model_executor.h
+index 3d40d47865b0d232bb1b8aa843c43923d0552b5d..54840c378b40031ca5e5449105b8b8ac5315113e 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.h
++++ b/runtime/executor/llm_litert_compiled_model_executor.h
+@@ -95,6 +95,11 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
+       const ExecutorInputs& inputs, const ExecutorDecodeParams& decode_params);
+ 
+   // State/context management APIs:
++  absl::StatusOr<SerializedLlmContext> SerializeContext() const override;
++
++  absl::Status LoadContext(absl::string_view metadata,
++                          absl::string_view state) override;
++
+   absl::StatusOr<std::unique_ptr<LlmContext>> CreateNewContext(
+       std::optional<uint32_t> lora_id,
+       RuntimeConfig runtime_config) const override;
+diff --git a/runtime/executor/llm_litert_compiled_model_executor_test.cc b/runtime/executor/llm_litert_compiled_model_executor_test.cc
+index e075c5adc3bbb478d4048a7da9df153c13b01d64..ebd77f10c59456fa057de0a9697d4052fd27190d 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor_test.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor_test.cc
+@@ -1904,5 +1904,98 @@ TEST(LlmLiteRtCompiledModelExecutorDynamicTest, DecodeTest) {
+   }
+ }
+ 
++TEST(LlmLiteRtCompiledModelExecutorStaticTest, PersistentContextAcrossExecutors) {
++  auto model_path =
++      std::filesystem::path(::testing::SrcDir()) / kTestStaticModelPath;
++  ASSERT_OK_AND_ASSIGN(auto resources,
++                       CreateExecutorModelResourcesLitertLm(model_path.string()));
++  ASSERT_OK_AND_ASSIGN(auto assets, ModelAssets::Create(model_path.string()));
++  ASSERT_OK_AND_ASSIGN(auto settings,
++                       LlmExecutorSettings::CreateDefault(std::move(assets)));
++  settings.SetCacheDir(":nocache");
++  settings.SetMaxNumTokens(kMaxNumTokens);
++  LITERT_ASSERT_OK_AND_ASSIGN(auto env, Environment::Create({}));
++  ASSERT_OK_AND_ASSIGN(auto source, LlmLiteRtCompiledModelExecutorStatic::Create(
++                                       settings, env, *resources));
++  ASSERT_OK_AND_ASSIGN(auto target, LlmLiteRtCompiledModelExecutorStatic::Create(
++                                       settings, env, *resources));
++  const std::vector<int> ids = {1, 2, 3};
++  LITERT_ASSERT_OK_AND_ASSIGN(auto buffer,
++                              CopyToTensorBuffer<int>(absl::MakeSpan(ids), {1, 3}));
++  ExecutorInputs inputs;
++  inputs.SetTextData(ExecutorTextData(std::move(buffer)));
++  ASSERT_OK(source->Prefill(inputs));
++  ASSERT_OK(source->Decode());
++  ASSERT_OK_AND_ASSIGN(auto saved, source->SerializeContext());
++  ASSERT_OK_AND_ASSIGN(auto empty, target->SerializeContext());
++
++  std::string corrupt = saved.state;
++  corrupt.back() ^= 1;
++  EXPECT_FALSE(target->LoadContext(saved.metadata, corrupt).ok());
++  ASSERT_OK_AND_ASSIGN(auto unchanged, target->SerializeContext());
++  EXPECT_EQ(unchanged.metadata, empty.metadata);
++  EXPECT_EQ(unchanged.state, empty.state);
++
++  ASSERT_OK(target->LoadContext(saved.metadata, saved.state));
++  ASSERT_OK_AND_ASSIGN(auto restored, target->SerializeContext());
++  EXPECT_EQ(restored.metadata, saved.metadata);
++  EXPECT_EQ(restored.state, saved.state);
++  ASSERT_OK_AND_ASSIGN(auto expected, source->Decode());
++  ASSERT_OK_AND_ASSIGN(auto actual, target->Decode());
++  EXPECT_EQ(actual, expected);
++  ASSERT_OK_AND_ASSIGN(auto expected_state, source->SerializeContext());
++  ASSERT_OK_AND_ASSIGN(auto actual_state, target->SerializeContext());
++  EXPECT_EQ(actual_state.state, expected_state.state);
++
++  // A restored completed turn must accept the next prompt with its pending
++  // output token, using the existing decode-to-prefill transition.
++  ASSERT_OK(source->Prefill(inputs));
++  ASSERT_OK(target->Prefill(inputs));
++  ASSERT_OK_AND_ASSIGN(expected, source->Decode());
++  ASSERT_OK_AND_ASSIGN(actual, target->Decode());
++  EXPECT_EQ(actual, expected);
++}
++
++TEST(LlmLiteRtCompiledModelExecutorDynamicTest, PersistentContextShrinksAndResumes) {
++  LITERT_ASSERT_OK_AND_ASSIGN(auto env, Environment::Create({}));
++  ASSERT_OK_AND_ASSIGN(auto source_pair,
++                       CreateDynamicExecutor(env, kTestDynamicModelPath));
++  ASSERT_OK_AND_ASSIGN(auto target_pair,
++                       CreateDynamicExecutor(env, kTestDynamicModelPath));
++  auto& source = source_pair.second;
++  auto& target = target_pair.second;
++  const std::vector<int> ids = {1, 2, 3};
++  LITERT_ASSERT_OK_AND_ASSIGN(auto buffer,
++                              CopyToTensorBuffer<int>(absl::MakeSpan(ids), {1, 3}));
++  ExecutorInputs inputs;
++  inputs.SetTextData(ExecutorTextData(std::move(buffer)));
++  ASSERT_OK(source->Prefill(inputs));
++  ASSERT_OK(source->Decode());
++  ASSERT_OK_AND_ASSIGN(auto saved, source->SerializeContext());
++
++  const std::vector<int> long_ids(24, 1);
++  LITERT_ASSERT_OK_AND_ASSIGN(
++      auto long_buffer,
++      CopyToTensorBuffer<int>(absl::MakeSpan(long_ids), {1, 24}));
++  ExecutorInputs long_inputs;
++  long_inputs.SetTextData(ExecutorTextData(std::move(long_buffer)));
++  ASSERT_OK(target->Prefill(long_inputs));
++  ASSERT_OK(target->Reset());
++  ASSERT_OK(target->LoadContext(saved.metadata, saved.state));
++  ASSERT_OK_AND_ASSIGN(auto restored, target->SerializeContext());
++  EXPECT_EQ(restored.metadata, saved.metadata);
++  EXPECT_EQ(restored.state, saved.state);
++
++  ASSERT_OK_AND_ASSIGN(auto expected, source->Decode());
++  ASSERT_OK_AND_ASSIGN(auto actual, target->Decode());
++  EXPECT_EQ(actual, expected);
++  ASSERT_OK(source->Prefill(inputs));
++  ASSERT_OK(target->Prefill(inputs));
++  ASSERT_OK_AND_ASSIGN(auto expected_state, source->SerializeContext());
++  ASSERT_OK_AND_ASSIGN(auto actual_state, target->SerializeContext());
++  EXPECT_EQ(actual_state.metadata, expected_state.metadata);
++  EXPECT_EQ(actual_state.state, expected_state.state);
++}
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/executor/llm_litert_npu_compiled_model_executor.cc b/runtime/executor/llm_litert_npu_compiled_model_executor.cc
+index b083a22b4099f9a0851f7c3cff0990e7d64a13d6..3e4a2578aee965e0e3ab739ec4028820206c5f21 100644
+--- a/runtime/executor/llm_litert_npu_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_npu_compiled_model_executor.cc
+@@ -31,6 +31,7 @@
+ #include "absl/log/log.h"  // from @com_google_absl
+ #include "absl/memory/memory.h"  // from @com_google_absl
+ #include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/status_macros.h"  // from @com_google_absl
+ #include "absl/status/statusor.h"  // from @com_google_absl
+ #include "absl/strings/match.h"  // from @com_google_absl
+ #include "absl/strings/numbers.h"  // from @com_google_absl
+@@ -58,7 +59,9 @@
+ #include "litert/cc/litert_tensor_buffer_types.h"  // from @litert
+ #include "runtime/components/constrained_decoding/constrained_decoder.h"
+ #include "runtime/components/model_resources.h"
++#include "runtime/executor/context_serialization.h"
+ #include "runtime/executor/litert/legacy_map_state.h"
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/executor/litert_compiled_model_executor_utils.h"
+ #include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/executor/llm_executor_processed_tokens.h"
+@@ -2345,6 +2348,237 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
+   return absl::OkStatus();
+ }
+ 
++namespace {
++
++absl::StatusOr<StateTensorBuffers> DuplicateNpuState(const ContextGroup& group) {
++  StateTensorBuffers buffers;
++  buffers.reserve(group.input_kv_cache_buffers.size());
++  for (const auto& [name, buffer] : group.input_kv_cache_buffers) {
++    LITERT_ASSIGN_OR_RETURN(auto alias, buffer.Duplicate());
++    buffers.emplace(std::string(name), std::move(alias));
++  }
++  return buffers;
++}
++
++// Before reallocating a dynamic context, check names, types and every axis that
++// cannot change with its sequence capacity. Exact allocated descriptors are
++// checked again before writing any tensor.
++absl::Status ValidateNpuStateForResize(
++    const ParsedSerializedState& state, const StateTensorBuffers& buffers,
++    const NpuModelGeometry& geometry, int capacity,
++    const proto::ExecutorMetadata* metadata) {
++  if (state.tensors.size() != buffers.size()) {
++    return absl::FailedPreconditionError("NPU state buffer count mismatch.");
++  }
++  for (const auto& tensor : state.tensors) {
++    auto buffer = buffers.find(tensor.name);
++    if (buffer == buffers.end()) {
++      return absl::FailedPreconditionError("Unknown NPU state buffer.");
++    }
++    ABSL_ASSIGN_OR_RETURN(auto expected, DescribeStateTensor(buffer->second));
++    // Match ResizeDynamicInputs: K grows along axis 2, V along axis 3;
++    // recurrent C state does not grow with the context length.
++    int axis = -1;
++    if (expected["shape"].size() >= 4) {
++      if (absl::StartsWith(tensor.name, kKvCacheKRootName)) axis = 2;
++      if (absl::StartsWith(tensor.name, kKvCacheVRootName)) axis = 3;
++    }
++    if (axis >= 0) {
++      int entries = capacity;
++      const proto::StateBuffer* declared = nullptr;
++      if (metadata != nullptr) {
++        for (const auto& info : metadata->llm_executor_metadata().state_buffers()) {
++          if (tensor.name == info.prefill_input_name() ||
++              tensor.name == info.decode_input_name()) {
++            declared = &info;
++            break;
++          }
++        }
++      }
++      if (declared != nullptr) {
++        if (declared->has_sequence_axis() && declared->sequence_axis() != axis) {
++          return absl::FailedPreconditionError("Incompatible NPU sequence axis.");
++        }
++        if (declared->has_minimum_sequence_length()) {
++          entries = std::max(entries, declared->minimum_sequence_length());
++        }
++        if (declared->has_maximum_sequence_length()) {
++          entries = std::min(entries, declared->maximum_sequence_length());
++        }
++      } else {
++        const auto info = geometry.kv_buffer_info.find(tensor.name);
++        if (info != geometry.kv_buffer_info.end() && info->second.is_local) {
++          // Heuristic local caches have a fixed physical ring-buffer length.
++          ABSL_ASSIGN_OR_RETURN(entries,
++                                ReadContextInteger(expected["shape"][axis]));
++        }
++      }
++      if (entries <= 0) {
++        return absl::FailedPreconditionError("Invalid NPU cache capacity.");
++      }
++      expected["shape"][axis] = entries;
++    }
++    // The parser has already checked that bytes exactly matches shape/type.
++    expected["bytes"] = tensor.descriptor.at("bytes");
++    if (expected.dump() != tensor.descriptor.dump()) {
++      return absl::FailedPreconditionError("NPU state descriptor mismatch.");
++    }
++  }
++  return absl::OkStatus();
++}
++
++}  // namespace
++
++absl::StatusOr<SerializedLlmContext>
++LlmLiteRtNpuCompiledModelExecutor::SerializeContext() const {
++  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
++    return absl::FailedPreconditionError(
++        "Disable speculative decoding for persistent NPU sessions; verifier "
++        "state cannot be rolled back to the completed turn boundary.");
++  }
++  if (context_groups_.empty()) {
++    return absl::FailedPreconditionError("No NPU context to serialize.");
++  }
++  nlohmann::json backend = {
++      {"kind", "npu"},
++      {"configuration",
++       {{"dynamic", is_dynamic_model_},
++        {"speculative_decoding", static_cast<int>(speculative_decoding_type_)},
++        {"kv_initial_value", kv_cache_init_value_}}},
++      {"group", active_context_group_index_},
++      {"capacity", dynamic_kv_cache_capacity_},
++  };
++  SerializedLlmContext result;
++  ABSL_ASSIGN_OR_RETURN(
++      result.metadata,
++      SerializeContextMetadata(executor_settings_, processed_tokens_,
++                               current_step_, ran_decode_, std::move(backend)));
++  ABSL_ASSIGN_OR_RETURN(auto buffers, DuplicateNpuState(ActiveContextGroup()));
++  LegacyMapState state(std::move(buffers));
++  ABSL_ASSIGN_OR_RETURN(result.state, state.Serialize());
++  return result;
++}
++
++absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
++    absl::string_view metadata, absl::string_view state) {
++  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
++    return absl::FailedPreconditionError(
++        "Disable speculative decoding for persistent NPU sessions; verifier "
++        "state cannot be rolled back to the completed turn boundary.");
++  }
++  if (current_step_ != 0 || context_groups_.empty()) {
++    return absl::FailedPreconditionError("LoadContext requires a fresh context.");
++  }
++  ABSL_ASSIGN_OR_RETURN(auto context,
++                        ParseContextMetadata(metadata, executor_settings_));
++  const auto& backend = context.backend;
++  const nlohmann::json configuration = {
++      {"dynamic", is_dynamic_model_},
++      {"speculative_decoding", static_cast<int>(speculative_decoding_type_)},
++      {"kv_initial_value", kv_cache_init_value_},
++  };
++  if (backend.size() != 4 || !backend.contains("kind") ||
++      backend["kind"] != "npu" || !backend.contains("configuration") ||
++      backend["configuration"].dump() != configuration.dump() ||
++      !backend.contains("group") || !backend.contains("capacity") ||
++      context.candidate_count != 1) {
++    return absl::FailedPreconditionError("Incompatible NPU execution context.");
++  }
++  ABSL_ASSIGN_OR_RETURN(int group_index, ReadContextInteger(backend["group"]));
++  ABSL_ASSIGN_OR_RETURN(int capacity, ReadContextInteger(backend["capacity"]));
++  if (group_index < 0 ||
++      static_cast<size_t>(group_index) >= context_groups_.size() ||
++      (is_dynamic_model_ && (group_index != 0 || capacity <= 0)) ||
++      (!is_dynamic_model_ && capacity != 0)) {
++    return absl::FailedPreconditionError("Invalid NPU context group.");
++  }
++  const int context_limit = is_dynamic_model_
++                                ? capacity
++                                : context_groups_[group_index].context_size;
++  // The final logical token may still be pending and absent from the cache.
++  if (context_limit > 0 &&
++      static_cast<int64_t>(context.current_step) >
++          static_cast<int64_t>(context_limit) + 1) {
++    return absl::InvalidArgumentError("NPU execution step exceeds cache capacity.");
++  }
++  ABSL_ASSIGN_OR_RETURN(int vocab_size, GetVocabSize());
++  auto input_elements = [&](absl::string_view name, bool raw_float)
++      -> absl::StatusOr<size_t> {
++    const auto& inputs = context_groups_[group_index]
++                             .text_decoder_inference_context
++                             .decode_input_buffers;
++    auto input = inputs.find(name);
++    if (input == inputs.end()) return 0;
++    if (raw_float) {
++      LITERT_ASSIGN_OR_RETURN(size_t bytes, input->second.PackedSize());
++      if (bytes % sizeof(float) != 0) {
++        return absl::FailedPreconditionError("Invalid NPU embedding layout.");
++      }
++      return bytes / sizeof(float);
++    }
++    LITERT_ASSIGN_OR_RETURN(auto type, input->second.TensorType());
++    LITERT_ASSIGN_OR_RETURN(size_t elements, type.Layout().NumElements());
++    return elements;
++  };
++  ABSL_ASSIGN_OR_RETURN(size_t embedding_elements,
++                        input_elements(TextDecoderSignatures::kInputEmbeddings,
++                                       true));
++  ABSL_ASSIGN_OR_RETURN(size_t per_layer_elements,
++                        input_elements(kPerLayerEmbedderTensor, false));
++  ABSL_RETURN_IF_ERROR(ValidateContextTokens(
++      context.tokens, vocab_size, embedding_elements, per_layer_elements));
++  ABSL_ASSIGN_OR_RETURN(auto parsed, ParseSerializedState(state));
++  if (parsed.metadata != nlohmann::json{{"kind", "legacy_map"}}) {
++    return absl::FailedPreconditionError("Invalid NPU state representation.");
++  }
++  ABSL_ASSIGN_OR_RETURN(auto buffers,
++                        DuplicateNpuState(context_groups_[group_index]));
++  if (is_dynamic_model_ && capacity != dynamic_kv_cache_capacity_) {
++    ABSL_RETURN_IF_ERROR(ValidateNpuStateForResize(
++        parsed, buffers, context_groups_[0].geometry, capacity,
++        executor_metadata_));
++    if (text_decoder_model_ == nullptr) {
++      return absl::FailedPreconditionError("NPU model unavailable for resizing.");
++    }
++    absl::flat_hash_map<absl::string_view, HWQuantParams> unused_quant_params;
++    LITERT_ASSIGN_OR_RETURN(
++        auto built,
++        CreateDynamicContextGroup(env_, text_decoder_model_,
++                                  text_decoder_compiled_model_,
++                                  prefill_signatures_.size, unused_quant_params,
++                                  kv_cache_init_value_, capacity,
++                                  executor_metadata_));
++    if (built.resolved_context_size != capacity) {
++      return absl::FailedPreconditionError("NPU cache capacity changed.");
++    }
++    built.group.decode_aux_signatures = context_groups_[0].decode_aux_signatures;
++    built.group.verify_aux_signatures = context_groups_[0].verify_aux_signatures;
++    ABSL_ASSIGN_OR_RETURN(buffers, DuplicateNpuState(built.group));
++    ABSL_RETURN_IF_ERROR(ValidateSerializedState(parsed, buffers));
++    LITERT_RETURN_IF_ERROR(ResizeAuxiliaryMaskInputs(
++        npu_auxiliary_context_.npu_auxiliary_compiled_model, built.group,
++        built.resolved_context_size));
++    LITERT_RETURN_IF_ERROR(main_mask_.RecreateContextLengthInputBuffers(
++        built.group.prefill_signatures.mask, built.group.decode_aux_signatures.mask,
++        built.group.verify_aux_signatures.mask));
++    ABSL_RETURN_IF_ERROR(LoadSerializedState(parsed, buffers));
++    // Keep the old aliases alive until all auxiliary consumers are rebound.
++    ContextGroup retired = std::move(context_groups_[0]);
++    context_groups_[0] = std::move(built.group);
++    active_context_group_index_ = 0;
++    dynamic_kv_cache_capacity_ = built.resolved_context_size;
++    LITERT_RETURN_IF_ERROR(RebindActiveContextGroup());
++  } else {
++    ABSL_RETURN_IF_ERROR(LoadSerializedState(parsed, buffers));
++    active_context_group_index_ = group_index;
++    LITERT_RETURN_IF_ERROR(RebindActiveContextGroup());
++  }
++  processed_tokens_ = std::move(context.tokens);
++  current_step_ = context.current_step;
++  ran_decode_ = context.ran_decode;
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<LlmContext>>
+ LlmLiteRtNpuCompiledModelExecutor::CreateNewContext(
+     std::optional<uint32_t> lora_id, RuntimeConfig runtime_config) const {
+diff --git a/runtime/executor/llm_litert_npu_compiled_model_executor.h b/runtime/executor/llm_litert_npu_compiled_model_executor.h
+index 28c0ed66e9cab4fd8eb8e24c2b643f4cb10bfe88..5314e15cb675d49d8758c7818021292085a5c37d 100644
+--- a/runtime/executor/llm_litert_npu_compiled_model_executor.h
++++ b/runtime/executor/llm_litert_npu_compiled_model_executor.h
+@@ -169,6 +169,11 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
+       std::optional<uint32_t> lora_id,
+       RuntimeConfig runtime_config) const override;
+ 
++  absl::StatusOr<SerializedLlmContext> SerializeContext() const override;
++
++  absl::Status LoadContext(absl::string_view metadata,
++                          absl::string_view state) override;
++
+   absl::StatusOr<std::unique_ptr<LlmContext>> CloneContext() const override;
+ 
+   absl::Status RestoreContext(

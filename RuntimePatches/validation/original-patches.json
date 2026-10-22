@@ -1,0 +1,62 @@
+{
+  "source_archive_sha256": "47138d30573a5e919ee056520a0c4d4474900ec92dc7aa51b63895f1eafd4c31",
+  "unchanged_patch_count": 14,
+  "patches": [
+    {
+      "path": "LiteRT/0001-litert-lock-failure.patch",
+      "sha256": "c48c720229c84faa00ff41f69c9687020d0706985acae7f944b49d98238f7f3f"
+    },
+    {
+      "path": "LiteRT/0002-litert-host-staging-api.patch",
+      "sha256": "d06914e54351dbf8cd66fd590c4199b4c2c2806f1ace392b9c114604fa2f37cf"
+    },
+    {
+      "path": "LiteRT/0003-litert-host-staging-providers.patch",
+      "sha256": "021e0ce703c4559e5a2308bdb0eba40c181733211a165c91532756ef0d219754"
+    },
+    {
+      "path": "LiteRT/0004-gemma-metal-kv-checkpoint.patch",
+      "sha256": "3b8e369cbaa0b6687720898ae3c79c9db607c2d140bd79793d7aefa393acbdd3"
+    },
+    {
+      "path": "LiteRT-LM/0001-packed-state-codec.patch",
+      "sha256": "69a8aac66618424718198305c50ff63f5492f266bae53ba758e7b8ff11332553"
+    },
+    {
+      "path": "LiteRT-LM/0002-litert-state-persistence.patch",
+      "sha256": "20736ae75f2a36db57b4a35fa244d5d7b68d174fce5255c970526a1a39d0dfd3"
+    },
+    {
+      "path": "LiteRT-LM/0003-executor-context-contract.patch",
+      "sha256": "505ff412c29a09bc35291b8e31ee0408b10136a543854d874197668755abe2a7"
+    },
+    {
+      "path": "LiteRT-LM/0004-backend-context-persistence.patch",
+      "sha256": "9cfaf97b90cf8bb9e9c638b83c92f6e5f9e7d8eb4f5ba9988dcee5714178a00b"
+    },
+    {
+      "path": "LiteRT-LM/0005-atomic-session-cache-files.patch",
+      "sha256": "ab669207ab17665424e67374c49a2b7dd0977927a9333f2f2ce19fc6fe5cddc4"
+    },
+    {
+      "path": "LiteRT-LM/0006-session-cache-api.patch",
+      "sha256": "a4379c183fe7691f96228b1715237bc93ff69784a4f925d1fc1dce7b57a22954"
+    },
+    {
+      "path": "LiteRT-LM/0007-mtp-cache-bounds.patch",
+      "sha256": "0471ef5384eb4724fcc9c0b7dfa3401411fe70ccb558e5f945419b7b7620f51a"
+    },
+    {
+      "path": "LiteRT-LM/0008-mtp-context-persistence.patch",
+      "sha256": "bc68a4e6aeac4e65fcaa4397a5d425ad3c31d3a79764010e284957747a0d08de"
+    },
+    {
+      "path": "LiteRT-LM/0009-npu-mtp-context-persistence.patch",
+      "sha256": "71ac82b51ace352b9c921d717a2b7b6e6fa7b97c298345103f3e833a13f8789a"
+    },
+    {
+      "path": "LiteRT-LM/0010-metal-kv-state-layout.patch",
+      "sha256": "e05818333c46240478b85035be84fa12e1c17623d32ea763e24789da24969868"
+    }
+  ]
+}

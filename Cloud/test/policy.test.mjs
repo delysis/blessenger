@@ -1,0 +1,7 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {matchesHash,sessionCookie,boundedBody,privateGet,base64,unbase64} from '../policy.mjs';
+test('pairing hash accepts only exact secret',async()=>{const value='a'.repeat(64);const hash=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))).toString('hex');assert(await matchesHash(value,hash));assert(!await matchesHash('b'.repeat(64),hash));assert(!await matchesHash(undefined,hash));assert(!await matchesHash(value,undefined));});
+test('LAN and misleading cookies cannot authenticate HTTPS',()=>{assert.equal(sessionCookie(new Headers({cookie:'blessenger_lan=abc; notblessenger=xyz'})),undefined);assert.equal(sessionCookie(new Headers({cookie:'a=b; blessenger=correct; other=thing'})),'correct');});
+test('upload bound checks actual stream, not just declared length',async()=>{const req=new Request('https://test/',{method:'POST',body:'123456'});await assert.rejects(boundedBody(req,5));});
+test('paths never expose arbitrary filesystem or network targets',()=>{for(const path of ['/api/network','/runtime/'+'a'.repeat(64)+'/../secret','https://elsewhere/','/avatar/../../secret'])assert(!privateGet(path));assert(privateGet('/runtime/'+'a'.repeat(64)+'/model.wasm'));});
+test('binary framing round trips full chunk',()=>{const bytes=crypto.getRandomValues(new Uint8Array(49152));assert.deepEqual(unbase64(base64(bytes)),bytes);});

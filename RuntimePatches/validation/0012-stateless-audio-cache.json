@@ -1,0 +1,85 @@
+{
+  "patch": "LiteRT-LM/0012-stateless-audio-cache.patch",
+  "patch_sha256": "fa60034a3b8c2b4a9a9b73e45bf610310c900f786e35acef19bfd9797b79a550",
+  "base_revision": "5f25078c9439e176615af5ba42636ed904fca847",
+  "incremental_apply_check": "passed",
+  "reconstructed_owned_files_equal_checkout": true,
+  "scope": "Exact pre-edit bytes for these owned files; root validates the complete prior series separately.",
+  "changed_files": [
+    {
+      "path": "runtime/executor/audio/audio_executor_base.h",
+      "before_git_blob": "45149690a9ca2e4094e589e361a05672085bd8ce",
+      "before_sha256": "3c150d5a21747e2c3ec973369878a2e8902542cf1feb66b0f0288bc3d7ae0ea9",
+      "after_sha256": "6c5e84dc11dcbbc0d09795ffdd4a1f87b78b9899c444e43b0804a25b806c06b0"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor.h",
+      "before_git_blob": "d46701579f7f3d54dc409a7c5edf4431b69cfcf5",
+      "before_sha256": "cee1ae077c345f7b0b14657c7e5de98e6064ea9192f58129adb77999f2962525",
+      "after_sha256": "dc80398daa3974a78f6a08c5c9cc82576e053636414214f558d495e315c74bb0"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor.cc",
+      "before_git_blob": "cb072781283cc3601ef232c8330a7aa832650158",
+      "before_sha256": "0240efc2602850bba6bd8c16f4f4523246bf33b07b7277f9480e681541e4812a",
+      "after_sha256": "66ffc14455d5c97307a2c15fa1772abf5e8d63567c321a6fc5e20bfe9938018a"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor_test.cc",
+      "before_git_blob": "da7b8c7568ab4e073eb3819477c4d7d0b2cdb93f",
+      "before_sha256": "7109296b7317797033546b42ab695ee62ca908bad620b0ae20f6a34083e7e6b2",
+      "after_sha256": "abd722a64211c3ecf018cf1a0f3dd894b08f3287579917a5b499d2cf36916218"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager.h",
+      "before_git_blob": "ce818ef78fe13f2c7e397f53aff4d054c5a8b271",
+      "before_sha256": "0ce11830cb18526c4f7540f4b2a41912b8501bacc955a82625baabdaa1315d29",
+      "after_sha256": "a8bbc5ee93bbd8772b37c0c9932105d77cac8997442ddcb9dc8e6af8f82835c6"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager.cc",
+      "before_git_blob": "cfc4892577271475ebd7d09b4d1af45ab856b155",
+      "before_sha256": "dfbe2ed4dae243970b70e2bfe8b15861e802920c686e9c874a2e7fc39fb0b971",
+      "after_sha256": "2d2c78c10a223e4b72e40ea710a18c577089898206099ba160f3eda7bca26f6d"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager_test.cc",
+      "before_git_blob": "52f19f6ee05ca9a9121c064de94683cd1b778641",
+      "before_sha256": "74448170b3937f1531bec84b767500ebffdd53102b1d1d6a9e234f54f0593da3",
+      "after_sha256": "3c62eb2408374119ee7653cab067ca231caf42d70e82052ebaf22a224414391c"
+    },
+    {
+      "path": "runtime/framework/resource_management/threaded_execution_manager.cc",
+      "before_git_blob": "2c09bbfb6c2d7febdc3b0f9d716e1c213467ff4b",
+      "before_sha256": "f31417a9f2df202bc95ac25c85cb68fd3f60c3730405b47f63cbe1a0bc50dc95",
+      "after_sha256": "b0faf897de2ebb5238bcfb61566deae81d2968a0a4fae2f251a448c1c0752658"
+    },
+    {
+      "path": "runtime/framework/resource_management/serial_execution_manager.cc",
+      "before_git_blob": "4c74134f2939916ff79988392129883efdb40007",
+      "before_sha256": "2a190c9baa3fa60881e88d4bd19fdbadee7a5c056dbd9626095078c13b340e2d",
+      "after_sha256": "c8c39845dfc38949a0c1c197d0475408c664b75ca2eb7062f709fd5ff7cc4db1"
+    },
+    {
+      "path": "runtime/framework/resource_management/execution_manager_test.cc",
+      "before_git_blob": "0fc13bfe6eb50d73f0175358d6579d8123dcb1c5",
+      "before_sha256": "ebec83765069bb78b70d2f062eb733bf14d91c70e9b4ebf9d70a8e7fdd3a7662",
+      "after_sha256": "40bac87f1c2b3952789577cc7451ec326b7c0800950f83094e6e0afa6801d3d3"
+    },
+    {
+      "path": "runtime/framework/resource_management/BUILD",
+      "before_git_blob": "3a62edd98f4ff681b9d07d8f076ae0956bd1cd66",
+      "before_sha256": "7639541df49311ee7ffbaf5bac274f82fbb36143d20bfc4506058c5b4aed636e",
+      "after_sha256": "9f1cbb1750fc8b8747a5abc33094aa667e78def8bc91bcf1b6e050beb34a01c5"
+    }
+  ],
+  "evidence_sha256": {
+    "12b-audio-signatures.json": "28937cbba56b710b2dfa4a7c4539219b31c92466aca8fed82b7258cdbc59b0cb",
+    "12b-audio-ranges.json": "0d3103f600ebed6a36b987e95ad8c628b5d62a5b10ef35902d690229d84cf687",
+    "e4b-audio-signatures.json": "7e2ddea638edbaed1d3a4105024da320ec637edac860f4c818be578026050f7c",
+    "e4b-audio-ranges.json": "93afa5c26766561a399620c502666554f98ff86124bee8af5f68315c0947ef9c",
+    "source-receipts.json": "98078d65462ba21333fa733f157b6da76e70ad0d4b6ca4cb6414e7f2eb8f2f3e"
+  },
+  "native_tests": "not_run",
+  "syntax_validation": "blocked; see validation/stateless-audio/syntax-check.json"
+}

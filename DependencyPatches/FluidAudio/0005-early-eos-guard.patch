@@ -1,0 +1,43 @@
+--- a/Sources/FluidAudio/TTS/PocketTTS/PocketTtsConstants.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/PocketTtsConstants.swift
+@@ -42,6 +42,9 @@
+     public static let temperature: Float = 0.7
+     /// flowlm_step EOS logit threshold — above this means the model is done speaking.
+     public static let eosThreshold: Float = -4.0
++
++    /// Ignore premature EOS before speech onset, matching PocketTTS generation.
++    public static let minimumFramesBeforeEos: Int = 6
+     public static let shortTextPadFrames: Int = 3
+     public static let longTextExtraFrames: Int = 1
+     public static let extraFramesAfterDetection: Int = 2
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift
+@@ -528,7 +528,7 @@
+                 sequence: sequence, noise: noise)
+ 
+             // EOS detection
+-            if eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
++            if step >= PocketTtsConstants.minimumFramesBeforeEos && eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
+                 eosStep = step
+                 Self.logger.info("Session chunk \(chunkIndex) (state) EOS at step \(step)")
+             }
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
+@@ -554,7 +554,7 @@
+                             kvState: &kvState
+                         )
+ 
+-                        if eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
++                        if step >= PocketTtsConstants.minimumFramesBeforeEos && eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
+                             eosStep = step
+                             PocketTtsSynthesizer.logger.info(
+                                 "Stream chunk \(chunkIdx + 1) EOS at step \(step)")
+@@ -669,7 +669,7 @@
+                         if Task.isCancelled { break }
+                         let (transformerOut, eosLogit) = try await flowLMStep(
+                             sequence: sequence, kvState: &kvState)
+-                        if eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
++                        if step >= PocketTtsConstants.minimumFramesBeforeEos && eosLogit > PocketTtsConstants.eosThreshold && eosStep == nil {
+                             eosStep = step
+                         }
+                         if let eos = eosStep, step >= eos + totalFramesAfterEos { break }

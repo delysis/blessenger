@@ -1,0 +1,224 @@
+{
+  "scope": "Validation-only offline/streaming parity; not detection latency or app acceptance",
+  "frames": 41,
+  "hop_ms": 80,
+  "clips": 30,
+  "changed_predictions": 0,
+  "inference_ms": {
+    "p50": 1.2301460083108395,
+    "p95": 1.3305555825354531,
+    "max": 1.4961670385673642
+  },
+  "rows": [
+    {
+      "path": "validation/peter/fd65d7a6b70cce92ee5bc784d52168431183bb4dda9af8fa33c39b322a479d5b-0.wav",
+      "label": "peter",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.5473316311836243
+    },
+    {
+      "path": "validation/peter/b3c08cc8ea7880083a62a749edc215989307b26b94c83c15b0aab2e6e4e39169-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.47958168387413025
+    },
+    {
+      "path": "validation/peter/f34e8b66faa602471f3854aabef1ca07319f4ab6eefa00982ecc3462564082fd-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.44473913311958313
+    },
+    {
+      "path": "validation/peter/da73b5c205e4b439cebd0d507481ac85a8839f41c5a21f80ae95213162f8e701-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.48388105630874634
+    },
+    {
+      "path": "validation/peter/3a0960afdbb6837bf754720da8718f3c164d4e0512bb3353ccfa68e41cf61437-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.43332234025001526
+    },
+    {
+      "path": "validation/peter/37847636936e8e14e7c9033ad7533b817d0ce9081cd3b4ba2fa2d529cbd5b0a9-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.45610347390174866
+    },
+    {
+      "path": "validation/peter/0f504446248198aa00b3894444cc9f53b11b600c58e026e0d407d98309c5f583-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.37624451518058777
+    },
+    {
+      "path": "validation/peter/822754f33430dda13cdbf676ffc394a453cb3cf129a0406028112ba36a318cc3-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.5055420994758606
+    },
+    {
+      "path": "validation/peter/33a29a476e5e787b77f41b94f493b74bf4feda33d3b5c5470a01cf474746d531-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.415620893239975
+    },
+    {
+      "path": "validation/peter/6c9b28b87a40fab6c88931346817f77a0f1a5baa305127fd1672a5624231c216-0.wav",
+      "label": "peter",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.5000910758972168
+    },
+    {
+      "path": "validation/gabor/a84d8545b9dbbece8b6b935a6e502192a1d4287f943fb4e1e800797c68005931-0.wav",
+      "label": "gabor",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.5318627953529358
+    },
+    {
+      "path": "validation/gabor/0786f148cdbdd9d34f538af9f6969a79f41657b0aac5f7bb410824145f836a52-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.48619207739830017
+    },
+    {
+      "path": "validation/gabor/1286809b69d16ba944d55c2e0b869ce2c2cf4b1eff4df5afc7070d4552f407a8-0.wav",
+      "label": "gabor",
+      "offline": "peter",
+      "streaming": "peter",
+      "relative_rmse": 0.4485870897769928
+    },
+    {
+      "path": "validation/gabor/812e53de8489e426f7924ed63507b571cba82905bd578b4a03d7782397397d06-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.434666246175766
+    },
+    {
+      "path": "validation/gabor/857ffd21cb3be1736e05dca423af9189a538be45dff0415074b4e1fd683d074e-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.43540483713150024
+    },
+    {
+      "path": "validation/gabor/d9ff4bc1688d14df6c01b06c464a432f45103f6420ad85d7a42a6c4bcf2643e1-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.48953676223754883
+    },
+    {
+      "path": "validation/gabor/b8a14607aeb734017d1ba92077c81516f0dfc9a9cc6f896146b31cc15e8f8ee1-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.38309985399246216
+    },
+    {
+      "path": "validation/gabor/65a55e3c381bd43591e0eaa54b72f94081f748c4f86ba91238e8d271e292e535-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.4825999438762665
+    },
+    {
+      "path": "validation/gabor/ef036d029765d7632781228f789747c4219e93206a4c64f2d592d1997f4686a0-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.4082460105419159
+    },
+    {
+      "path": "validation/gabor/738b81eeb50ea28d20b1a153491433b5c0bea22ab20c72e6690e06d896e5b344-0.wav",
+      "label": "gabor",
+      "offline": "gabor",
+      "streaming": "gabor",
+      "relative_rmse": 0.47144967317581177
+    },
+    {
+      "path": "validation/other/878dc5b8fa941d717050d4b4f5f6c7e2389865f84b1170959ef2ed0888ef2080-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.5031593441963196
+    },
+    {
+      "path": "validation/other/e0648ee8a028bba196853ef7464e2dc88640ef598641a94b4b84e37d1b7a8ba0-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.5146243572235107
+    },
+    {
+      "path": "validation/other/2ac40ca4630426f5a93bfe0ad59e26a648b870dd9a74902e0928589b6cff5f37-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.48949140310287476
+    },
+    {
+      "path": "validation/other/ad390cef0c2fa97611206d2eadcdd4742ab5098effd4a581bcac573227a23b3f-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.4918307065963745
+    },
+    {
+      "path": "validation/other/c95dca5f5246cbbac326d6b1b22677647a85d21b2ea49c091d8f51b18e6929cf-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.47327300906181335
+    },
+    {
+      "path": "validation/other/1d4c804a07d2fbbc5bbe30e95e87df0e41e6403a517bb0f1c2954682187f04d3-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.5184856653213501
+    },
+    {
+      "path": "validation/other/63306e7094413f097587c3d4b963b6e6c5edc7cb61b0a0971c41d23753c11f48-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.49517589807510376
+    },
+    {
+      "path": "validation/other/a7d4b10fa0e8891dc62ec3093963edb70ba4ab0134cc39424fdcea5f70d35300-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.46472564339637756
+    },
+    {
+      "path": "validation/other/f369e35363994bd8172801cfdfa02bfe515a748b5bd22a93ca3c4feba368b422-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.4198801815509796
+    },
+    {
+      "path": "validation/other/98918738d76360ee93282ca600cc82ba8485cc10dc42fd5411a795f209a8d9f2-0.wav",
+      "label": "other",
+      "offline": "other",
+      "streaming": "other",
+      "relative_rmse": 0.49210625886917114
+    }
+  ]
+}

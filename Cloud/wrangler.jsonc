@@ -1,0 +1,11 @@
+{
+ "name":"blessenger",
+ "main":"worker.mjs",
+ "compatibility_date":"2026-10-20",
+ "account_id":"628329f4e6aa6bfa460b9e81e596177d",
+ "workers_dev":true,
+ "assets":{"directory":"./public","binding":"ASSETS","run_worker_first":true},
+ "durable_objects":{"bindings":[{"name":"GATEWAY","class_name":"Gateway"}]},
+ "migrations":[{"tag":"v1","new_sqlite_classes":["Gateway"]}],
+ "observability":{"enabled":false}
+}

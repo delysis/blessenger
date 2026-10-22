@@ -1,0 +1,730 @@
+diff --git a/c/BUILD b/c/BUILD
+index 3a48859..860465a 100644
+--- a/c/BUILD
++++ b/c/BUILD
+@@ -43,6 +43,7 @@ exports_files([
+ ])
+ 
+ ENGINE_LITE_COMMON_DEPS = [
++    "//runtime/core:session_cache_file",
+     ":engine_internal",
+     ":error_reporter_headers",
+     ":error_reporter_internal",
+diff --git a/c/conversation.cc b/c/conversation.cc
+index 7f95486..13f6b7d 100644
+--- a/c/conversation.cc
++++ b/c/conversation.cc
+@@ -12,6 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
++#include "runtime/core/session_cache_file.h"
+ #include "c/conversation.h"
+ 
+ #include <memory>
+@@ -604,6 +605,38 @@ LiteRtLmStatusCode litert_lm_conversation_get_history(
+   return kLiteRtLmStatusOk;
+ }
+ 
++struct LiteRtLmCacheSnapshot {
++  litert::lm::SessionCacheSnapshot value;
++};
++
++LiteRtLmStatusCode litert_lm_conversation_capture_cache(
++    LiteRtLmConversation* conversation, LiteRtLmCacheSnapshot** out_snapshot) {
++  LITERT_LM_C_RETURN_IF_NULL(out_snapshot);
++  *out_snapshot = nullptr;
++  if (!conversation || !conversation->conversation)
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid conversation.");
++  auto result = conversation->conversation->CaptureCache();
++  if (!result.ok()) return litert::lm::c::ToCStatus(result.status());
++  *out_snapshot = new LiteRtLmCacheSnapshot{std::move(*result)};
++  return kLiteRtLmStatusOk;
++}
++
++LiteRtLmStatusCode litert_lm_cache_snapshot_write(
++    const LiteRtLmCacheSnapshot* snapshot, const char* path,
++    const char* compatibility_key, const char* previous_path, size_t* out_written_bytes) {
++  LITERT_LM_C_RETURN_IF_NULL(snapshot);
++  LITERT_LM_C_RETURN_IF_NULL(path);
++  LITERT_LM_C_RETURN_IF_NULL(compatibility_key);
++  const auto& value = snapshot->value;
++  return litert::lm::c::ToCStatus(litert::lm::WriteSessionCacheFile(
++      path, compatibility_key, value.last_prefill_token_id, value.metadata,
++      value.state, previous_path ? previous_path : "", out_written_bytes, true));
++}
++
++void litert_lm_cache_snapshot_delete(LiteRtLmCacheSnapshot* snapshot) {
++  delete snapshot;
++}
++
+ LiteRtLmStatusCode litert_lm_conversation_save_cache(
+     LiteRtLmConversation* conversation, const char* path,
+     const char* compatibility_key) {
+diff --git a/c/conversation.h b/c/conversation.h
+index a3cccca..a44b510 100644
+--- a/c/conversation.h
++++ b/c/conversation.h
+@@ -735,6 +735,21 @@ LiteRtLmStatusCode litert_lm_conversation_count_tokens(
+     const char* extra_context,
+     const LiteRtLmConversationOptionalArgs* optional_args, int* out_count);
+ 
++// Capture runs on the conversation owner thread after a completed turn.
++// The result owns immutable bytes and may be written/deleted on another thread.
++// Never overlap capture with inference. Writing does not access the conversation.
++typedef struct LiteRtLmCacheSnapshot LiteRtLmCacheSnapshot;
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_capture_cache(
++    LiteRtLmConversation* conversation, LiteRtLmCacheSnapshot** out_snapshot);
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_cache_snapshot_write(
++    const LiteRtLmCacheSnapshot* snapshot, const char* path,
++    const char* compatibility_key, const char* previous_path,
++    size_t* out_written_bytes);
++LITERT_LM_C_API_EXPORT
++void litert_lm_cache_snapshot_delete(LiteRtLmCacheSnapshot* snapshot);
++
+ #ifdef __cplusplus
+ }  // extern "C"
+ #endif
+diff --git a/runtime/conversation/conversation.cc b/runtime/conversation/conversation.cc
+index 8eb1ef4..67f5d74 100644
+--- a/runtime/conversation/conversation.cc
++++ b/runtime/conversation/conversation.cc
+@@ -1026,6 +1026,20 @@ absl::Status Conversation::SaveCache(absl::string_view path,
+   return session_->SaveCache(path, compatibility_key);
+ }
+ 
++absl::StatusOr<SessionCacheSnapshot> Conversation::CaptureCache() {
++  ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
++  absl::MutexLock lock(history_mutex_);
++  if (is_appending_message_ || checkpoint_message_index_.has_value() ||
++      history_.empty() || !history_.back().is_object() ||
++      !history_.back().contains("role") ||
++      history_.back()["role"] != "assistant") {
++    return absl::FailedPreconditionError(
++        "Conversation cache requires a completed assistant turn.");
++  }
++  ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_));
++  return session_->CaptureCache();
++}
++
+ absl::Status Conversation::LoadCache(absl::string_view path,
+                                     absl::string_view compatibility_key,
+                                     std::vector<Message> history) {
+diff --git a/runtime/conversation/conversation.h b/runtime/conversation/conversation.h
+index b3e1c3d..5327db5 100644
+--- a/runtime/conversation/conversation.h
++++ b/runtime/conversation/conversation.h
+@@ -672,6 +672,7 @@ class Conversation {
+   // Supports alternating user/assistant text or user audio turns. Prefilled
+   // prefaces, channel filtering, constraints, tools, and pending messages are
+   // not supported. Session::SaveCache restrictions also apply.
++  absl::StatusOr<SessionCacheSnapshot> CaptureCache();
+   absl::Status SaveCache(absl::string_view path,
+                         absl::string_view compatibility_key);
+ 
+diff --git a/runtime/core/session_advanced.cc b/runtime/core/session_advanced.cc
+index b4629c4..7772b68 100644
+--- a/runtime/core/session_advanced.cc
++++ b/runtime/core/session_advanced.cc
+@@ -495,6 +495,12 @@ SessionAdvanced::~SessionAdvanced() {
+ 
+ absl::Status SessionAdvanced::SaveCache(absl::string_view path,
+                                        absl::string_view compatibility_key) {
++  ABSL_ASSIGN_OR_RETURN(auto snapshot, CaptureCache());
++  return WriteSessionCacheFile(path, compatibility_key,
++      snapshot.last_prefill_token_id, snapshot.metadata, snapshot.state);
++}
++
++absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache() {
+   absl::MutexLock lock(mutex_);
+   if (session_state_ != SessionState::kDecoded) {
+     return absl::FailedPreconditionError(
+@@ -509,9 +515,8 @@ absl::Status SessionAdvanced::SaveCache(absl::string_view path,
+   ABSL_ASSIGN_OR_RETURN(
+       auto context,
+       manager->SerializeSessionContext(session_id_, last_task_ids_));
+-  return WriteSessionCacheFile(path, compatibility_key,
+-                              session_info_->last_prefill_token_id,
+-                              context.metadata, context.state);
++  return SessionCacheSnapshot{session_info_->last_prefill_token_id,
++                              std::move(context.metadata), std::move(context.state)};
+ }
+ 
+ absl::Status SessionAdvanced::LoadCache(absl::string_view path,
+diff --git a/runtime/core/session_advanced.h b/runtime/core/session_advanced.h
+index b47a908..32354c9 100644
+--- a/runtime/core/session_advanced.h
++++ b/runtime/core/session_advanced.h
+@@ -166,6 +166,7 @@ class SessionAdvanced : public SessionInterface {
+ 
+   absl::StatusOr<BenchmarkInfo*> GetMutableBenchmarkInfo() override;
+ 
++  absl::StatusOr<SessionCacheSnapshot> CaptureCache() override;
+   absl::Status SaveCache(absl::string_view path,
+                          absl::string_view compatibility_key) override
+       ABSL_LOCKS_EXCLUDED(mutex_);
+diff --git a/runtime/core/session_cache_file.cc b/runtime/core/session_cache_file.cc
+index 4c705fb..27b5b72 100644
+--- a/runtime/core/session_cache_file.cc
++++ b/runtime/core/session_cache_file.cc
+@@ -15,6 +15,11 @@
+ #include "runtime/core/session_cache_file.h"
+ 
+ #include <atomic>
++#include <algorithm>
++#include <cstring>
++#if defined(__APPLE__)
++#include <sys/clonefile.h>
++#endif
+ #include <cerrno>
+ #include <chrono>
+ #include <cstddef>
+@@ -51,6 +56,9 @@ namespace litert::lm {
+ namespace {
+ 
+ constexpr absl::string_view kMagic = "LRTLMCS1";
++constexpr absl::string_view kIncrementalMagic = "LRTLMCS2";
++// Stable tensor offsets across growing conversation metadata. Sparse on first write.
++constexpr size_t kStateOffset = 16 * 1024 * 1024 + 8192;
+ constexpr size_t kHeaderSize = 40;
+ constexpr size_t kMaxKeySize = 4096;
+ constexpr size_t kMaxMetadataSize = 16 * 1024 * 1024;
+@@ -104,12 +112,15 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+                                    absl::string_view compatibility_key,
+                                    int last_prefill_token_id,
+                                    absl::string_view metadata,
+-                                   absl::string_view state) {
++                                   absl::string_view state,
++                                   absl::string_view previous_path, size_t* written_bytes,
++                                   bool incremental) {
++  if (written_bytes) *written_bytes = 0;
+   ABSL_RETURN_IF_ERROR(CheckArguments(path, compatibility_key));
+   if (metadata.empty() || metadata.size() > kMaxMetadataSize || state.empty()) {
+     return absl::InvalidArgumentError("Invalid session cache payload.");
+   }
+-  std::string header(kMagic);
++  std::string header(incremental ? kIncrementalMagic : kMagic);
+   AppendLittleEndian(header, compatibility_key.size(), 8);
+   AppendLittleEndian(header, metadata.size(), 8);
+   AppendLittleEndian(header, state.size(), 8);
+@@ -122,6 +133,14 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+   const auto destination = std::filesystem::u8path(path.begin(), path.end());
+   std::filesystem::path temporary;
+   FILE* file = nullptr;
++  std::unique_ptr<MemoryMappedFile> previous;
++#if defined(__APPLE__)
++  if (incremental && !previous_path.empty()) {
++    auto mapped = MemoryMappedFile::Create(previous_path, MemoryMappedFile::Access::kRead);
++    if (!mapped.ok()) return mapped.status();
++    previous = std::move(*mapped);
++  }
++#endif
+   static std::atomic<uint64_t> sequence{0};
+   for (int attempt = 0; attempt < 16 && file == nullptr; ++attempt) {
+     temporary = destination;
+@@ -131,7 +150,23 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+ #if defined(_WIN32)
+     file = _wfopen(temporary.c_str(), L"wbx");
+ #else
+-    file = std::fopen(temporary.c_str(), "wbx");
++#if defined(__APPLE__)
++    if (previous) {
++      const std::string previous_name(previous_path);
++      if (clonefile(previous_name.c_str(), temporary.c_str(), 0) == 0) {
++        file = std::fopen(temporary.c_str(), "r+b");
++        if (file == nullptr) {
++          const int saved = errno;
++          std::filesystem::remove(temporary);
++          return absl::ErrnoToStatus(saved, "Could not open cloned checkpoint.");
++        }
++      } else if (errno == ENOTSUP || errno == EXDEV) {
++        previous.reset();  // Correct full-write fallback on non-cloning volumes.
++        file = std::fopen(temporary.c_str(), "wbx");
++      }
++    } else
++#endif
++    { file = std::fopen(temporary.c_str(), "wbx"); }
+ #endif
+     if (file == nullptr && errno != EEXIST) {
+       return absl::ErrnoToStatus(errno, "Could not create session cache.");
+@@ -153,7 +188,44 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+   ABSL_RETURN_IF_ERROR(WriteAll(file, header));
+   ABSL_RETURN_IF_ERROR(WriteAll(file, compatibility_key));
+   ABSL_RETURN_IF_ERROR(WriteAll(file, metadata));
+-  ABSL_RETURN_IF_ERROR(WriteAll(file, state));
++  size_t changed_bytes = header.size() + compatibility_key.size() + metadata.size();
++  const size_t state_offset = incremental ? kStateOffset :
++      header.size() + compatibility_key.size() + metadata.size();
++  if (std::fseek(file, state_offset, SEEK_SET) != 0)
++    return absl::ErrnoToStatus(errno, "Could not seek checkpoint payload.");
++  // Compare immutable captured bytes with the previous immutable file. All reads,
++  // hashing, clone I/O and durability happen after capture, outside the executor.
++  // APFS copy-on-write blocks are 4 KiB. Compare in larger runs first, then
++  // refine changed runs so sparse KV column updates do not amplify disk writes.
++  constexpr size_t kCompareBytes = 64 * 1024;
++  constexpr size_t kBlockBytes = 4096;
++  auto unchanged = [&](size_t offset, size_t size) {
++    const size_t position = state_offset + offset;
++    return previous && position <= previous->length() &&
++        size <= previous->length() - position &&
++        std::memcmp(static_cast<const char*>(previous->data()) + position,
++                    state.data() + offset, size) == 0;
++  };
++  if (!previous) {
++    ABSL_RETURN_IF_ERROR(WriteAll(file, state));
++    changed_bytes += state.size();
++  }
++  for (size_t offset = 0; previous && offset < state.size(); offset += kCompareBytes) {
++    const size_t count = std::min(kCompareBytes, state.size() - offset);
++    if (unchanged(offset, count)) continue;
++    for (size_t inner = 0; inner < count; inner += kBlockBytes) {
++      const size_t size = std::min(kBlockBytes, count - inner);
++      if (unchanged(offset + inner, size)) continue;
++      if (std::fseek(file, state_offset + offset + inner, SEEK_SET) != 0)
++        return absl::ErrnoToStatus(errno, "Could not seek changed checkpoint block.");
++      ABSL_RETURN_IF_ERROR(WriteAll(file, state.substr(offset + inner, size)));
++      changed_bytes += size;
++    }
++  }
++#if !defined(_WIN32)
++  if (std::fflush(file) != 0 || ftruncate(fileno(file), state_offset + state.size()) != 0)
++    return absl::ErrnoToStatus(errno, "Could not size checkpoint.");
++#endif
+   if (std::fflush(file) != 0) {
+     return absl::ErrnoToStatus(errno, "Could not flush session cache.");
+   }
+@@ -200,6 +272,7 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+         sync_errno, "Cache published; directory durability is uncertain.");
+   }
+ #endif
++  if (written_bytes) *written_bytes = changed_bytes;
+   return absl::OkStatus();
+ }
+ 
+@@ -216,7 +289,7 @@ absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
+   absl::string_view bytes(static_cast<const char*>(mapping->data()),
+                          static_cast<size_t>(mapping->length()));
+   const auto header = bytes.substr(0, kHeaderSize);
+-  if (header.substr(0, 8) != kMagic) {
++  if (header.substr(0, 8) != kMagic && header.substr(0, 8) != kIncrementalMagic) {
+     return absl::InvalidArgumentError("Unsupported session cache format.");
+   }
+   const uint64_t key_size = ReadLittleEndian(header.substr(8, 8));
+@@ -234,6 +307,12 @@ absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
+   }
+   const auto metadata = bytes.substr(0, metadata_size);
+   bytes.remove_prefix(metadata_size);
++  if (header.substr(0, 8) == kIncrementalMagic) {
++    const size_t consumed = kHeaderSize + key_size + metadata_size;
++    if (consumed > kStateOffset || kStateOffset - consumed > bytes.size())
++      return absl::DataLossError("Invalid aligned checkpoint payload.");
++    bytes.remove_prefix(kStateOffset - consumed);
++  }
+   if (state_size == 0 || state_size != bytes.size()) {
+     return absl::DataLossError("Invalid session cache state length.");
+   }
+diff --git a/runtime/core/session_cache_file.h b/runtime/core/session_cache_file.h
+index 2bac194..05da7db 100644
+--- a/runtime/core/session_cache_file.h
++++ b/runtime/core/session_cache_file.h
+@@ -40,7 +40,10 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+                                   absl::string_view compatibility_key,
+                                   int last_prefill_token_id,
+                                   absl::string_view metadata,
+-                                  absl::string_view state);
++                                  absl::string_view state,
++                                  absl::string_view previous_path = "",
++                                  size_t* written_bytes = nullptr,
++                                  bool incremental = false);
+ 
+ // Checks framing, compatibility key, and checksum before returning any views.
+ // The application must not modify/truncate a published cache file in place.
+diff --git a/runtime/core/session_cache_file_test.cc b/runtime/core/session_cache_file_test.cc
+index fb0471c..cc32009 100644
+--- a/runtime/core/session_cache_file_test.cc
++++ b/runtime/core/session_cache_file_test.cc
+@@ -15,6 +15,11 @@
+ #include "runtime/core/session_cache_file.h"
+ 
+ #include <chrono>
++#if !defined(_WIN32)
++#include <signal.h>
++#include <sys/wait.h>
++#include <unistd.h>
++#endif
+ #include <filesystem>
+ #include <fstream>
+ #include <iterator>
+@@ -125,5 +130,79 @@ TEST_F(SessionCacheFileTest, PublicationFailureRemovesOnlyTemporaryFile) {
+                           std::filesystem::directory_iterator()), 1);
+ }
+ 
++
++TEST_F(SessionCacheFileTest, IncrementalClonePreservesParentAndGrowingMetadata) {
++  std::string before(3 * 65536 + 17, 'a');
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "old-key", 1, "small", before, "", nullptr, true).ok());
++  const auto parent_bytes = ReadBytes();
++  const auto child = (directory_ / "child.cache").string();
++  std::string after = before;
++  after[65536 + 9] = 'z';
++  after.back() = 'q';
++  size_t written = 0;
++  ASSERT_TRUE(WriteSessionCacheFile(child, "new-key", 2, std::string(8192, 'm'),
++                                   after, path_, &written, true).ok());
++#if defined(__APPLE__)
++  EXPECT_LT(written, after.size());
++#endif
++  EXPECT_EQ(ReadBytes(), parent_bytes);
++  auto restored = ReadSessionCacheFile(child, "new-key");
++  ASSERT_TRUE(restored.ok()) << restored.status();
++  EXPECT_EQ(restored->state, after);
++  EXPECT_EQ(restored->metadata, std::string(8192, 'm'));
++  EXPECT_EQ(restored->last_prefill_token_id, 2);
++  EXPECT_FALSE(ReadSessionCacheFile(child, "old-key").ok());
++}
++
++TEST_F(SessionCacheFileTest, IncrementalCloneCanShrinkAndRepairsCorruptParentData) {
++  std::string before(4 * 65536, 'a');
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "key", 1, "metadata", before, "", nullptr, true).ok());
++  auto corrupt = ReadBytes();
++  corrupt.back() = 'x';
++  ReplaceBytes(corrupt);
++  const auto child = (directory_ / "child.cache").string();
++  ASSERT_TRUE(WriteSessionCacheFile(child, "key", 2, "metadata", before, path_, nullptr, true).ok());
++  auto repaired = ReadSessionCacheFile(child, "key");
++  ASSERT_TRUE(repaired.ok()) << repaired.status();
++  EXPECT_EQ(repaired->state, before);
++  before.resize(123);
++  const auto short_path = (directory_ / "short.cache").string();
++  ASSERT_TRUE(WriteSessionCacheFile(short_path, "key", 3, "m", before, child, nullptr, true).ok());
++  auto shortened = ReadSessionCacheFile(short_path, "key");
++  ASSERT_TRUE(shortened.ok()) << shortened.status();
++  EXPECT_EQ(shortened->state, before);
++}
++
++
++#if !defined(_WIN32)
++TEST_F(SessionCacheFileTest, ProcessDeathLeavesOnlyOldOrCompleteNewCheckpoint) {
++  const std::string old_state(8 * 1024 * 1024, 'a');
++  const std::string new_state(8 * 1024 * 1024, 'b');
++  for (const int delay_us : {0, 100, 1000, 5000, 20000, 100000}) {
++    ASSERT_TRUE(WriteSessionCacheFile(path_, "key", 1, "old", old_state, "", nullptr, true).ok());
++    const pid_t child = fork();
++    ASSERT_GE(child, 0);
++    if (child == 0) {
++      const auto status = WriteSessionCacheFile(path_, "key", 2, "new", new_state, path_, nullptr, true);
++      _exit(status.ok() ? 0 : 1);
++    }
++    usleep(delay_us);
++    kill(child, SIGKILL);
++    int status = 0;
++    ASSERT_EQ(waitpid(child, &status, 0), child);
++    auto restored = ReadSessionCacheFile(path_, "key");
++    ASSERT_TRUE(restored.ok()) << restored.status();
++    if (restored->last_prefill_token_id == 1) {
++      EXPECT_EQ(restored->metadata, "old");
++      EXPECT_EQ(restored->state, old_state);
++    } else {
++      EXPECT_EQ(restored->last_prefill_token_id, 2);
++      EXPECT_EQ(restored->metadata, "new");
++      EXPECT_EQ(restored->state, new_state);
++    }
++  }
++}
++#endif
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/engine/engine.h b/runtime/engine/engine.h
+index 89173e0..315e4b1 100644
+--- a/runtime/engine/engine.h
++++ b/runtime/engine/engine.h
+@@ -17,6 +17,7 @@
+ 
+ #include <memory>
+ #include <optional>
++#include <string>
+ #include <vector>
+ 
+ #include "absl/base/attributes.h"  // from @com_google_absl
+@@ -35,6 +36,13 @@
+ #include "support/tokenizer/tokenizer.h"
+ 
+ namespace litert::lm {
++// Immutable owned bytes, independent of the executor after CaptureCache returns.
++struct SessionCacheSnapshot {
++  int last_prefill_token_id;
++  std::string metadata;
++  std::string state;
++};
++
+ 
+ // Engine is the interface for the LLM runtime. It is responsible for
+ // - Initializing the LLM model and related resources, e.g. tokenizer,
+@@ -320,6 +328,9 @@ class SessionInterface {
+   // tokenizer, runtime/delegate build, and execution/session configuration.
+   // Reuse the identity verified at installation; a filename is not an identity.
+   // This saves model context, not Conversation history or named checkpoints.
++  virtual absl::StatusOr<SessionCacheSnapshot> CaptureCache() {
++    return absl::UnimplementedError("Session cache snapshot not implemented.");
++  }
+   virtual absl::Status SaveCache(absl::string_view path,
+                                 absl::string_view compatibility_key) {
+     return absl::UnimplementedError("Session cache persistence not implemented.");
+diff --git a/runtime/executor/litert/BUILD b/runtime/executor/litert/BUILD
+index faf4b1a..6ab3153 100644
+--- a/runtime/executor/litert/BUILD
++++ b/runtime/executor/litert/BUILD
+@@ -13,6 +13,7 @@
+ # limitations under the License.
+ 
+ # [Google-internal load of `cc_library`]
++load("@rules_cc//cc:objc_library.bzl", "objc_library")
+ 
+ package(
+     default_hdrs_check = "strict",
+@@ -104,8 +105,12 @@ cc_library(
+ cc_library(
+     name = "state_serialization",
+     srcs = ["state_serialization.cc"],
+-    hdrs = ["state_serialization.h"],
+-    deps = [
++    hdrs = ["state_serialization.h", "metal_snapshot.h"],
++    deps = select({
++        "@platforms//os:macos": [":metal_snapshot"],
++        "@platforms//os:ios": [":metal_snapshot"],
++        "//conditions:default": [],
++    }) + [
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/crc:crc32c",
+         "@com_google_absl//absl/status",
+@@ -133,7 +138,7 @@ cc_test(
+         "@com_google_googletest//:gtest_main",
+         "@litert//litert/c/internal:litert_tensor_buffer_registry",
+         "@litert//litert/c:litert_custom_tensor_buffer",
+-        "@litert//litert/c:litert_environment_options_header",
++        "@litert//litert/c:litert_environment_options",
+         "@litert//litert/c:litert_tensor_buffer",
+         "@litert//litert/cc:litert_element_type",
+         "@litert//litert/cc:litert_environment",
+@@ -146,3 +151,14 @@ cc_test(
+         "//runtime/util:test_utils",
+     ],
+ )
++
++objc_library(
++    name = "metal_snapshot",
++    srcs = select({
++        "@platforms//os:macos": ["metal_snapshot.mm"],
++        "@platforms//os:ios": ["metal_snapshot.mm"],
++        "//conditions:default": [],
++    }),
++    hdrs = ["metal_snapshot.h"],
++    sdk_frameworks = ["Metal"],
++)
+diff --git a/runtime/executor/litert/metal_snapshot.h b/runtime/executor/litert/metal_snapshot.h
+new file mode 100644
+index 0000000..926afc6
+--- /dev/null
++++ b/runtime/executor/litert/metal_snapshot.h
+@@ -0,0 +1,21 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#pragma once
++#include <cstddef>
++namespace litert::lm {
++// Caller owns an idle executor; the tensor completion event has been waited.
++// Only exact-size shared buffers are supported. No logical-layout conversion.
++void* SharedMetalSnapshotBytes(void* buffer, size_t bytes);
++}
+diff --git a/runtime/executor/litert/metal_snapshot.mm b/runtime/executor/litert/metal_snapshot.mm
+new file mode 100644
+index 0000000..e636d81
+--- /dev/null
++++ b/runtime/executor/litert/metal_snapshot.mm
+@@ -0,0 +1,24 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/litert/metal_snapshot.h"
++#import <Metal/Metal.h>
++namespace litert::lm {
++void* SharedMetalSnapshotBytes(void* handle, size_t bytes) {
++  id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)handle;
++  if (buffer == nil || buffer.storageMode != MTLStorageModeShared ||
++      buffer.length != bytes) return nullptr;
++  return buffer.contents;
++}
++}
+diff --git a/runtime/executor/litert/state_serialization.cc b/runtime/executor/litert/state_serialization.cc
+index 37c46e5..870c846 100644
+--- a/runtime/executor/litert/state_serialization.cc
++++ b/runtime/executor/litert/state_serialization.cc
+@@ -15,6 +15,9 @@
+ #include "runtime/executor/litert/state_serialization.h"
+ 
+ #include <algorithm>
++#if defined(__APPLE__)
++#include "runtime/executor/litert/metal_snapshot.h"
++#endif
+ #include <cstddef>
+ #include <cstdint>
+ #include <cstring>
+@@ -238,6 +241,45 @@ absl::StatusOr<void*> LockForTransfer(TensorBuffer& buffer,
+   return *data;
+ }
+ 
++// Version 2 is deliberately restricted to homogeneous, exact-size shared
++// Metal INT8/FP16 tensors. The compatibility key must include the delegate build.
++// Version 1 remains readable and remains the format for other providers.
++bool IsPhysicalMetal(const TensorBuffer& buffer) {
++#if defined(__APPLE__)
++  auto storage = buffer.BufferType();
++  auto type = buffer.TensorType();
++  auto handle = buffer.GetMetalBuffer();
++  return storage && type && handle && *handle != nullptr &&
++      ((*storage == TensorBufferType::kMetalBuffer &&
++        type->ElementType() == ElementType::Int8) ||
++       (*storage == TensorBufferType::kMetalBufferFp16 &&
++        type->ElementType() == ElementType::Float16));
++#else
++  return false;
++#endif
++}
++
++absl::StatusOr<void*> PhysicalMetalBytes(const TensorBuffer& source, size_t bytes) {
++#if defined(__APPLE__)
++  if (!IsPhysicalMetal(source))
++    return absl::InvalidArgumentError("Physical Metal snapshot storage mismatch.");
++  // A completed executor operation owns the fence. Still honor any buffer event.
++  LITERT_ASSIGN_OR_RETURN(auto buffer, source.Duplicate());
++  if (buffer.HasEvent()) {
++    LITERT_ASSIGN_OR_RETURN(auto event, buffer.GetEvent());
++    LITERT_RETURN_IF_ERROR(event.Wait(-1));
++  }
++  LITERT_RETURN_IF_ERROR(buffer.ReleaseHostStagingMemory());
++  LITERT_ASSIGN_OR_RETURN(auto handle, buffer.GetMetalBuffer());
++  void* data = SharedMetalSnapshotBytes(handle, bytes);
++  if (data == nullptr)
++    return absl::UnimplementedError("Physical snapshot requires exact-size shared Metal storage.");
++  return data;
++#else
++  return absl::UnimplementedError("Physical Metal snapshot requires Apple Metal.");
++#endif
++}
++
+ }  // namespace
+ 
+ absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer) {
+@@ -277,8 +319,11 @@ absl::StatusOr<std::string> SerializeState(
+     descriptor["name"] = name;
+     tensors.push_back(std::move(descriptor));
+   }
++  const bool physical_metal = !buffers.empty() &&
++      std::all_of(buffers.begin(), buffers.end(),
++                  [](const auto& item) { return IsPhysicalMetal(item.second); });
+   const std::string header =
+-      nlohmann::json({{"version", 1},
++      nlohmann::json({{"version", physical_metal ? 2 : 1},
+                       {"byte_order", ByteOrder()},
+                       {"metadata", metadata},
+                       {"tensors", std::move(tensors)}})
+@@ -300,6 +345,11 @@ absl::StatusOr<std::string> SerializeState(
+     LITERT_ASSIGN_OR_RETURN(size_t bytes, source.PackedSize());
+     ABSL_ASSIGN_OR_RETURN(size_t offset, TransferOffset(source, bytes));
+     if (bytes != 0) {
++      if (physical_metal) {
++        ABSL_ASSIGN_OR_RETURN(void* data, PhysicalMetalBytes(source, bytes));
++        result.append(static_cast<const char*>(data), bytes);
++        continue;
++      }
+       // Duplicate only the handle, never the tensor payload.
+       LITERT_ASSIGN_OR_RETURN(auto buffer, source.Duplicate());
+       LITERT_RETURN_IF_ERROR(buffer.ReleaseHostStagingMemory());
+@@ -344,11 +394,11 @@ absl::StatusOr<ParsedSerializedState> ParseSerializedState(
+     return absl::DataLossError("Invalid serialized state JSON header.");
+   }
+   uint64_t version;
+-  if (!UnsignedInteger(header["version"], version) || version != 1 ||
++  if (!UnsignedInteger(header["version"], version) || (version != 1 && version != 2) ||
+       !header["byte_order"].is_string() || header["byte_order"] != ByteOrder()) {
+     return absl::FailedPreconditionError("Incompatible serialized state format.");
+   }
+-  ParsedSerializedState result{std::move(header["metadata"]), {}};
++  ParsedSerializedState result{std::move(header["metadata"]), {}, version == 2};
+   size_t position = kPrefixBytes + header_bytes;
+   for (auto& tensor : header["tensors"]) {
+     if (!tensor.is_object() || tensor.size() != 4 ||
+@@ -387,6 +437,10 @@ absl::Status ValidateSerializedState(const ParsedSerializedState& state,
+       return absl::InvalidArgumentError("State tensor name mismatch.");
+     }
+     previous_name = tensor.name;
++    if (state.physical_metal) {
++      ABSL_ASSIGN_OR_RETURN(auto data, PhysicalMetalBytes(it->second, tensor.bytes.size()));
++      (void)data;
++    }
+     ABSL_ASSIGN_OR_RETURN(auto expected, DescribeStateTensor(it->second));
+     if (tensor.descriptor.dump() != expected.dump() ||
+         tensor.bytes.size() != expected["bytes"].get<size_t>()) {
+@@ -408,6 +462,11 @@ absl::Status LoadSerializedState(const ParsedSerializedState& state,
+     ABSL_ASSIGN_OR_RETURN(size_t offset,
+                           TransferOffset(buffer, tensor.bytes.size()));
+     if (!tensor.bytes.empty()) {
++      if (state.physical_metal) {
++        ABSL_ASSIGN_OR_RETURN(void* data, PhysicalMetalBytes(buffer, tensor.bytes.size()));
++        std::memcpy(data, tensor.bytes.data(), tensor.bytes.size());
++        continue;
++      }
+       ABSL_ASSIGN_OR_RETURN(
+           void* data, LockForTransfer(buffer, TensorBuffer::LockMode::kWrite));
+       std::memcpy(static_cast<char*>(data) + offset, tensor.bytes.data(),
+diff --git a/runtime/executor/litert/state_serialization.h b/runtime/executor/litert/state_serialization.h
+index f1a0a3c..2c43491 100644
+--- a/runtime/executor/litert/state_serialization.h
++++ b/runtime/executor/litert/state_serialization.h
+@@ -39,6 +39,7 @@ struct SerializedStateTensor {
+ struct ParsedSerializedState {
+   nlohmann::json metadata;
+   std::vector<SerializedStateTensor> tensors;
++  bool physical_metal = false;
+ };
+ 
+ // Returns {"type": integer, "shape": [dimensions], "bytes": integer}.
+diff --git a/runtime/executor/litert/state_serialization_test.cc b/runtime/executor/litert/state_serialization_test.cc
+index ee6b4ba..096d981 100644
+--- a/runtime/executor/litert/state_serialization_test.cc
++++ b/runtime/executor/litert/state_serialization_test.cc
+@@ -284,7 +284,7 @@ TEST_F(StateSerializationTest, RejectsDuplicateNamesAndUnsupportedVersion) {
+   header["tensors"][1]["name"] = "a";
+   EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header)).ok());
+   header = Header(serialized);
+-  header["version"] = 2;
++  header["version"] = 3;
+   EXPECT_THAT(ParseSerializedState(ReplaceHeader(serialized, header)),
+               StatusIs(absl::StatusCode::kFailedPrecondition));
+   header = Header(serialized);

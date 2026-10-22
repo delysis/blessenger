@@ -1,0 +1,976 @@
+diff --git a/litert/build_common/export_litert_runtime_cmake_linux.lds b/litert/build_common/export_litert_runtime_cmake_linux.lds
+--- a/litert/build_common/export_litert_runtime_cmake_linux.lds
++++ b/litert/build_common/export_litert_runtime_cmake_linux.lds
+@@ -19,6 +19,7 @@
+     /* All LiteRt C APIs */
+     LiteRt*;
+     kLiteRtRuntimeBuiltin;
++    kLiteRtRuntimeHostStagingMemoryApi;
+ 
+     /* C options API (c/options/*.h) */
+     Lrt*;
+diff --git a/litert/build_common/export_litert_runtime_only_darwin.lds b/litert/build_common/export_litert_runtime_only_darwin.lds
+--- a/litert/build_common/export_litert_runtime_only_darwin.lds
++++ b/litert/build_common/export_litert_runtime_only_darwin.lds
+@@ -1,3 +1,4 @@
+ # All LiteRt C APIs
+ _LiteRt*
+ _kLiteRtRuntimeBuiltin
++_kLiteRtRuntimeHostStagingMemoryApi
+diff --git a/litert/build_common/export_litert_runtime_only_linux.lds b/litert/build_common/export_litert_runtime_only_linux.lds
+--- a/litert/build_common/export_litert_runtime_only_linux.lds
++++ b/litert/build_common/export_litert_runtime_only_linux.lds
+@@ -12,6 +12,7 @@
+     /* All LiteRt C APIs */
+     LiteRt*;
+     kLiteRtRuntimeBuiltin;
++    kLiteRtRuntimeHostStagingMemoryApi;
+ 
+   local:
+ 
+diff --git a/litert/build_common/export_litert_tflite_runtime_darwin.lds b/litert/build_common/export_litert_tflite_runtime_darwin.lds
+--- a/litert/build_common/export_litert_tflite_runtime_darwin.lds
++++ b/litert/build_common/export_litert_tflite_runtime_darwin.lds
+@@ -2,3 +2,4 @@
+ _LiteRt*
+ _TfLite*
+ _kLiteRtRuntimeBuiltin
++_kLiteRtRuntimeHostStagingMemoryApi
+diff --git a/litert/build_common/export_litert_tflite_runtime_linux.lds b/litert/build_common/export_litert_tflite_runtime_linux.lds
+--- a/litert/build_common/export_litert_tflite_runtime_linux.lds
++++ b/litert/build_common/export_litert_tflite_runtime_linux.lds
+@@ -12,6 +12,7 @@
+     /* All LiteRt C APIs */
+     LiteRt*;
+     kLiteRtRuntimeBuiltin;
++    kLiteRtRuntimeHostStagingMemoryApi;
+ 
+     /* All TfLite C APIs */
+     _TfLite*;
+diff --git a/litert/c/internal/BUILD b/litert/c/internal/BUILD
+--- a/litert/c/internal/BUILD
++++ b/litert/c/internal/BUILD
+@@ -72,6 +72,8 @@
+     srcs = ["litert_abi_header_test.cc"],
+     deps = [
+         ":litert_abi_header",
++        ":litert_accelerator_def",
++        ":litert_custom_tensor_buffer_handlers_def",
+         "@com_google_googletest//:gtest_main",
+     ],
+ )
+@@ -589,6 +591,7 @@
+         "//litert/cc/internal:__pkg__",
+     ],
+     deps = [
++        ":litert_abi_header",
+         ":litert_accelerator_header",
+         ":litert_scheduling_info",
+         "//litert/c:litert_any",
+@@ -680,6 +683,11 @@
+ cc_library(
+     name = "litert_runtime_builtin_dynamic",
+     srcs = ["litert_runtime_builtin.cc"],
++    local_defines = ["LITERT_CC_RUNTIME_BUILTIN_DYNAMIC"],
++    linkopts = select({
++        "//litert:windows": [],
++        "//conditions:default": ["-ldl"],
++    }),
+     # The visibility is for testing only, otherwise it would be private.
+     visibility = [
+         "//litert/cc/internal:__pkg__",
+@@ -734,6 +742,7 @@
+ filegroup(
+     name = "litert_cc_sdk_files",
+     srcs = [
++        "litert_abi_header.h",
+         "litert_accelerator.h",
+         "litert_logging.cc",
+         "litert_logging.h",
+diff --git a/litert/c/internal/litert_abi_header_test.cc b/litert/c/internal/litert_abi_header_test.cc
+--- a/litert/c/internal/litert_abi_header_test.cc
++++ b/litert/c/internal/litert_abi_header_test.cc
+@@ -18,9 +18,60 @@
+ 
+ #include <gtest/gtest.h>
+ 
++#include "litert/c/internal/litert_accelerator_def.h"
++#include "litert/c/internal/litert_custom_tensor_buffer_handlers_def.h"
++
+ namespace {
+ 
+ int DummyFunc() { return 0; }
++
++LiteRtStatus ReleaseHostStagingMemory(HwMemoryInfoPtr) {
++  return kLiteRtStatusOk;
++}
++
++TEST(LiteRtAbiHeaderTest, CustomBufferHostStagingCapability) {
++  LiteRtCustomTensorBufferHandlersDef old = {};
++  old.abi_header = {sizeof(old), 1, 0, 0};
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&old), nullptr);
++  old.abi_header.minor_version = 1;
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&old), nullptr);
++
++  LiteRtCustomTensorBufferHandlersDefV1_1 def = {};
++  def.v1.abi_header = {sizeof(def), 1, 1, 0};
++  def.release_host_staging_memory = ReleaseHostStagingMemory;
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&def.v1),
++            ReleaseHostStagingMemory);
++  --def.v1.abi_header.struct_size;
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&def.v1), nullptr);
++  ++def.v1.abi_header.struct_size;
++  def.v1.abi_header.minor_version = 0;
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&def.v1), nullptr);
++  def.v1.abi_header = {sizeof(def), 2, 1, 0};
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(&def.v1), nullptr);
++  EXPECT_EQ(LiteRtGetCustomTensorBufferHostStagingMemoryHandler(nullptr), nullptr);
++}
++
++TEST(LiteRtAbiHeaderTest, AcceleratorHostStagingCapability) {
++  LiteRtAcceleratorDefV1 old = {};
++  old.abi_header = {sizeof(old), 1, 0, 0};
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&old), nullptr);
++  old.abi_header.minor_version = 1;
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&old), nullptr);
++
++  LiteRtAcceleratorDefV1_1 def = {};
++  def.v1.abi_header = {sizeof(def), 1, 1, 0};
++  def.release_host_staging_memory = ReleaseHostStagingMemory;
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&def.v1),
++            ReleaseHostStagingMemory);
++  --def.v1.abi_header.struct_size;
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&def.v1), nullptr);
++  ++def.v1.abi_header.struct_size;
++  def.v1.abi_header.minor_version = 0;
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&def.v1), nullptr);
++  def.v1.abi_header = {sizeof(def), 2, 1, 0};
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(&def.v1), nullptr);
++  EXPECT_EQ(LiteRtGetAcceleratorHostStagingMemoryHandler(nullptr), nullptr);
++}
+ 
+ // Initial API version.
+ struct DummyStructV1 {
+diff --git a/litert/c/internal/litert_accelerator_def.h b/litert/c/internal/litert_accelerator_def.h
+--- a/litert/c/internal/litert_accelerator_def.h
++++ b/litert/c/internal/litert_accelerator_def.h
+@@ -65,6 +65,22 @@
+   LiteRtCustomTensorBufferHandlersDef buffer_handlers;
+ } LiteRtAcceleratorDefV1;
+ 
++// Optional ABI 1.1 extension. Keep V1 and its embedded handler definition fixed
++// so existing accelerators and runtimes can continue to exchange the V1 prefix.
++typedef struct {
++  LiteRtAcceleratorDefV1 v1;
++  ReleaseCustomTensorBufferHostStagingMemory release_host_staging_memory;
++} LiteRtAcceleratorDefV1_1;
++
++static inline ReleaseCustomTensorBufferHostStagingMemory
++LiteRtGetAcceleratorHostStagingMemoryHandler(const LiteRtAcceleratorDefV1* def) {
++  if (def == NULL || !LITERT_ABI_IS_COMPATIBLE(def, 1, 1) ||
++      def->abi_header.struct_size < sizeof(LiteRtAcceleratorDefV1_1)) {
++    return NULL;
++  }
++  return ((const LiteRtAcceleratorDefV1_1*)def)->release_host_staging_memory;
++}
++
+ // ABI compatibility check for LiteRtAcceleratorDefV1.
+ //
+ // Note: Please get review from the LiteRT ABI compatibility team when you make
+@@ -73,6 +89,11 @@
+     __SIZEOF_POINTER__ == 8
+ static_assert(sizeof(LiteRtAcceleratorDefV1) == 200,
+               "LiteRtAcceleratorDefV1 size mismatch");
++static_assert(sizeof(LiteRtAcceleratorDefV1_1) == 208,
++              "LiteRtAcceleratorDefV1_1 size mismatch");
++static_assert(offsetof(LiteRtAcceleratorDefV1_1,
++                       release_host_staging_memory) == 200,
++              "V1.1 extension must follow the complete V1 definition");
+ static_assert(offsetof(LiteRtAcceleratorDefV1, abi_header) == 0,
+               "LiteRtAcceleratorDefV1 abi_header offset mismatch");
+ static_assert(offsetof(LiteRtAcceleratorDefV1, get_name) == 8,
+diff --git a/litert/c/internal/litert_custom_tensor_buffer_handlers_def.h b/litert/c/internal/litert_custom_tensor_buffer_handlers_def.h
+--- a/litert/c/internal/litert_custom_tensor_buffer_handlers_def.h
++++ b/litert/c/internal/litert_custom_tensor_buffer_handlers_def.h
+@@ -53,10 +53,33 @@
+       [LITERT_CUSTOM_BUFFER_HANDLERS_DEF_MAX_SUPPORTED_BUFFER_TYPES];
+ } LiteRtCustomTensorBufferHandlersDef;
+ 
++// Optional ABI 1.1 extension. The fixed-size V1 definition remains unchanged.
++typedef struct LiteRtCustomTensorBufferHandlersDefV1_1 {
++  LiteRtCustomTensorBufferHandlersDef v1;
++  ReleaseCustomTensorBufferHostStagingMemory release_host_staging_memory;
++} LiteRtCustomTensorBufferHandlersDefV1_1;
++
++static inline ReleaseCustomTensorBufferHostStagingMemory
++LiteRtGetCustomTensorBufferHostStagingMemoryHandler(
++    const LiteRtCustomTensorBufferHandlersDef* def) {
++  if (def == NULL || !LITERT_ABI_IS_COMPATIBLE(def, 1, 1) ||
++      def->abi_header.struct_size <
++          sizeof(LiteRtCustomTensorBufferHandlersDefV1_1)) {
++    return NULL;
++  }
++  return ((const LiteRtCustomTensorBufferHandlersDefV1_1*)def)
++      ->release_host_staging_memory;
++}
++
+ #if defined(__cplusplus) && defined(__SIZEOF_POINTER__) && \
+     __SIZEOF_POINTER__ == 8
+ static_assert(sizeof(LiteRtCustomTensorBufferHandlersDef) == 136,
+               "LiteRtCustomTensorBufferHandlersDef size mismatch");
++static_assert(sizeof(LiteRtCustomTensorBufferHandlersDefV1_1) == 144,
++              "LiteRtCustomTensorBufferHandlersDefV1_1 size mismatch");
++static_assert(offsetof(LiteRtCustomTensorBufferHandlersDefV1_1,
++                       release_host_staging_memory) == 136,
++              "V1.1 extension must follow the complete V1 definition");
+ static_assert(offsetof(LiteRtCustomTensorBufferHandlersDef, abi_header) == 0,
+               "LiteRtCustomTensorBufferHandlersDef abi_header offset mismatch");
+ static_assert(offsetof(LiteRtCustomTensorBufferHandlersDef, device_tag) == 56,
+diff --git a/litert/c/internal/litert_runtime_api_export.cc b/litert/c/internal/litert_runtime_api_export.cc
+--- a/litert/c/internal/litert_runtime_api_export.cc
++++ b/litert/c/internal/litert_runtime_api_export.cc
+@@ -282,3 +282,11 @@
+             LiteRtGetAcceleratorDelegationMetricsPartitionCount,
+         // Google-internal LINT.ThenChange()
+     };
++
++extern "C" LITERT_CAPI_EXPORT const LiteRtRuntimeHostStagingMemoryApi
++    kLiteRtRuntimeHostStagingMemoryApi = {
++        .abi_header = {sizeof(LiteRtRuntimeHostStagingMemoryApi), 1, 0, 0},
++        .runtime = &kLiteRtRuntimeBuiltin,
++        .release_tensor_buffer_host_staging_memory =
++            LiteRtReleaseTensorBufferHostStagingMemory,
++    };
+diff --git a/litert/c/internal/litert_runtime_api_export.h b/litert/c/internal/litert_runtime_api_export.h
+--- a/litert/c/internal/litert_runtime_api_export.h
++++ b/litert/c/internal/litert_runtime_api_export.h
+@@ -23,6 +23,8 @@
+ #endif
+ 
+ extern LITERT_CAPI_EXPORT const LiteRtRuntimeCApiStruct kLiteRtRuntimeBuiltin;
++extern LITERT_CAPI_EXPORT const LiteRtRuntimeHostStagingMemoryApi
++    kLiteRtRuntimeHostStagingMemoryApi;
+ 
+ #ifdef __cplusplus
+ }  // extern "C"
+diff --git a/litert/c/internal/litert_runtime_builtin.cc b/litert/c/internal/litert_runtime_builtin.cc
+--- a/litert/c/internal/litert_runtime_builtin.cc
++++ b/litert/c/internal/litert_runtime_builtin.cc
+@@ -16,6 +16,14 @@
+ 
+ #include "litert/c/internal/litert_runtime_c_api.h"
+ 
++#if defined(LITERT_CC_RUNTIME_BUILTIN_DYNAMIC)
++#if LITERT_WINDOWS_OS
++#include <windows.h>
++#else
++#include <dlfcn.h>
++#endif
++#endif
++
+ // Header-selected builtin runtime implementation.
+ #if defined(LITERT_CC_RUNTIME_BUILTIN_NONE)
+ #if defined(__ANDROID__)
+@@ -25,6 +33,7 @@
+ #include "litert/c/internal/litert_logging.h"
+ #include "litert/cc/internal/litert_shared_library.h"
+ #include "litert/cc/litert_expected.h"
++
+ #endif  // defined(__ANDROID__)
+ #else
+ #include "litert/c/internal/litert_runtime_api_export.h"
+@@ -74,3 +83,56 @@
+   return &kLiteRtRuntimeBuiltin;
+ #endif  // defined(LITERT_CC_RUNTIME_BUILTIN_NONE)
+ }
++
++const LiteRtRuntimeHostStagingMemoryApi* GetLiteRtRuntimeHostStagingMemoryApi(
++    const LiteRtRuntimeCApiStruct* runtime) {
++  const LiteRtRuntimeHostStagingMemoryApi* api = nullptr;
++#if defined(LITERT_CC_RUNTIME_BUILTIN_DYNAMIC)
++  static const auto* dynamic_api =
++      []() -> const LiteRtRuntimeHostStagingMemoryApi* {
++#if LITERT_WINDOWS_OS
++    HMODULE module = nullptr;
++    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
++                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
++                           reinterpret_cast<LPCSTR>(&kLiteRtRuntimeBuiltin),
++                           &module)) {
++      return nullptr;
++    }
++    return reinterpret_cast<const LiteRtRuntimeHostStagingMemoryApi*>(
++        GetProcAddress(module, "kLiteRtRuntimeHostStagingMemoryApi"));
++#else
++    return static_cast<const LiteRtRuntimeHostStagingMemoryApi*>(
++        dlsym(RTLD_DEFAULT, "kLiteRtRuntimeHostStagingMemoryApi"));
++#endif
++  }();
++  api = dynamic_api;
++#elif defined(LITERT_CC_RUNTIME_BUILTIN_NONE)
++#if defined(__ANDROID__)
++  if (runtime != GetLiteRtRuntimeBuiltin()) {
++    return nullptr;
++  }
++  static const auto* android_api =
++      []() -> const LiteRtRuntimeHostStagingMemoryApi* {
++    // GetLiteRtRuntimeBuiltin keeps the library loaded for this pointer's life.
++    auto library = litert::SharedLibrary::Load(
++        "libLiteRt.so", litert::RtldFlags::Default());
++    if (!library) {
++      return nullptr;
++    }
++    auto symbol = library->LookupSymbol<const LiteRtRuntimeHostStagingMemoryApi*>(
++        "kLiteRtRuntimeHostStagingMemoryApi");
++    return symbol ? *symbol : nullptr;
++  }();
++  api = android_api;
++#endif
++#else
++  api = &kLiteRtRuntimeHostStagingMemoryApi;
++#endif
++  if (api == nullptr || !LITERT_ABI_IS_COMPATIBLE(api, 1, 0) ||
++      api->abi_header.struct_size < sizeof(LiteRtRuntimeHostStagingMemoryApi) ||
++      api->runtime != runtime ||
++      api->release_tensor_buffer_host_staging_memory == nullptr) {
++    return nullptr;
++  }
++  return api;
++}
+diff --git a/litert/c/internal/litert_runtime_builtin.h b/litert/c/internal/litert_runtime_builtin.h
+--- a/litert/c/internal/litert_runtime_builtin.h
++++ b/litert/c/internal/litert_runtime_builtin.h
+@@ -24,6 +24,11 @@
+ /// Gets the builtin LiteRT runtime implementation.
+ const LiteRtRuntimeCApiStruct* GetLiteRtRuntimeBuiltin();
+ 
++// Returns the optional extension only for the runtime that owns it. An older
++// dynamically loaded runtime or an external runtime without it returns null.
++const LiteRtRuntimeHostStagingMemoryApi* GetLiteRtRuntimeHostStagingMemoryApi(
++    const LiteRtRuntimeCApiStruct* runtime);
++
+ #ifdef __cplusplus
+ }  // extern "C"
+ #endif
+diff --git a/litert/c/internal/litert_runtime_c_api.h b/litert/c/internal/litert_runtime_c_api.h
+--- a/litert/c/internal/litert_runtime_c_api.h
++++ b/litert/c/internal/litert_runtime_c_api.h
+@@ -18,6 +18,7 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ 
++#include "litert/c/internal/litert_abi_header.h"
+ #include "litert/c/internal/litert_scheduling_info.h"
+ #include "litert/c/litert_any.h"
+ #include "litert/c/litert_common.h"
+@@ -803,6 +804,15 @@
+ 
+ // LINT.ThenChange(:version_number)
+ 
++// Optional extension exported separately from the unversioned function table.
++// Never append optional entries to, or probe past, an older runtime's table.
++typedef struct {
++  LiteRtAbiHeader abi_header;
++  const LiteRtRuntimeCApiStruct* runtime;
++  LiteRtStatus (*release_tensor_buffer_host_staging_memory)(
++      LiteRtTensorBuffer buffer);
++} LiteRtRuntimeHostStagingMemoryApi;
++
+ #ifdef __cplusplus
+ }  // extern "C"
+ #endif
+diff --git a/litert/c/internal/litert_tensor_buffer_registry.cc b/litert/c/internal/litert_tensor_buffer_registry.cc
+--- a/litert/c/internal/litert_tensor_buffer_registry.cc
++++ b/litert/c/internal/litert_tensor_buffer_registry.cc
+@@ -44,6 +44,18 @@
+   return kLiteRtStatusOk;
+ }
+ 
++LiteRtStatus LiteRtRegisterTensorBufferHostStagingMemoryHandler(
++    LiteRtEnvironment env, LiteRtTensorBufferType buffer_type,
++    ReleaseCustomTensorBufferHostStagingMemory handler) {
++  if (env == nullptr || handler == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  LITERT_RETURN_IF_ERROR(
++      env->GetTensorBufferRegistry().RegisterHostStagingMemoryHandler(buffer_type,
++                                                                    handler));
++  return kLiteRtStatusOk;
++}
++
+ LiteRtStatus LiteRtGetTensorBufferRegistry(LiteRtEnvironment env,
+                                            void** registry) {
+   *registry = reinterpret_cast<void*>(&env->GetTensorBufferRegistry());
+diff --git a/litert/c/internal/litert_tensor_buffer_registry.h b/litert/c/internal/litert_tensor_buffer_registry.h
+--- a/litert/c/internal/litert_tensor_buffer_registry.h
++++ b/litert/c/internal/litert_tensor_buffer_registry.h
+@@ -35,6 +35,11 @@
+     ImportCustomTensorBuffer import_func, LiteRtEnvOptionTag device_tag,
+     LiteRtEnvOptionTag queue_tag);
+ 
++// Registers the optional ABI 1.1 operation after the base handlers.
++LiteRtStatus LiteRtRegisterTensorBufferHostStagingMemoryHandler(
++    LiteRtEnvironment env, LiteRtTensorBufferType buffer_type,
++    ReleaseCustomTensorBufferHostStagingMemory handler);
++
+ // Retrieves a singleton instance of the tensor buffer registry.
+ LiteRtStatus LiteRtGetTensorBufferRegistry(LiteRtEnvironment env,
+                                            void** registry);
+diff --git a/litert/c/litert_custom_tensor_buffer.h b/litert/c/litert_custom_tensor_buffer.h
+--- a/litert/c/litert_custom_tensor_buffer.h
++++ b/litert/c/litert_custom_tensor_buffer.h
+@@ -88,6 +88,12 @@
+ // Custom TensorBuffer handler function to clear a custom TensorBuffer.
+ typedef LiteRtStatus (*ClearCustomTensorBuffer)(HwMemoryInfoPtr hw_memory_info);
+ 
++// Completes host-to-device transfers and releases optional host staging memory.
++// The buffer must be unlocked and idle. Canonical storage must be preserved.
++// Success guarantees that a later device use needs no deferred host upload.
++typedef LiteRtStatus (*ReleaseCustomTensorBufferHostStagingMemory)(
++    HwMemoryInfoPtr hw_memory_info);
++
+ #ifdef __cplusplus
+ }
+ #endif  // __cplusplus
+diff --git a/litert/c/litert_runtime_c_api_so_symbol_test.sh b/litert/c/litert_runtime_c_api_so_symbol_test.sh
+--- a/litert/c/litert_runtime_c_api_so_symbol_test.sh
++++ b/litert/c/litert_runtime_c_api_so_symbol_test.sh
+@@ -40,7 +40,7 @@
+ 
+ # Filter for LiteRt symbols (type T means text/code symbol, exported)
+ # Remove @@VERS_1.0 to match the file content
+-litert_symbols=$(echo "$symbols" | grep -E " (T LiteRt|D kLiteRtRuntimeBuiltin)" | awk '{print $3}' | sed 's/@@VERS_1.0//' | LC_ALL=C sort)
++litert_symbols=$(echo "$symbols" | grep -E " (T LiteRt|D kLiteRtRuntime)" | awk '{print $3}' | sed 's/@@VERS_1.0//' | LC_ALL=C sort)
+ 
+ # Filter out comments and empty lines from expected symbols
+ # Sorting in shell is needed to ensure sort stability.
+diff --git a/litert/c/litert_runtime_c_api_so_symbols.txt b/litert/c/litert_runtime_c_api_so_symbols.txt
+--- a/litert/c/litert_runtime_c_api_so_symbols.txt
++++ b/litert/c/litert_runtime_c_api_so_symbols.txt
+@@ -394,6 +394,8 @@
+ LiteRtRegisterAccelerator
+ LiteRtRegisterNpuAccelerator
+ LiteRtRegisterTensorBufferHandlers
++LiteRtRegisterTensorBufferHostStagingMemoryHandler
++LiteRtReleaseTensorBufferHostStagingMemory
+ LiteRtResetProfiler
+ LiteRtRunCompiledModel
+ LiteRtRunCompiledModelAsync
+@@ -425,3 +427,4 @@
+ LiteRtWaitEvent
+ LiteRtWrapDelegate
+ kLiteRtRuntimeBuiltin
++kLiteRtRuntimeHostStagingMemoryApi
+diff --git a/litert/c/litert_tensor_buffer.cc b/litert/c/litert_tensor_buffer.cc
+--- a/litert/c/litert_tensor_buffer.cc
++++ b/litert/c/litert_tensor_buffer.cc
+@@ -627,6 +627,15 @@
+   return kLiteRtStatusOk;
+ }
+ 
++LiteRtStatus LiteRtReleaseTensorBufferHostStagingMemory(
++    LiteRtTensorBuffer tensor_buffer) {
++  if (!tensor_buffer) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  LITERT_RETURN_IF_ERROR(tensor_buffer->ReleaseHostStagingMemory());
++  return kLiteRtStatusOk;
++}
++
+ LiteRtStatus LiteRtClearTensorBuffer(LiteRtTensorBuffer tensor_buffer) {
+   if (!tensor_buffer) {
+     return kLiteRtStatusErrorInvalidArgument;
+diff --git a/litert/c/litert_tensor_buffer.h b/litert/c/litert_tensor_buffer.h
+--- a/litert/c/litert_tensor_buffer.h
++++ b/litert/c/litert_tensor_buffer.h
+@@ -366,6 +366,17 @@
+ // TODO b/413449050 - Update behavior to upload contents without conversion.
+ LiteRtStatus LiteRtUnlockTensorBuffer(LiteRtTensorBuffer buffer);
+ 
++// Complete pending host-to-device transfers and release optional host staging
++// memory without changing the tensor contents or its device allocation.
++// The buffer must be unlocked and idle, with no concurrent access. This may
++// block. Direct host mappings need no additional memory and are a no-op.
++//
++// Call before a one-off Lock/Unlock to check provider support, and again after
++// Unlock to release the staging allocation. No deferred upload remains after
++// success. Older custom providers return kLiteRtStatusErrorUnsupported.
++LiteRtStatus LiteRtReleaseTensorBufferHostStagingMemory(
++    LiteRtTensorBuffer buffer);
++
+ // Clear a tensor buffer possibly asynchronously.
+ //
+ // It may return immediately after scheduling a clear operation though it
+diff --git a/litert/c/windows_exported_symbols.def b/litert/c/windows_exported_symbols.def
+--- a/litert/c/windows_exported_symbols.def
++++ b/litert/c/windows_exported_symbols.def
+@@ -20,6 +20,7 @@
+ 
+ EXPORTS
+   kLiteRtRuntimeBuiltin DATA
++  kLiteRtRuntimeHostStagingMemoryApi DATA
+   LiteRtAddCustomOpKernelOption
+   LiteRtAddEnvironmentOptions
+   LiteRtAddExternalTensorBinding
+@@ -348,6 +349,8 @@
+   LiteRtPushOp
+   LiteRtRegisterAccelerator
+   LiteRtRegisterTensorBufferHandlers
++  LiteRtRegisterTensorBufferHostStagingMemoryHandler
++  LiteRtReleaseTensorBufferHostStagingMemory
+   LiteRtResetProfiler
+   LiteRtRunCompiledModel
+   LiteRtRunCompiledModelAsync
+diff --git a/litert/cc/CMakeLists.txt b/litert/cc/CMakeLists.txt
+--- a/litert/cc/CMakeLists.txt
++++ b/litert/cc/CMakeLists.txt
+@@ -223,6 +223,11 @@
+ 
+ target_compile_features(litert_c_api_dynamic_runtime_helpers PRIVATE cxx_std_20)
+ 
++target_compile_definitions(litert_c_api_dynamic_runtime_helpers
++    PRIVATE LITERT_CC_RUNTIME_BUILTIN_DYNAMIC
++)
++target_link_libraries(litert_c_api_dynamic_runtime_helpers PUBLIC ${CMAKE_DL_LIBS})
++
+ if(LITERT_PLATFORM_ANDROID)
+     target_link_libraries(litert_c_api_dynamic_runtime_helpers PUBLIC ${LOG_LIB})
+ endif()
+diff --git a/litert/cc/internal/litert_runtime_proxy.h b/litert/cc/internal/litert_runtime_proxy.h
+--- a/litert/cc/internal/litert_runtime_proxy.h
++++ b/litert/cc/internal/litert_runtime_proxy.h
+@@ -1041,6 +1041,14 @@
+     LITERT_PROXY_METHOD_STATUS(litert_unlock_tensor_buffer, buffer);
+   }
+ 
++  LiteRtStatus ReleaseTensorBufferHostStagingMemory(LiteRtTensorBuffer buffer) {
++    const auto* api = GetLiteRtRuntimeHostStagingMemoryApi(runtime_c_api_);
++    if (api == nullptr) {
++      return kLiteRtStatusErrorUnsupported;
++    }
++    return api->release_tensor_buffer_host_staging_memory(buffer);
++  }
++
+   LiteRtStatus ClearTensorBuffer(LiteRtTensorBuffer tensor_buffer) {
+     LITERT_PROXY_METHOD_STATUS(litert_clear_tensor_buffer, tensor_buffer);
+   }
+diff --git a/litert/cc/litert_tensor_buffer.h b/litert/cc/litert_tensor_buffer.h
+--- a/litert/cc/litert_tensor_buffer.h
++++ b/litert/cc/litert_tensor_buffer.h
+@@ -710,6 +710,17 @@
+     return {};
+   }
+ 
++  /// Completes pending host uploads and releases optional host staging memory.
++  /// Preserves tensor contents and the device allocation. Requires an unlocked,
++  /// idle buffer; may block. Call before a one-off Lock to check support and
++  /// after Unlock to avoid retaining a host mirror or deferring an upload.
++  /// Returns Unsupported for runtimes or providers without this capability.
++  Expected<void> ReleaseHostStagingMemory() {
++    LITERT_RETURN_IF_ERROR(
++        env_.runtime->ReleaseTensorBufferHostStagingMemory(Get()));
++    return {};
++  }
++
+   /// @brief Writes data from a user-provided `Span<const T>` to the
+   /// tensor buffer.
+   ///
+diff --git a/litert/cc_sdk/CMakeLists.txt b/litert/cc_sdk/CMakeLists.txt
+--- a/litert/cc_sdk/CMakeLists.txt
++++ b/litert/cc_sdk/CMakeLists.txt
+@@ -101,6 +101,9 @@
+     ${LITERT_CC_SRCS}
+ )
+ 
++target_compile_definitions(litert_cc_api PRIVATE LITERT_CC_RUNTIME_BUILTIN_DYNAMIC)
++target_link_libraries(litert_cc_api PRIVATE ${CMAKE_DL_LIBS})
++
+ # Set PUBLIC_HEADER property for proper installation
+ set_target_properties(litert_cc_api PROPERTIES
+     PUBLIC_HEADER "${LITERT_CC_HEADERS}"
+diff --git a/litert/cc_sdk/litert_cc_sdk_hdrs.txt b/litert/cc_sdk/litert_cc_sdk_hdrs.txt
+--- a/litert/cc_sdk/litert_cc_sdk_hdrs.txt
++++ b/litert/cc_sdk/litert_cc_sdk_hdrs.txt
+@@ -1,3 +1,4 @@
++litert/c/internal/litert_abi_header.h
+ litert/c/internal/litert_accelerator.h
+ litert/c/internal/litert_logging.h
+ litert/c/internal/litert_options_helper.h
+diff --git a/litert/runtime/BUILD b/litert/runtime/BUILD
+--- a/litert/runtime/BUILD
++++ b/litert/runtime/BUILD
+@@ -414,6 +414,7 @@
+         "//litert/cc:litert_environment",
+         "//litert/cc:litert_layout",
+         "//litert/cc:litert_macros",
++        "//litert/cc:litert_tensor_buffer",
+         "//litert/test:matchers",
+         "@com_google_googletest//:gtest_main",
+     ],
+diff --git a/litert/runtime/accelerators/registration_helper.cc b/litert/runtime/accelerators/registration_helper.cc
+--- a/litert/runtime/accelerators/registration_helper.cc
++++ b/litert/runtime/accelerators/registration_helper.cc
+@@ -88,6 +88,12 @@
+         accelerator_def->buffer_handlers.import_func,
+         accelerator_def->buffer_handlers.device_tag,
+         accelerator_def->buffer_handlers.queue_tag));
++    if (auto release =
++            LiteRtGetAcceleratorHostStagingMemoryHandler(accelerator_def)) {
++      LITERT_RETURN_IF_ERROR(LiteRtRegisterTensorBufferHostStagingMemoryHandler(
++          env, accelerator_def->buffer_handlers.supported_buffer_types[i],
++          release));
++    }
+   }
+ 
+   return kLiteRtStatusOk;
+diff --git a/litert/runtime/custom_buffer.cc b/litert/runtime/custom_buffer.cc
+--- a/litert/runtime/custom_buffer.cc
++++ b/litert/runtime/custom_buffer.cc
+@@ -105,6 +105,21 @@
+   return {};
+ }
+ 
++LITERT_NO_CFI_CHECK Expected<void> CustomBuffer::ReleaseHostStagingMemory() {
++  LITERT_ASSIGN_OR_RETURN(auto registry, GetTensorBufferRegistry(env_));
++  LITERT_ASSIGN_OR_RETURN(auto handlers,
++                          registry->GetCustomHandlers(buffer_type_));
++  if (handlers.release_host_staging_memory == nullptr) {
++    return Unexpected(kLiteRtStatusErrorUnsupported,
++                      "Buffer provider cannot release host staging memory.");
++  }
++  auto status = handlers.release_host_staging_memory(hw_memory_info_);
++  if (status != kLiteRtStatusOk) {
++    return Unexpected(status, "Failed to release host staging memory.");
++  }
++  return {};
++}
++
+ LITERT_NO_CFI_CHECK Expected<void> CustomBuffer::Clear() {
+   LITERT_ASSIGN_OR_RETURN(auto registry, GetTensorBufferRegistry(env_));
+   LITERT_ASSIGN_OR_RETURN(auto custom_buffer_handlers,
+diff --git a/litert/runtime/custom_buffer.h b/litert/runtime/custom_buffer.h
+--- a/litert/runtime/custom_buffer.h
++++ b/litert/runtime/custom_buffer.h
+@@ -55,6 +55,9 @@
+   // Writes the data from the CPU memory to the Custom buffer.
+   Expected<void> Unlock();
+ 
++  // Completes pending host transfers and releases optional staging storage.
++  Expected<void> ReleaseHostStagingMemory();
++
+   // Clears the Custom buffer.
+   Expected<void> Clear();
+ 
+diff --git a/litert/runtime/dispatch/litert_dispatch.cc b/litert/runtime/dispatch/litert_dispatch.cc
+--- a/litert/runtime/dispatch/litert_dispatch.cc
++++ b/litert/runtime/dispatch/litert_dispatch.cc
+@@ -123,6 +123,12 @@
+           TheApi.tensor_buffer_handlers_def->import_func,
+           TheApi.tensor_buffer_handlers_def->device_tag,
+           TheApi.tensor_buffer_handlers_def->queue_tag));
++      if (auto release = LiteRtGetCustomTensorBufferHostStagingMemoryHandler(
++              TheApi.tensor_buffer_handlers_def)) {
++        LITERT_RETURN_IF_ERROR(LiteRtRegisterTensorBufferHostStagingMemoryHandler(
++            env, TheApi.tensor_buffer_handlers_def->supported_buffer_types[i],
++            release));
++      }
+     }
+   }
+   return kLiteRtStatusOk;
+diff --git a/litert/runtime/gl_buffer.cc b/litert/runtime/gl_buffer.cc
+--- a/litert/runtime/gl_buffer.cc
++++ b/litert/runtime/gl_buffer.cc
+@@ -238,6 +238,26 @@
+ template Expected<void> GlBuffer::Unlock<float>();
+ template Expected<void> GlBuffer::Unlock<char>();
+ 
++Expected<void> GlBuffer::ReleaseHostStagingMemory() {
++#if LITERT_HAS_OPENGL_SUPPORT
++  absl::MutexLock lock(&mutex_);
++  if (data_ == nullptr) {
++    return {};
++  }
++  glFinish();
++  if (glGetError() != GL_NO_ERROR) {
++    return Unexpected(kLiteRtStatusErrorRuntimeFailure,
++                      "Failed to complete OpenGL host transfer.");
++  }
++  litert_aligned_free(data_);
++  data_ = nullptr;
++  return {};
++#else
++  return Unexpected(kLiteRtStatusErrorUnsupported,
++                    "OpenGL buffers are not supported.");
++#endif
++}
++
+ template <typename T>
+ Expected<T*> GlBuffer::Lock(LiteRtTensorBufferLockMode mode) {
+ #if LITERT_HAS_OPENGL_SUPPORT
+diff --git a/litert/runtime/gl_buffer.h b/litert/runtime/gl_buffer.h
+--- a/litert/runtime/gl_buffer.h
++++ b/litert/runtime/gl_buffer.h
+@@ -58,6 +58,8 @@
+   template <typename T>
+   Expected<void> Unlock();
+ 
++  Expected<void> ReleaseHostStagingMemory();
++
+   LiteRtGLenum target() const;
+   LiteRtGLuint id() const;
+   size_t size_bytes() const;
+diff --git a/litert/runtime/tensor_buffer.cc b/litert/runtime/tensor_buffer.cc
+--- a/litert/runtime/tensor_buffer.cc
++++ b/litert/runtime/tensor_buffer.cc
+@@ -1229,6 +1229,35 @@
+   }
+ }
+ 
++Expected<void> LiteRtTensorBufferT::ReleaseHostStagingMemory() {
++  LITERT_RETURN_IF_ERROR(!is_locked_,
++                         Unexpected(kLiteRtStatusErrorRuntimeFailure,
++                                    "Tensor buffer is still locked."));
++  if (auto* custom = std::get_if<litert::internal::CustomBuffer>(&buffer_)) {
++    return custom->ReleaseHostStagingMemory();
++  }
++  switch (buffer_type()) {
++    case kLiteRtTensorBufferTypeHostMemory:
++    case kLiteRtTensorBufferTypeAhwb:
++    case kLiteRtTensorBufferTypeIon:
++    case kLiteRtTensorBufferTypeDmaBuf:
++    case kLiteRtTensorBufferTypeFastRpc:
++      return {};
++    case kLiteRtTensorBufferTypeGlBuffer: {
++#if LITERT_HAS_OPENGL_SUPPORT
++      LITERT_ASSIGN_OR_RETURN(auto gl_buffer, GetGlBuffer());
++      return gl_buffer->ReleaseHostStagingMemory();
++#else
++      return Unexpected(kLiteRtStatusErrorUnsupported,
++                        "OpenGL buffers are not supported.");
++#endif
++    }
++    default:
++      return Unexpected(kLiteRtStatusErrorUnsupported,
++                        "Buffer cannot release host staging memory.");
++  }
++}
++
+ Expected<void> LiteRtTensorBufferT::Clear() {
+   switch (buffer_type()) {
+     case kLiteRtTensorBufferTypeOpenClBuffer:
+diff --git a/litert/runtime/tensor_buffer.h b/litert/runtime/tensor_buffer.h
+--- a/litert/runtime/tensor_buffer.h
++++ b/litert/runtime/tensor_buffer.h
+@@ -178,6 +178,8 @@
+ 
+   litert::Expected<void*> Lock(LiteRtTensorBufferLockMode mode);
+   litert::Expected<void> Unlock();
++
++  litert::Expected<void> ReleaseHostStagingMemory();
+   litert::Expected<void> Clear();
+ 
+   // Used to duplicate the current tensor buffer. Internally it increases
+diff --git a/litert/runtime/tensor_buffer_registry.cc b/litert/runtime/tensor_buffer_registry.cc
+--- a/litert/runtime/tensor_buffer_registry.cc
++++ b/litert/runtime/tensor_buffer_registry.cc
+@@ -55,6 +55,23 @@
+   return {};
+ }
+ 
++litert::Expected<void> TensorBufferRegistry::RegisterHostStagingMemoryHandler(
++    LiteRtTensorBufferType buffer_type,
++    ::ReleaseCustomTensorBufferHostStagingMemory handler) {
++  auto it = handlers_.find(buffer_type);
++  if (it == handlers_.end()) {
++    return litert::Unexpected(kLiteRtStatusErrorNotFound,
++                              "Register the buffer handlers first.");
++  }
++  auto& registered = it->second.release_host_staging_memory;
++  if (registered != nullptr && registered != handler) {
++    return litert::Unexpected(kLiteRtStatusErrorAlreadyExists,
++                              "Different host staging handler registered.");
++  }
++  registered = handler;
++  return {};
++}
++
+ litert::Expected<CustomTensorBufferHandlers>
+ TensorBufferRegistry::GetCustomHandlers(
+     const LiteRtTensorBufferType buffer_type) {
+diff --git a/litert/runtime/tensor_buffer_registry.h b/litert/runtime/tensor_buffer_registry.h
+--- a/litert/runtime/tensor_buffer_registry.h
++++ b/litert/runtime/tensor_buffer_registry.h
+@@ -40,6 +40,10 @@
+   LiteRtEnvOptionTag device_tag;
+   // The tag of the environment option that holds the GPU queue.
+   LiteRtEnvOptionTag queue_tag;
++
++  // Optional ABI 1.1 operation; never invoked by ordinary Lock/Unlock.
++  ::ReleaseCustomTensorBufferHostStagingMemory release_host_staging_memory =
++      nullptr;
+ };
+ 
+ class TensorBufferRegistry {
+@@ -54,6 +58,10 @@
+       LiteRtTensorBufferType buffer_type,
+       const CustomTensorBufferHandlers& handlers);
+ 
++  litert::Expected<void> RegisterHostStagingMemoryHandler(
++      LiteRtTensorBufferType buffer_type,
++      ::ReleaseCustomTensorBufferHostStagingMemory handler);
++
+   // Returns the custom tensor buffer handlers for the given buffer type.
+   litert::Expected<CustomTensorBufferHandlers> GetCustomHandlers(
+       const LiteRtTensorBufferType buffer_type);
+diff --git a/litert/runtime/tensor_buffer_registry_test.cc b/litert/runtime/tensor_buffer_registry_test.cc
+--- a/litert/runtime/tensor_buffer_registry_test.cc
++++ b/litert/runtime/tensor_buffer_registry_test.cc
+@@ -18,6 +18,7 @@
+ #include <cstdlib>
+ #include <cstring>
+ #include <memory>
++#include <vector>
+ 
+ #include <gtest/gtest.h>
+ #include "litert/c/internal/litert_logging.h"
+@@ -29,6 +30,7 @@
+ #include "litert/cc/litert_environment.h"
+ #include "litert/cc/litert_layout.h"
+ #include "litert/cc/litert_macros.h"
++#include "litert/cc/litert_tensor_buffer.h"
+ #include "litert/runtime/tensor_buffer.h"
+ #include "litert/test/matchers.h"
+ 
+@@ -38,6 +40,10 @@
+   size_t bytes;
+   void* mapped_ptr;
+   bool fail_next_lock = false;
++  std::vector<char> contents;
++  LiteRtTensorBufferLockMode mode = kLiteRtTensorBufferLockModeRead;
++  LiteRtStatus release_status = kLiteRtStatusOk;
++  int releases = 0;
+ };
+ 
+ static int kDummyHandleStorage = 0;
+@@ -52,6 +58,7 @@
+       new CustomHwMemoryInfo{.bytes = bytes, .mapped_ptr = nullptr};
+   memory_info->memory_handle =
+       reinterpret_cast<HwMemoryHandle>(&kDummyHandleStorage);
++  memory_info->contents.assign(bytes, kMockBufferValue);
+   *hw_memory_info = memory_info;
+   return kLiteRtStatusOk;
+ }
+@@ -66,6 +73,21 @@
+ }
+ 
+ LiteRtStatus UnlockMyCustomTensorBuffer(HwMemoryInfoPtr hw_memory_info) {
++  auto* info = static_cast<CustomHwMemoryInfo*>(hw_memory_info);
++  if (info->mode != kLiteRtTensorBufferLockModeRead) {
++    memcpy(info->contents.data(), info->mapped_ptr, info->bytes);
++  }
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus ReleaseMyHostStagingMemory(HwMemoryInfoPtr hw_memory_info) {
++  auto* info = static_cast<CustomHwMemoryInfo*>(hw_memory_info);
++  ++info->releases;
++  if (info->release_status != kLiteRtStatusOk) {
++    return info->release_status;
++  }
++  free(info->mapped_ptr);
++  info->mapped_ptr = nullptr;
+   return kLiteRtStatusOk;
+ }
+ 
+@@ -82,7 +104,10 @@
+                hw_info->bytes);
+     hw_info->mapped_ptr = malloc(hw_info->bytes);
+   }
+-  memset(hw_info->mapped_ptr, kMockBufferValue, hw_info->bytes);
++  hw_info->mode = mode;
++  if (mode != kLiteRtTensorBufferLockModeWrite) {
++    memcpy(hw_info->mapped_ptr, hw_info->contents.data(), hw_info->bytes);
++  }
+   *host_memory_ptr = hw_info->mapped_ptr;
+   return kLiteRtStatusOk;
+ }
+@@ -156,6 +181,80 @@
+   EXPECT_FALSE(tensor_buffer->Unlock());
+ }
+ 
++TEST(TensorBufferRegistryTest, ExplicitHostStagingRelease) {
++  LITERT_ASSERT_OK_AND_ASSIGN(auto env, litert::Environment::Create({}));
++  litert::internal::TensorBufferRegistry* registry = nullptr;
++  LITERT_ASSERT_OK(LiteRtGetTensorBufferRegistry(
++      env.Get(), reinterpret_cast<void**>(&registry)));
++  const litert::internal::CustomTensorBufferHandlers handlers = {
++      .create_func = CreateMyCustomTensorBuffer,
++      .destroy_func = DestroyMyCustomTensorBuffer,
++      .lock_func = LockMyCustomTensorBuffer,
++      .unlock_func = UnlockMyCustomTensorBuffer};
++  constexpr auto type = kLiteRtTensorBufferTypeUserCustomBuffer;
++  LITERT_ASSERT_OK(registry->RegisterHandlers(type, handlers));
++  constexpr LiteRtRankedTensorType tensor_type = {
++      kLiteRtElementTypeInt32, litert::BuildLayout({8})};
++  LITERT_ASSERT_OK_AND_ASSIGN(auto buffer, LiteRtTensorBufferT::CreateManaged(
++                                              env.Get(), type, tensor_type, 32));
++  LITERT_ASSERT_OK_AND_ASSIGN(auto custom, buffer->GetCustomBuffer());
++  auto* info = static_cast<CustomHwMemoryInfo*>(custom->hw_memory_info());
++
++  auto unsupported = buffer->ReleaseHostStagingMemory();
++  ASSERT_FALSE(unsupported);
++  EXPECT_EQ(unsupported.Error().Status(), kLiteRtStatusErrorUnsupported);
++  EXPECT_EQ(info->mapped_ptr, nullptr);
++
++  LITERT_ASSERT_OK(registry->RegisterHostStagingMemoryHandler(
++      type, ReleaseMyHostStagingMemory));
++  // Re-registering a V1 provider must preserve its separately registered tail.
++  LITERT_ASSERT_OK(registry->RegisterHandlers(type, handlers));
++  LITERT_ASSERT_OK_AND_ASSIGN(void* data,
++                             buffer->Lock(kLiteRtTensorBufferLockModeWrite));
++  memset(data, 0x5a, 32);
++  EXPECT_FALSE(buffer->ReleaseHostStagingMemory());
++  EXPECT_EQ(info->releases, 0);
++  LITERT_ASSERT_OK(buffer->Unlock());
++  EXPECT_EQ(info->releases, 0);
++  EXPECT_NE(info->mapped_ptr, nullptr);
++
++  info->release_status = kLiteRtStatusErrorRuntimeFailure;
++  EXPECT_FALSE(buffer->ReleaseHostStagingMemory());
++  EXPECT_NE(info->mapped_ptr, nullptr);
++  info->release_status = kLiteRtStatusOk;
++  LITERT_ASSERT_OK(buffer->ReleaseHostStagingMemory());
++  EXPECT_EQ(info->mapped_ptr, nullptr);
++  LITERT_ASSERT_OK(buffer->ReleaseHostStagingMemory());
++  LITERT_ASSERT_OK_AND_ASSIGN(data,
++                             buffer->Lock(kLiteRtTensorBufferLockModeRead));
++  EXPECT_EQ(memcmp(data, info->contents.data(), 32), 0);
++  EXPECT_EQ(static_cast<char*>(data)[0], 0x5a);
++  LITERT_ASSERT_OK(buffer->Unlock());
++  LITERT_ASSERT_OK(buffer->ReleaseHostStagingMemory());
++}
++
++TEST(TensorBufferRegistryTest, HostReleasePreservesCanonicalStorage) {
++  LITERT_ASSERT_OK_AND_ASSIGN(auto env, litert::Environment::Create({}));
++  constexpr LiteRtRankedTensorType type = {
++      kLiteRtElementTypeInt32, litert::BuildLayout({8})};
++  LITERT_ASSERT_OK_AND_ASSIGN(
++      auto buffer, litert::TensorBuffer::CreateManaged(
++                       env, litert::TensorBufferType::kHostMemory,
++                       litert::RankedTensorType(type), 32));
++  LITERT_ASSERT_OK(buffer.ReleaseHostStagingMemory());
++  LITERT_ASSERT_OK_AND_ASSIGN(void* data,
++                             buffer.Lock(litert::TensorBuffer::LockMode::kWrite));
++  memset(data, 0x5a, 32);
++  EXPECT_FALSE(buffer.ReleaseHostStagingMemory());
++  LITERT_ASSERT_OK(buffer.Unlock());
++  LITERT_ASSERT_OK(buffer.ReleaseHostStagingMemory());
++  LITERT_ASSERT_OK_AND_ASSIGN(data,
++                             buffer.Lock(litert::TensorBuffer::LockMode::kRead));
++  EXPECT_EQ(static_cast<char*>(data)[0], 0x5a);
++  LITERT_ASSERT_OK(buffer.Unlock());
++  LITERT_ASSERT_OK(buffer.ReleaseHostStagingMemory());
++}
++
+ TEST(TensorBufferRegistryTest, RegistryOwnership) {
+   LITERT_ASSIGN_OR_ABORT(litert::Environment env,
+                          litert::Environment::Create({}));

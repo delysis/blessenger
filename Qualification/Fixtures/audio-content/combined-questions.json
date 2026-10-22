@@ -1,0 +1,50 @@
+[
+  {
+    "path": "original-0.wav",
+    "answer": "\\b(?:four|4)\\b"
+  },
+  {
+    "path": "original-1.wav",
+    "answer": "\\b(?:eight|8)\\b"
+  },
+  {
+    "path": "original-2.wav",
+    "answer": "\\bParis\\b"
+  },
+  {
+    "path": "original-3.wav",
+    "answer": "\\b(?:seven|7)\\b"
+  },
+  {
+    "path": "original-4.wav",
+    "answer": "\\b(?:nine|9)\\b"
+  },
+  {
+    "path": "original-5.wav",
+    "answer": "\\bEarth\\b"
+  },
+  {
+    "path": "heldout-0.wav",
+    "text": "How many days are in a week?",
+    "voice": "Daniel",
+    "answer": "\\b(?:seven|7)\\b"
+  },
+  {
+    "path": "heldout-1.wav",
+    "text": "What is six plus seven?",
+    "voice": "Karen",
+    "answer": "\\b(?:thirteen|13)\\b"
+  },
+  {
+    "path": "heldout-2.wav",
+    "text": "Which planet do humans live on?",
+    "voice": "Moira",
+    "answer": "\\bEarth\\b"
+  },
+  {
+    "path": "heldout-3.wav",
+    "text": "What is twenty minus three?",
+    "voice": "Rishi",
+    "answer": "\\b(?:seventeen|17)\\b"
+  }
+]

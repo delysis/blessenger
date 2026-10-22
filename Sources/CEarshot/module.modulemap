@@ -1,0 +1,5 @@
+module CEarshot [system] {
+  header "bridge.h"
+  link "earshot"
+  export *
+}

@@ -1,0 +1,76 @@
+<!doctype html><meta charset="utf-8"><title>Blessenger speech diagnostics</title>
+<button id="run">Run</button><pre id="status">Idle</pre><div id="clips"></div>
+<script type="module">
+import {loadBlessengerSpeech} from './blessenger-speech.mjs';
+import {SpeechPlayback} from './playback.mjs';
+import {speechReference} from './reference.mjs';
+const status=document.querySelector('#status'),run=document.querySelector('#run');
+run.onclick=async()=>{
+ run.disabled=true;let tts,context;
+ try{
+  context=new AudioContext(); await context.resume();
+  status.textContent='Loading';
+  const catalog=await (await fetch('./model/voices.json')).json();
+  const voices=Object.fromEntries(catalog.voices.map(v=>[v.contact,`./model/voices/${v.contact}.safetensors`]));
+  const model={weights:{f32:'./model/model.safetensors'},config:'./model/config.json',tokenizer:'./model/tokenizer.json',voices,defaultVoice:Object.keys(voices)[0]};
+  tts=await loadBlessengerSpeech(model);
+  const results=[];
+  for(const voice of Object.keys(voices)){
+   status.textContent=`Synthesizing ${results.length+1}/14`;
+   const chunks=[];const stream=tts.stream('Thank you.',{voice,temperature:.7,seed:42});
+   for await(const pcm of stream){if(!pcm.every(Number.isFinite))throw Error('Nonfinite PCM');chunks.push(pcm);}
+   const stats=await stream.done;
+   if(!chunks.length)throw Error('No speech generated');
+   const controller=new AbortController();
+   const interrupted=tts.stream('This is a longer reply that will be interrupted before it completes.',{voice,temperature:.7,seed:42,signal:controller.signal});
+   let interruptedFrames=0;
+   for await(const pcm of interrupted){interruptedFrames+=pcm.length;controller.abort();break;}
+   await interrupted.done;
+   const restarted=tts.stream('Thank you.',{voice,temperature:.7,seed:42});
+   for await(const pcm of restarted){
+    if(pcm.length!==chunks[0].length||!pcm.every((v,i)=>v===chunks[0][i]))throw Error('Reply changed after cancellation');
+    break;
+   }
+   await restarted.done;
+   results.push({voice,frames:chunks.reduce((n,x)=>n+x.length,0),interruptedFrames,stats,restartEqual:true});
+  }
+  const referenceSeed='18446744073709551615';
+  const referenceVoice=Object.keys(voices)[0];
+  const partial=tts.stream('Thank you.',{voice:referenceVoice,temperature:.7,seed:BigInt(referenceSeed)});
+  let prefix;
+  for await(const chunk of partial){prefix=chunk.slice();break;}
+  await partial.done;
+  const prefixSHA256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',prefix)),b=>b.toString(16).padStart(2,'0')).join('');
+  const referenceRequest={text:'Thank you.',voice:referenceVoice,seed:referenceSeed,prefixFrames:prefix.length,prefixSHA256};
+  const recovered=await speechReference(tts,referenceRequest);
+  let mismatchRejected=false;
+  try{await speechReference(tts,{...referenceRequest,prefixSHA256:'0'.repeat(64)});}catch(error){if(!String(error).includes('differs'))throw error;mismatchRejected=true;}
+  if(!mismatchRejected)throw Error('Mismatching reference accepted');
+  const reference={seed:referenceSeed,prefixFrames:prefix.length,recoveredFrames:recovered.length,prefixSHA256,mismatchRejected};
+  await context.audioWorklet.addModule('./qualify-call-audio.js');
+  const node=new AudioWorkletNode(context,'call-audio',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1]});
+  const mute=context.createGain();mute.gain.value=0;node.connect(mute).connect(context.destination);
+  const heard={};
+  const playback=new SpeechPlayback(tts,node.port,({epoch,through})=>{
+   if(through<=(heard[epoch]??0))throw Error('Heard frames must increase');
+   heard[epoch]=through;
+  });
+  let firstRendered;
+  node.port.onmessage=({data})=>{playback.acknowledge(data);if(data.epoch==='cancel'&&data.played===0)firstRendered?.();};
+  playback.begin('clean');
+  const clean=await playback.speak('Thank you.',Object.keys(voices)[0],'clean','18446744073709551615');
+  playback.begin('cancel');
+  const rendered=new Promise(resolve=>firstRendered=resolve);
+  const interrupted=playback.speak('This is a long reply that should stop before it finishes speaking.',Object.keys(voices)[0],'cancel','9007199254740993');
+  await rendered;
+  playback.begin('restart');
+  const restarted=playback.speak('Thank you.',Object.keys(voices)[1],'restart','42');
+  const cancelled=await interrupted,afterCancel=await restarted;
+  if(!cancelled.cancelled||afterCancel.cancelled||clean.cancelled)throw Error('AudioWorklet cancellation failed');
+  if(heard.clean!==clean.samples||heard.restart!==afterCancel.samples||heard.cancel!==1920)throw Error('Rendered frame journal mismatch');
+  node.disconnect();mute.disconnect();
+  status.textContent=JSON.stringify({passed:true,device:tts.device,threads:tts.threads,results,reference,playback:{clean,cancelled,afterCancel,heard},scope:'Real browser worker, muted synthesis, AudioWorklet rendering and cancellation; no microphone or acoustic test'},null,2);
+ }catch(error){status.textContent=JSON.stringify({passed:false,error:String(error),stack:error.stack},null,2);}
+ finally{tts?.dispose();await context?.close();run.disabled=false;}
+};
+</script>

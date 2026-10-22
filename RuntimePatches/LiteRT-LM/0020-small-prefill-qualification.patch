@@ -1,0 +1,41 @@
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index a01c3c8..fb38156 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -16,6 +16,8 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <chrono>
++#include <cstdio>
+ #include <cstdint>
+ #include <cstring>
+ #include <cstdlib>
+@@ -2335,7 +2338,14 @@ absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
+       ids.size() == 1 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
+     work_groups = {{std::string(kDecodeSignatureRunner), 1}};
+   }
++  // Qualification only: compare short suffixes against the padded prefill graph.
++  if (std::getenv("CALL_GEMMA_QUALIFY_SHORT_PREFILL") != nullptr &&
++      ids.size() <= 16 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
++    work_groups.assign(ids.size(), {std::string(kDecodeSignatureRunner), 1});
++  }
++  const bool trace_prefill = std::getenv("CALL_GEMMA_TRACE_PREFILL") != nullptr;
+   for (int i = 0; i < work_groups.size(); ++i) {
++    const auto prefill_started = std::chrono::steady_clock::now();
+     const auto& prefill_signature = work_groups[i].first;
+     int prefill_length = work_groups[i].second;
+     // Keep track of the signatures that have already had their buffers
+@@ -2366,6 +2376,12 @@ absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
+         prefill_signature, prefill_input_buffers_[prefill_signature],
+         prefill_output_buffers_[prefill_signature],
+         ids.subspan(/*pos=*/0, prefill_length), async, &inputs));
++    if (trace_prefill) {
++      const auto elapsed = std::chrono::duration<double, std::milli>(
++          std::chrono::steady_clock::now() - prefill_started).count();
++      std::fprintf(stderr, "CALLGEMMA_PREFILL signature=%s tokens=%d ms=%.6f\n",
++                   prefill_signature.c_str(), prefill_length, elapsed);
++    }
+     ids = ids.subspan(/*pos=*/prefill_length);
+   }
+   RET_CHECK_EQ(ids.size(), 0).SetCode(absl::StatusCode::kInternal)

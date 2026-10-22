@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@mlc-ai/web-llm": "0.2.86"
+  },
+  "name": "blessenger-browser-gemma",
+  "private": true,
+  "type": "module"
+}

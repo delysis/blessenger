@@ -1,0 +1,37 @@
+{
+  "url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/5f25078c9439e176615af5ba42636ed904fca847/runtime/testdata/dummy_audio_no_mask.litertlm",
+  "git_blob": "de87e4b0b36963ee779a8bd98f5144739258b324",
+  "size": 18424,
+  "sections": [
+    {
+      "begin": 16384,
+      "end": 18424,
+      "metadata": {
+        "model_type": "tf_lite_audio_encoder_hw"
+      },
+      "signature": {
+        "serving_default": {
+          "subgraph_index": 0,
+          "inputs": {
+            "src_inputs": {
+              "shape": [
+                1,
+                10,
+                8
+              ]
+            }
+          },
+          "outputs": {
+            "features": {
+              "shape": [
+                1,
+                5,
+                5
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

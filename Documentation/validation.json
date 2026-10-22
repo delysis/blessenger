@@ -1,0 +1,109 @@
+{
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "apple_sdk_available": false,
+    "swift_compiler_available": true,
+    "swift_compiler": "Swift 6.2.3 (swift-6.2.3-RELEASE), x86_64-unknown-linux-gnu"
+  },
+  "results": [
+    {
+      "check": "Qualification driver/analyzer compile and portable admission checks",
+      "status": "PASS",
+      "evidence": "../Qualification/VALIDATION.txt",
+      "limitations": "C++ harness checks only; no model/runtime implementation loaded."
+    },
+    {
+      "check": "Production codec metadata/parser tests",
+      "status": "PASS",
+      "test_count": 11,
+      "evidence": "../RuntimePatches/validation/int8-metal-codec/parser-tests.json",
+      "limitations": "Provider transfer tests are syntax-checked but not linked or run."
+    },
+    {
+      "check": "C11 new Conversation declarations",
+      "status": "PASS",
+      "compiler": "cc -std=c11 -Wall -Wextra -Werror -fsyntax-only",
+      "limitations": "Function pointer signatures in actual bundled headers; no native implementation linkage."
+    },
+    {
+      "check": "Four new incremental patches",
+      "status": "PASS",
+      "evidence": "../RuntimePatches/validation",
+      "limitations": "Exact pre-edit bytes, git apply with whitespace checks, and final byte reconstruction; no Mac build."
+    },
+    {
+      "check": "Original patch files unchanged",
+      "status": "PASS",
+      "count": 14,
+      "evidence": "../RuntimePatches/validation/original-patches.json"
+    },
+    {
+      "check": "Final C headers match patched source",
+      "status": "PASS",
+      "files": [
+        "Reference/LiteRT-LM/c/engine.h",
+        "Reference/LiteRT-LM/c/conversation.h"
+      ]
+    },
+    {
+      "check": "Shell syntax, JSON/plist/scheme parsing, bundled Markdown links",
+      "status": "PASS",
+      "limitations": "Xcode project acceptance and Swift dependency resolution require Xcode."
+    },
+    {
+      "check": "Platform-independent production Swift tests",
+      "status": "PASS",
+      "test_count": 19,
+      "suite_count": 3,
+      "evidence": "../Qualification/Validation/swift-portable/tests.xml",
+      "flags": [
+        "Swift language mode 6",
+        "-strict-concurrency=complete",
+        "-warnings-as-errors on production/test targets",
+        "-enable-actor-data-race-checks"
+      ],
+      "limitations": "Exact production sources and tests, no Apple or inference API mocks. AppKit, AVFoundation, CoreML, Metal and native C runtime linkage are not typechecked or exercised."
+    },
+    {
+      "check": "Cancellation qualification driver after callback lifetime correction",
+      "status": "PASS",
+      "evidence": "../Qualification/Validation/callback-lifetime/compile-commands.sh",
+      "limitations": "Actual driver/analyzer compile and analyzer self-tests; native cancellation/worker joining remain unrun."
+    }
+  ],
+  "not_run": [
+    "Full native Swift app build and the 12 Apple-dependent tests (checkpoint storage, model verification/preparation, voice decoder)",
+    "Apple Clang full runtime builds",
+    "Metal provider/kernel tests",
+    "Gemma4 text/audio inference",
+    "MTP/cross-MTP comparisons",
+    "Native cache save/restart/restore and count_tokens purity",
+    "CoreML/ANE fallback and physical audio playback",
+    "Relocated app launch",
+    "Performance, retained-memory and end-to-end latency measurements"
+  ],
+  "source_review": "Independent owners reviewed callback/handle lifetimes, checkpoint publication, pinned audio APIs and native build linkage. Continuation fixed the qualification callback lifetime, AVAudioConverter callback synchronization, and compressed voice-file reads; the new reader/tests received an independent review. Native behavior remains unqualified.",
+  "qualification_policy": {
+    "inference_regression_default_percent": 0,
+    "retained_memory_default_bytes": 0,
+    "confidence_default": 0.99,
+    "minimum_measured_abba_blocks": 12,
+    "save_load_budgets": "Must be predeclared on the Mac before data collection",
+    "inconclusive_is_pass": false
+  },
+  "artifact_status": {
+    "requested_qat_provenance_verified": false,
+    "first_run": "Explicit alternate-model choice; pinned automatic download afterward",
+    "runtime_binary_included": false,
+    "gemma_weights_included": false
+  },
+  "portable_test_runner": {
+    "framework": "Swift Testing",
+    "test_methods_total": 31,
+    "executed_on_linux": 19,
+    "apple_dependent_not_run": 12,
+    "replay": "bash Tools/test-portable-swift.sh",
+    "discovery_note": "Linux Swift 6.2.3 XCTest discovery was observed to abort casting generated @Sendable test method references. Portable suites were migrated to Swift Testing without changing the assertions or production behavior. The initial separate compiler driver also crashed in this restricted host; the successful run uses SwiftPM integrated driver."
+  }
+}

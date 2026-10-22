@@ -1,0 +1,663 @@
+diff --git a/runtime/core/BUILD b/runtime/core/BUILD
+index 1aa77a6..9d060d9 100644
+--- a/runtime/core/BUILD
++++ b/runtime/core/BUILD
+@@ -392,6 +392,7 @@ cc_library(
+     srcs = ["session_cache_file.cc"],
+     hdrs = ["session_cache_file.h"],
+     deps = [
++        "//runtime/util:tracked_state_output",
+         "@com_google_absl//absl/cleanup",
+         "@com_google_absl//absl/crc:crc32c",
+         "@com_google_absl//absl/status",
+@@ -407,6 +408,7 @@ cc_test(
+     name = "session_cache_file_test",
+     srcs = ["session_cache_file_test.cc"],
+     deps = [
++        "@com_google_absl//absl/crc:crc32c",
+         ":session_cache_file",
+         "@com_google_absl//absl/status",
+         "@com_google_googletest//:gtest_main",
+diff --git a/runtime/core/session_cache_file.cc b/runtime/core/session_cache_file.cc
+index 717bf1d..253c3bb 100644
+--- a/runtime/core/session_cache_file.cc
++++ b/runtime/core/session_cache_file.cc
+@@ -396,7 +396,10 @@ absl::StatusOr<std::shared_ptr<CapturedCacheFile>> CapturedCacheFile::Create(
+     // Never wait for a pending materialization or retain a chain of deltas.
+     // A published base owns only a descriptor and hashes, not its ancestors.
+     result->base_ = std::atomic_load(&previous->materialized_);
+-    if (!result->base_) result->base_ = previous->base_;
++    if (!result->base_) result->base_ = std::atomic_load(&previous->base_);
++    // Materialization can publish and release its parent between these loads.
++    if (!result->base_) result->base_ = std::atomic_load(&previous->materialized_);
++    result->had_base_ = static_cast<bool>(result->base_);
+     if (result->base_) result->hashes_->reserve(result->base_->hashes->size());
+   }
+ #endif
+@@ -443,6 +446,7 @@ absl::Status CapturedCacheFile::FlushRun() {
+ }
+ 
+ absl::Status CapturedCacheFile::Block(const char* data, size_t bytes) {
++  scanned_bytes_ += bytes;
+ #if defined(__APPLE__)
+   static const std::array<char, 4096> zero{};
+   static const auto zero_hash = [] {
+@@ -456,8 +460,9 @@ absl::Status CapturedCacheFile::Block(const char* data, size_t bytes) {
+   else CC_SHA256(data, static_cast<CC_LONG>(bytes), hash.data());
+   const size_t index = hashes_->size();
+   const bool unchanged = base_ && index < base_->hashes->size() &&
+-                         (*base_->hashes)[index] == hash;
+-  hashes_->push_back(hash);
++                         (*base_->hashes)[index].hash == hash;
++  const uint32_t block_crc = static_cast<uint32_t>(absl::ComputeCrc32c(absl::string_view(data, bytes)));
++  hashes_->push_back({hash, block_crc, tracked_version_});
+   // Compare strong content hashes, never CRCs, when reusing a cloned block.
+   // CRC32C remains the independent on-disk framing/integrity check.
+   const bool write = !unchanged && (base_ || !is_zero);
+@@ -473,11 +478,61 @@ absl::Status CapturedCacheFile::Block(const char* data, size_t bytes) {
+     std::memcpy(compare_.data() + run_size_, data, bytes);
+     run_size_ += bytes;
+   }
++#if defined(__APPLE__)
++  crc_ = static_cast<uint32_t>(absl::ConcatCrc32c(absl::crc32c_t(crc_), absl::crc32c_t(block_crc), bytes));
++#else
+   crc_ = static_cast<uint32_t>(absl::ExtendCrc32c(absl::crc32c_t(crc_), absl::string_view(data, bytes)));
++#endif
+   position_ += bytes;
+   return absl::OkStatus();
+ }
+ 
++uint32_t CapturedCacheFile::CurrentCRC() const {
++  return static_cast<uint32_t>(absl::ExtendCrc32c(absl::crc32c_t(crc_),
++      absl::string_view(partial_.data(), partial_size_)));
++}
++
++bool CapturedCacheFile::WriteTracked(const char* data, size_t size, uint64_t incarnation,
++                                    const uint32_t* versions, size_t count) {
++  if (finished_ || !status_.ok()) return false;
++  // Only whole aligned physical blocks may bypass content reads. Unaligned
++  // tensors retain the conservative scan path, including boundary blocks.
++  if (!incarnation || partial_size_ || position_ % 4096 || size % 4096 || count != size / 4096)
++    return xsputn(data, size) == static_cast<std::streamsize>(size);
++  if (!versions) return false;
++  if (!tracked_source_) tracked_source_ = incarnation;
++  if (tracked_source_ != incarnation) return false;
++  const bool audit = std::getenv("CALL_GEMMA_VERIFY_DIRTY") != nullptr;
++  for (size_t i = 0; i < count; ++i) {
++    const size_t index = hashes_->size();
++    const BlockInfo* old = base_ && index < base_->hashes->size() ? &(*base_->hashes)[index] : nullptr;
++    if (old && base_->incarnation == incarnation && old->version == versions[i]) {
++      status_ = FlushRun();
++      if (!status_.ok()) return false;
++#if defined(__APPLE__)
++      if (audit) {
++        std::array<unsigned char, 32> actual;
++        CC_SHA256(data + i * 4096, 4096, actual.data());
++        if (actual != old->hash) {
++          status_ = absl::DataLossError("Dirty tracking missed a changed physical cache block.");
++          return false;
++        }
++      }
++#endif
++      reused_bytes_ += 4096;
++      hashes_->push_back(*old);
++      crc_ = static_cast<uint32_t>(absl::ConcatCrc32c(absl::crc32c_t(crc_), absl::crc32c_t(old->crc), 4096));
++      position_ += 4096;
++    } else {
++      tracked_version_ = versions[i];
++      status_ = Block(data + i * 4096, 4096);
++      tracked_version_ = 0;
++      if (!status_.ok()) return false;
++    }
++  }
++  return true;
++}
++
+ std::streamsize CapturedCacheFile::xsputn(const char* data, std::streamsize size) {
+ #if defined(_WIN32)
+   return 0;
+@@ -527,10 +582,12 @@ absl::Status CapturedCacheFile::Finish() {
+       return absl::ErrnoToStatus(errno, "Could not size initial captured state.");
+     const int fd = fcntl(fd_, F_DUPFD_CLOEXEC, 0);
+     if (fd < 0) return absl::ErrnoToStatus(errno, "Could not retain initial captured state.");
+-    std::shared_ptr<const Base> base(new Base{fd, hashes_});
++    std::shared_ptr<const Base> base(new Base{fd, hashes_, tracked_source_});
+     std::atomic_store(&materialized_, base);
+   }
+ #endif
++  if (std::getenv("CALL_GEMMA_CAPTURE_METRICS"))
++    std::fprintf(stderr, "CAPTURE scanned_bytes=%zu reused_bytes=%zu\n", scanned_bytes_, reused_bytes_);
+   finished_ = true;
+   return absl::OkStatus();
+ }
+@@ -539,7 +596,7 @@ absl::StatusOr<std::shared_ptr<const CapturedCacheFile::Base>>
+ CapturedCacheFile::Materialize() const {
+   if (auto existing = std::atomic_load(&materialized_)) return existing;
+   ABSL_ASSIGN_OR_RETURN(int fd, CaptureFD(directory_, base_ ? base_->fd : -1));
+-  auto base = std::shared_ptr<const Base>(new Base{fd, hashes_});
++  auto base = std::shared_ptr<const Base>(new Base{fd, hashes_, tracked_source_});
+   std::array<char, 65536> buffer;
+   for (const auto& delta : deltas_) {
+     if (!spilled_) {
+@@ -562,6 +619,9 @@ CapturedCacheFile::Materialize() const {
+     return absl::ErrnoToStatus(errno, "Could not size captured state.");
+ #endif
+   std::atomic_store(&materialized_, base);
++  // The cloned file is now self-contained. Release the obsolete parent's index
++  // and descriptor before potentially slow durable publication.
++  std::atomic_store(&base_, std::shared_ptr<const Base>{});
+   std::string().swap(delta_bytes_);
+   return base;
+ }
+@@ -605,7 +665,7 @@ absl::Status CapturedCacheFile::Publish(absl::string_view path, absl::string_vie
+   file = std::fopen(temporary.c_str(), cloned ? "r+b" : "wbx");
+   if (!file) return absl::ErrnoToStatus(errno, "Could not open captured checkpoint.");
+   if (fchmod(fileno(file), 0600) != 0) return absl::ErrnoToStatus(errno, "Could not restrict checkpoint.");
+-  size_t written = bytes_written_ + ((spilled_ && !base_) ? 0 : payload_size_);
++  size_t written = bytes_written_ + ((spilled_ && !had_base_) ? 0 : payload_size_);
+   if (!cloned) {
+     if (fseek(file, kStateOffset, SEEK_SET) != 0) return absl::ErrnoToStatus(errno, "Could not seek checkpoint.");
+     std::array<char, 65536> buffer;
+diff --git a/runtime/core/session_cache_file.h b/runtime/core/session_cache_file.h
+index 55e54f9..dd28940 100644
+--- a/runtime/core/session_cache_file.h
++++ b/runtime/core/session_cache_file.h
+@@ -24,6 +24,7 @@
+ #include <cstdint>
+ #include <vector>
+ 
++#include "runtime/util/tracked_state_output.h"
+ #include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/status/statusor.h"  // from @com_google_absl
+ #include "absl/strings/string_view.h"  // from @com_google_absl
+@@ -56,7 +57,7 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+ // (larger deltas spill to an unlinked file), plus SHA-256 block indexes and a
+ // 1 MiB working buffer. Background materialization clones a completed base;
+ // pending captures never form an accumulating chain of deltas.
+-class CapturedCacheFile final : public std::streambuf {
++class CapturedCacheFile final : public std::streambuf, public TrackedStateOutput {
+  public:
+   static absl::StatusOr<std::shared_ptr<CapturedCacheFile>> Create(
+       absl::string_view directory, std::shared_ptr<const CapturedCacheFile> previous = nullptr);
+@@ -64,6 +65,9 @@ class CapturedCacheFile final : public std::streambuf {
+   absl::Status Finish();
+   absl::Status Publish(absl::string_view path, absl::string_view key,
+       int last_token, absl::string_view metadata, size_t* written_bytes) const;
++  bool WriteTracked(const char* data, size_t size, uint64_t incarnation,
++                    const uint32_t* versions, size_t count) override;
++  uint32_t CurrentCRC() const override;
+   size_t bytes_written() const { return bytes_written_; }
+   size_t size() const { return position_; }
+  private:
+@@ -71,14 +75,23 @@ class CapturedCacheFile final : public std::streambuf {
+   std::streamsize xsputn(const char* data, std::streamsize size) override;
+   absl::Status Block(const char* data, size_t bytes);
+   absl::Status FlushRun();
+-  using Hashes = std::vector<std::array<unsigned char, 32>>;
++  struct BlockInfo {
++    std::array<unsigned char, 32> hash;
++    uint32_t crc;
++    uint32_t version;
++  };
++  using Hashes = std::vector<BlockInfo>;
++  uint32_t tracked_version_ = 0;
++  uint64_t tracked_source_ = 0;
+   struct Base {
+     int fd;
+     std::shared_ptr<const Hashes> hashes;
++    uint64_t incarnation;
+     ~Base();
+   };
+   struct Delta { size_t offset, size, payload; };
+-  std::shared_ptr<const Base> base_;
++  mutable std::shared_ptr<const Base> base_;
++  bool had_base_ = false;
+   mutable std::shared_ptr<const Base> materialized_;
+   mutable std::mutex publish_mutex_;
+   mutable std::string delta_bytes_;
+@@ -95,6 +108,8 @@ class CapturedCacheFile final : public std::streambuf {
+   int fd_;
+   size_t position_ = 0;
+   size_t bytes_written_ = 0;
++  size_t scanned_bytes_ = 0;
++  size_t reused_bytes_ = 0;
+   uint32_t crc_ = 0;
+   bool finished_ = false;
+   absl::Status status_;
+diff --git a/runtime/core/session_cache_file_test.cc b/runtime/core/session_cache_file_test.cc
+index ff61f0d..824be8e 100644
+--- a/runtime/core/session_cache_file_test.cc
++++ b/runtime/core/session_cache_file_test.cc
+@@ -27,6 +27,7 @@
+ #include <system_error>
+ 
+ #include <gtest/gtest.h>
++#include "absl/crc/crc32c.h"
+ #include "absl/status/status.h"  // from @com_google_absl
+ 
+ namespace litert::lm {
+@@ -285,6 +286,39 @@ TEST_F(SessionCacheFileTest, BoundedCaptureDeathKeepsLastPublishedGeneration) {
+     }
+   }
+ }
++TEST_F(SessionCacheFileTest, TrackedCaptureDeathKeepsLastPublishedGeneration) {
++  const std::string old_state(2 * 1024 * 1024, 'a');
++  std::string new_state = old_state; new_state[4097] = 'b';
++  std::vector<uint32_t> original_versions(old_state.size() / 4096, 1);
++  auto new_versions = original_versions; new_versions[1] = 2;
++  for (const int delay_us : {0, 100, 1000, 5000, 20000, 100000}) {
++    auto base = CapturedCacheFile::Create(directory_.string());
++    ASSERT_TRUE(base.ok()) << base.status();
++    ASSERT_TRUE((*base)->WriteTracked(old_state.data(), old_state.size(), 91, original_versions.data(), original_versions.size()));
++    ASSERT_TRUE((*base)->Finish().ok());
++    ASSERT_TRUE((*base)->Publish(path_, "key", 1, "old", nullptr).ok());
++    const pid_t child = fork();
++    ASSERT_GE(child, 0);
++    if (child == 0) {
++      auto captured = CapturedCacheFile::Create(directory_.string(), *base);
++      if (!captured.ok()) _exit(1);
++      bool written = (*captured)->WriteTracked(new_state.data(), new_state.size(), 91, new_versions.data(), new_versions.size());
++      if (!written || !(*captured)->Finish().ok()) _exit(2);
++      _exit((*captured)->Publish(path_, "key", 2, "new", nullptr).ok() ? 0 : 3);
++    }
++    usleep(delay_us); kill(child, SIGKILL);
++    int status = 0; ASSERT_EQ(waitpid(child, &status, 0), child);
++    if (WIFEXITED(status)) EXPECT_EQ(WEXITSTATUS(status), 0);
++    auto restored = ReadSessionCacheFile(path_, "key");
++    ASSERT_TRUE(restored.ok()) << restored.status();
++    if (restored->last_prefill_token_id == 1) {
++      EXPECT_EQ(restored->metadata, "old"); EXPECT_EQ(restored->state, old_state);
++    } else {
++      EXPECT_EQ(restored->last_prefill_token_id, 2);
++      EXPECT_EQ(restored->metadata, "new"); EXPECT_EQ(restored->state, new_state);
++    }
++  }
++}
+ #endif
+ 
+ #if !defined(_WIN32)
+@@ -330,5 +364,51 @@ TEST_F(SessionCacheFileTest, OversizedDeltaSpillsAndRetriesAfterPublicationFailu
+ }
+ #endif
+ 
++TEST_F(SessionCacheFileTest, TrackedBlocksReuseCompletedBaseAndPreserveSkippedChanges) {
++  std::string bytes(8 * 4096, 'a');
++  std::vector<uint32_t> versions(8, 1);
++  auto first = CapturedCacheFile::Create(directory_.string());
++  ASSERT_TRUE(first.ok());
++  ASSERT_TRUE((*first)->WriteTracked(bytes.data(), bytes.size(), 77, versions.data(), versions.size()));
++  ASSERT_TRUE((*first)->Finish().ok());
++  ASSERT_TRUE((*first)->Publish(path_, "first", 1, "m", nullptr).ok());
++  bytes[4097] = 'b'; versions[1] = 2;
++  auto pending = CapturedCacheFile::Create(directory_.string(), *first);
++  ASSERT_TRUE(pending.ok());
++  ASSERT_TRUE((*pending)->WriteTracked(bytes.data(), bytes.size(), 77, versions.data(), versions.size()));
++  ASSERT_TRUE((*pending)->Finish().ok());
++  bytes[7 * 4096 + 8] = 'c'; versions[7] = 3;
++  auto latest = CapturedCacheFile::Create(directory_.string(), *pending);
++  ASSERT_TRUE(latest.ok());
++  ASSERT_TRUE((*latest)->WriteTracked(bytes.data(), bytes.size(), 77, versions.data(), versions.size()));
++  // Include a partial block tail: CurrentCRC must include pending bytes too.
++  std::ostream output(latest->get()); output.write("tail", 4);
++  EXPECT_EQ((*latest)->CurrentCRC(), static_cast<uint32_t>(absl::ComputeCrc32c(bytes + "tail")));
++  ASSERT_TRUE((*latest)->Finish().ok());
++  ASSERT_TRUE((*latest)->Publish(path_, "latest", 2, "m", nullptr).ok());
++  auto loaded = ReadSessionCacheFile(path_, "latest");
++  ASSERT_TRUE(loaded.ok()) << loaded.status();
++  EXPECT_EQ(loaded->state, bytes + "tail");
++}
++
++TEST_F(SessionCacheFileTest, TrackingIncarnationChangeCannotReuseStaleBlocks) {
++  std::string bytes(4096, 'a');
++  uint32_t version = 1;
++  auto first = CapturedCacheFile::Create(directory_.string());
++  ASSERT_TRUE(first.ok());
++  ASSERT_TRUE((*first)->WriteTracked(bytes.data(), bytes.size(), 1, &version, 1));
++  ASSERT_TRUE((*first)->Finish().ok());
++  ASSERT_TRUE((*first)->Publish(path_, "first", 1, "m", nullptr).ok());
++  auto next = CapturedCacheFile::Create(directory_.string(), *first);
++  ASSERT_TRUE(next.ok());
++  bytes.assign(4096, 'z');
++  ASSERT_TRUE((*next)->WriteTracked(bytes.data(), bytes.size(), 2, &version, 1));
++  ASSERT_TRUE((*next)->Finish().ok());
++  ASSERT_TRUE((*next)->Publish(path_, "next", 2, "m", nullptr).ok());
++  auto loaded = ReadSessionCacheFile(path_, "next");
++  ASSERT_TRUE(loaded.ok()) << loaded.status();
++  EXPECT_EQ(loaded->state, bytes);
++}
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/executor/litert/BUILD b/runtime/executor/litert/BUILD
+index 6ab3153..57b3a7b 100644
+--- a/runtime/executor/litert/BUILD
++++ b/runtime/executor/litert/BUILD
+@@ -111,6 +111,7 @@ cc_library(
+         "@platforms//os:ios": [":metal_snapshot"],
+         "//conditions:default": [],
+     }) + [
++        "//runtime/util:tracked_state_output",
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/crc:crc32c",
+         "@com_google_absl//absl/status",
+diff --git a/runtime/executor/litert/state.cc b/runtime/executor/litert/state.cc
+index 32a6588..bf5be17 100644
+--- a/runtime/executor/litert/state.cc
++++ b/runtime/executor/litert/state.cc
+@@ -13,6 +13,8 @@
+ // limitations under the License.
+ 
+ #include "runtime/executor/litert/state.h"
++#include <atomic>
++#include <limits>
+ 
+ #include <algorithm>
+ #include <cstddef>
+@@ -252,11 +254,89 @@ absl::StatusOr<std::string> LitertState::Serialize() const {
+   return SerializeState(data.first, data.second);
+ }
+ 
+-absl::Status LitertState::SerializeTo(std::ostream& output) const {
++void LitertState::InvalidateCaptureTracking() {
++  capture_incarnation_ = 0;
++  capture_versions_.clear();
++  tracked_writes_ = false;
++  dirty_begin_ = dirty_end_ = 0;
++}
++
++void LitertState::MarkCacheWrite(int begin, int end) {
++  if (begin < 0 || end < begin) { InvalidateCaptureTracking(); return; }
++  if (!tracked_writes_) { dirty_begin_ = begin; dirty_end_ = end; }
++  else { dirty_begin_ = std::min(dirty_begin_, begin); dirty_end_ = std::max(dirty_end_, end); }
++  tracked_writes_ = true;
++}
++
++absl::Status LitertState::SerializeTo(std::ostream& output, bool track) const {
+   ABSL_ASSIGN_OR_RETURN(auto data,
+       SerializationData(batch_size_, num_entries_, allocation_policy_,
+                         bank_1_is_input_, bank_1_state_buffers_, bank_2_state_buffers_));
+-  return SerializeState(data.first, data.second, &output).status();
++  if (!track || !tracked_writes_ || batch_size_ != 1 || bank_2_state_buffers_ ||
++      allocation_policy_ != AllocationPolicy::kGpuOptimizedInplace) {
++    // A conservative capture can follow writes outside the tracked dispatch
++    // path (for example MTP). Never reuse older tracked versions afterwards.
++    capture_incarnation_ = 0;
++    capture_versions_.clear();
++    return SerializeState(data.first, data.second, &output).status();
++  }
++  static std::atomic<uint64_t> next_incarnation{1};
++  if (capture_version_ == std::numeric_limits<uint32_t>::max()) {
++    capture_incarnation_ = 0;
++    capture_version_ = 0;
++    capture_versions_.clear();
++  }
++  if (!capture_incarnation_) capture_incarnation_ = next_incarnation.fetch_add(1);
++  const uint32_t version = ++capture_version_;
++  for (const auto& [name, buffer] : data.second) {
++    const bool key = absl::StartsWith(name, "1/kv_cache_k_");
++    const bool value = absl::StartsWith(name, "1/kv_cache_v_");
++    LITERT_ASSIGN_OR_RETURN(auto type, buffer.TensorType());
++    LITERT_ASSIGN_OR_RETURN(size_t bytes, buffer.PackedSize());
++    const auto shape = type.Layout().Dimensions();
++    auto& tags = capture_versions_[name];
++    if (tags.size() != (bytes + 4095) / 4096) tags.assign((bytes + 4095) / 4096, version);
++    const int element_bytes = type.ElementType() == ElementType::Int8 ? 1 :
++                              type.ElementType() == ElementType::Float16 ? 2 : 0;
++    // Exact layouts of the pinned ML Drift cache-update kernel. Unknown states,
++    // ring wrap, and incompatible dimensions conservatively dirty all blocks.
++    if ((!key && !value) || !element_bytes || shape.size() != 4 || shape[0] != 1 ||
++        shape[1] <= 0 || shape[2] <= 0 || shape[3] <= 0 || shape[2] % 4 || shape[3] % 4 ||
++        dirty_end_ > shape[key ? 2 : 3]) {
++      std::fill(tags.begin(), tags.end(), version);
++      continue;
++    }
++    const size_t capacity = shape[key ? 2 : 3];
++    const size_t heads = shape[1], width = shape[key ? 3 : 2];
++    auto mark = [&](size_t begin, size_t end) {
++      if (begin >= end) return;
++      for (size_t block = begin / 4096; block <= (end - 1) / 4096 && block < tags.size(); ++block)
++        tags[block] = version;
++    };
++    const size_t begin = std::min<size_t>(dirty_begin_, capacity);
++    const size_t end = std::min<size_t>(dirty_end_, capacity);
++    if (key) {
++      // vec4 index = ((head * width/4 + slice) * capacity/4 + token/4)*4 + token%4.
++      for (size_t head = 0; head < heads; ++head)
++        for (size_t slice = 0; slice < width / 4; ++slice) {
++          const size_t base = (head * width / 4 + slice) * capacity * 4 * element_bytes;
++          mark(base + begin * 4 * element_bytes, base + end * 4 * element_bytes);
++        }
++    } else {
++      // Values interleave four tokens within each head-dimension tile. Mark
++      // complete token groups, including harmless neighbouring words.
++      for (size_t head = 0; head < heads; ++head) {
++        const size_t base = head * capacity * width * element_bytes;
++        mark(base + (begin / 4) * 4 * width * element_bytes,
++             base + ((end + 3) / 4) * 4 * width * element_bytes);
++      }
++    }
++  }
++  auto status = SerializeState(data.first, data.second, &output, capture_incarnation_, &capture_versions_).status();
++  // Only reset after successful capture. Subsequent writes start a new interval;
++  // unchanged snapshots retain the version of every previously touched block.
++  if (status.ok()) { dirty_begin_ = std::numeric_limits<int>::max(); dirty_end_ = 0; }
++  return status;
+ }
+ 
+ absl::Status LitertState::ValidateLoad(const ParsedSerializedState& state,
+@@ -358,6 +438,7 @@ absl::StatusOr<nlohmann::json> LitertState::GetTensorDescriptors() const {
+ }
+ 
+ absl::Status LitertState::Load(const ParsedSerializedState& state) {
++  InvalidateCaptureTracking();
+   ABSL_RETURN_IF_ERROR(ValidateLoad(state));
+   ABSL_ASSIGN_OR_RETURN(
+       auto data, SerializationData(batch_size_, num_entries_, allocation_policy_,
+@@ -387,6 +468,7 @@ absl::StatusOr<std::unique_ptr<LitertState>> LitertState::Create(
+ 
+ absl::Status LitertState::SelectAndCopyFrom(StateInterface& other,
+                                             int batch_index) {
++  InvalidateCaptureTracking();
+   auto other_litert = dynamic_cast<LitertState*>(&other);
+   RET_CHECK(other_litert != nullptr) << "Only support LitertState.";
+   RET_CHECK(!bank_2_state_buffers_.has_value());
+@@ -405,6 +487,7 @@ absl::Status LitertState::SelectAndCopyFrom(StateInterface& other,
+ }
+ 
+ absl::Status LitertState::BroadcastAndCopyFrom(StateInterface& other) {
++  InvalidateCaptureTracking();
+   auto other_litert = dynamic_cast<LitertState*>(&other);
+   RET_CHECK(other_litert != nullptr) << "Only support LitertState.";
+   RET_CHECK(!bank_2_state_buffers_.has_value());
+@@ -476,6 +559,7 @@ bool LitertState::IsHostMemory() const {
+ }
+ 
+ absl::Status LitertState::CopyContentsFrom(const LitertState& other) {
++  InvalidateCaptureTracking();
+   if (this == &other) {
+     return absl::OkStatus();
+   }
+@@ -514,6 +598,7 @@ bool LitertState::Contains(absl::string_view tensor_name) const {
+ }
+ 
+ absl::Status LitertState::Clear() {
++  InvalidateCaptureTracking();
+   for (auto& [_, state_buffer] : bank_1_state_buffers_) {
+     LITERT_RETURN_IF_ERROR(state_buffer.buffer.Clear());
+   }
+@@ -528,6 +613,7 @@ absl::Status LitertState::Clear() {
+ absl::Status LitertState::Resize(CompiledModel& compiled_model,
+                                  absl::string_view signature_name,
+                                  int num_entries) {
++  InvalidateCaptureTracking();
+   RET_CHECK(!bank_2_state_buffers_.has_value())
+           .SetCode(absl::StatusCode::kInvalidArgument)
+       << "Out of place KV cache cannot be resized.";
+diff --git a/runtime/executor/litert/state.h b/runtime/executor/litert/state.h
+index 6962f57..e3b0aa9 100644
+--- a/runtime/executor/litert/state.h
++++ b/runtime/executor/litert/state.h
+@@ -16,6 +16,8 @@
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_H_
+ 
+ #include <ostream>
++#include <cstdint>
++#include <vector>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -63,7 +65,10 @@ class LitertState : public StateInterface {
+   int GetBatchSize() const override { return batch_size_; }
+ 
+   absl::StatusOr<std::string> Serialize() const override;
+-  absl::Status SerializeTo(std::ostream& output) const;
++  absl::Status SerializeTo(std::ostream& output, bool track = false) const;
++  // Called before every supported cache-update dispatch with its actual params.
++  void MarkCacheWrite(int begin, int end);
++  void InvalidateCaptureTracking();
+ 
+   absl::Status Load(absl::string_view serialized_state) override;
+ 
+@@ -160,6 +165,13 @@ class LitertState : public StateInterface {
+         bank_2_state_buffers_(std::move(bank_2_state_buffers)),
+         allocation_policy_(allocation_policy) {}
+ 
++  mutable uint64_t capture_incarnation_ = 0;
++  mutable uint32_t capture_version_ = 0;
++  mutable absl::flat_hash_map<std::string, std::vector<uint32_t>> capture_versions_;
++  mutable int dirty_begin_ = 0;
++  mutable int dirty_end_ = 0;
++  mutable bool tracked_writes_ = false;
++
+   // Batch size of the KV cache buffers.
+   int batch_size_;
+   // Number of entries in the KV cache.
+diff --git a/runtime/executor/litert/state_serialization.cc b/runtime/executor/litert/state_serialization.cc
+index a9683ac..6411bf1 100644
+--- a/runtime/executor/litert/state_serialization.cc
++++ b/runtime/executor/litert/state_serialization.cc
+@@ -13,6 +13,7 @@
+ // limitations under the License.
+ 
+ #include "runtime/executor/litert/state_serialization.h"
++#include "runtime/util/tracked_state_output.h"
+ 
+ #include <ostream>
+ #include <algorithm>
+@@ -298,7 +299,8 @@ absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer) {
+ 
+ absl::StatusOr<std::string> SerializeState(
+     const nlohmann::json& metadata, const StateTensorBuffers& buffers,
+-    std::ostream* output) {
++    std::ostream* output, uint64_t incarnation,
++    const absl::flat_hash_map<std::string, std::vector<uint32_t>>* versions) {
+   if (!metadata.is_object() || buffers.size() > kMaxTensors) {
+     return absl::InvalidArgumentError("Invalid state metadata or tensor count.");
+   }
+@@ -350,8 +352,9 @@ absl::StatusOr<std::string> SerializeState(
+   }
+   if (!output) result.reserve(overhead + payload_bytes);
+   absl::crc32c_t crc = absl::ComputeCrc32c("");
++  auto* tracked = output ? dynamic_cast<TrackedStateOutput*>(output->rdbuf()) : nullptr;
+   auto append = [&](absl::string_view data) -> absl::Status {
+-    crc = absl::ExtendCrc32c(crc, data);
++    if (!tracked) crc = absl::ExtendCrc32c(crc, data);
+     if (output) {
+       output->write(data.data(), data.size());
+       if (!*output) return absl::InternalError("Bounded state output failed.");
+@@ -369,7 +372,13 @@ absl::StatusOr<std::string> SerializeState(
+     if (bytes != 0) {
+       if (physical_metal) {
+         ABSL_ASSIGN_OR_RETURN(void* data, PhysicalMetalBytes(source, bytes));
+-        ABSL_RETURN_IF_ERROR(append(absl::string_view(static_cast<const char*>(data), bytes)));
++        if (tracked && versions && versions->contains(name)) {
++          const auto& tags = versions->at(name);
++          if (!tracked->WriteTracked(static_cast<const char*>(data), bytes, incarnation, tags.data(), tags.size()))
++            return absl::InternalError("Tracked state output failed.");
++        } else {
++          ABSL_RETURN_IF_ERROR(append(absl::string_view(static_cast<const char*>(data), bytes)));
++        }
+         continue;
+       }
+       // Duplicate only the handle, never the tensor payload.
+@@ -382,7 +391,7 @@ absl::StatusOr<std::string> SerializeState(
+     }
+   }
+   std::string checksum;
+-  AppendInteger(checksum, static_cast<uint32_t>(crc), 4);
++  AppendInteger(checksum, tracked ? tracked->CurrentCRC() : static_cast<uint32_t>(crc), 4);
+   if (output) {
+     output->write(checksum.data(), checksum.size());
+     if (!*output) return absl::InternalError("Bounded state checksum output failed.");
+diff --git a/runtime/executor/litert/state_serialization.h b/runtime/executor/litert/state_serialization.h
+index afd08c8..f400d0c 100644
+--- a/runtime/executor/litert/state_serialization.h
++++ b/runtime/executor/litert/state_serialization.h
+@@ -53,7 +53,9 @@ absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer);
+ // declared tensor types; a hardware buffer's storage type is not its dtype.
+ absl::StatusOr<std::string> SerializeState(
+     const nlohmann::json& metadata, const StateTensorBuffers& buffers,
+-    std::ostream* output = nullptr);
++    std::ostream* output = nullptr,
++    uint64_t incarnation = 0,
++    const absl::flat_hash_map<std::string, std::vector<uint32_t>>* versions = nullptr);
+ 
+ // Checks the complete framing, checksum, descriptors and lengths. The result
+ // borrows tensor bytes from serialized_state, which must outlive the result.
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index 7fd6692..2a59afd 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -902,6 +902,16 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::BindTensorsAndRunPrefill(
+     pre_graph_run_callback_(prefill_signature, current_step, input_buffers);
+   }
+ 
++  if (litert_state && gpu_optimized_single_buffer_cache_ && signatures_.input_int32_param) {
++    auto& params = prefill_input_buffers[*signatures_.input_int32_param];
++    LITERT_ASSIGN_OR_RETURN(size_t bytes, params.PackedSize());
++    if (bytes >= 2 * sizeof(int32_t)) {
++      LITERT_ASSIGN_OR_RETURN(auto lock, TensorBufferScopedLock::Create(params, TensorBuffer::LockMode::kRead));
++      const auto* values = static_cast<const int32_t*>(lock.second);
++      litert_state->MarkCacheWrite(values[0], values[1]);
++    } else { litert_state->InvalidateCaptureTracking(); }
++  } else if (litert_state) { litert_state->InvalidateCaptureTracking(); }
++
+   litert::Options run_options = GetRunOptions();
+   if (async) {
+     LITERT_RETURN_IF_ERROR(compiled_model_->RunAsync(
+@@ -1206,6 +1216,16 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::BindTensorsAndRunDecode(
+                             decode_input_buffers);
+   }
+ 
++  if (litert_state && gpu_optimized_single_buffer_cache_ && signatures_.input_int32_param) {
++    auto& params = decode_input_buffers_[*signatures_.input_int32_param];
++    LITERT_ASSIGN_OR_RETURN(size_t bytes, params.PackedSize());
++    if (bytes >= 2 * sizeof(int32_t)) {
++      LITERT_ASSIGN_OR_RETURN(auto lock, TensorBufferScopedLock::Create(params, TensorBuffer::LockMode::kRead));
++      const auto* values = static_cast<const int32_t*>(lock.second);
++      litert_state->MarkCacheWrite(values[0], values[1]);
++    } else { litert_state->InvalidateCaptureTracking(); }
++  } else if (litert_state) { litert_state->InvalidateCaptureTracking(); }
++
+   litert::Options run_options = GetRunOptions();
+   bool async = true;
+   LITERT_RETURN_IF_ERROR(
+@@ -1775,7 +1795,7 @@ LlmLiteRtCompiledModelExecutorBase::SerializeContextImpl(std::ostream* output) c
+   if (output) {
+     const auto* state = dynamic_cast<const LitertState*>(active);
+     if (!state) return absl::UnimplementedError("State has no bounded serializer.");
+-    ABSL_RETURN_IF_ERROR(state->SerializeTo(*output));
++    ABSL_RETURN_IF_ERROR(state->SerializeTo(*output, gpu_optimized_single_buffer_cache_ && verify_steps == 0 && heads == 1));
+   } else {
+     ABSL_ASSIGN_OR_RETURN(result.state, active->Serialize());
+   }
+diff --git a/runtime/util/BUILD b/runtime/util/BUILD
+index e31d373..44bd197 100644
+--- a/runtime/util/BUILD
++++ b/runtime/util/BUILD
+@@ -786,3 +786,5 @@ cc_test(
+         "//runtime/proto:litert_lm_metrics_cc_proto",
+     ],
+ )
++
++cc_library(name = "tracked_state_output", hdrs = ["tracked_state_output.h"])

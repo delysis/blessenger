@@ -1,0 +1,96 @@
+{
+  "scope": "Validation only; held-out test not scored; not acoustic or streaming acceptance",
+  "seconds": 1.10842587496154,
+  "trials": [
+    {
+      "features": "flatten",
+      "C": 0.001,
+      "wrong_activations": 0,
+      "correct_detections": 30,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0,
+      "margin": 0.2
+    },
+    {
+      "features": "flatten",
+      "C": 0.01,
+      "wrong_activations": 0,
+      "correct_detections": 29,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.7,
+      "margin": 0
+    },
+    {
+      "features": "flatten",
+      "C": 0.1,
+      "wrong_activations": 0,
+      "correct_detections": 30,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.9,
+      "margin": 0
+    },
+    {
+      "features": "flatten",
+      "C": 1,
+      "wrong_activations": 0,
+      "correct_detections": 33,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.95,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "C": 0.001,
+      "wrong_activations": 0,
+      "correct_detections": 71,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.2,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "C": 0.01,
+      "wrong_activations": 0,
+      "correct_detections": 69,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.5,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "C": 0.1,
+      "wrong_activations": 0,
+      "correct_detections": 66,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.7,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "C": 1,
+      "wrong_activations": 0,
+      "correct_detections": 47,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.95,
+      "margin": 0
+    }
+  ],
+  "chosen": {
+    "features": "pool",
+    "C": 0.001,
+    "wrong_activations": 0,
+    "correct_detections": 71,
+    "positive_clips": 112,
+    "negative_clips": 21,
+    "threshold": 0.2,
+    "margin": 0
+  }
+}

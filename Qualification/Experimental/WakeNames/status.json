@@ -1,0 +1,86 @@
+{
+  "status": "Not implemented or accepted in the app",
+  "contact_storage": {
+    "wakeName": "Stored and editable, but no detector consumes it"
+  },
+  "manual_group_routing": {
+    "implemented": "Roster-bound manual selection, shared current-call committed history with attribution and no recursive imports; actual muted 12B app three-way round trips passed twice.",
+    "missing_evidence": "Cancellation during handoff and live speaker group conversation remain unqualified."
+  },
+  "training_candidates": [
+    {
+      "name": "openWakeWord",
+      "source": "https://github.com/dscripka/openWakeWord",
+      "revision": "368c03716d1e92591906a84949bc477f3a834455",
+      "approach": "Shared frozen audio embedding and trained wake-name head; synthetic positives and hard negatives",
+      "boundary": "Research source inspected; no native integration or trained contact models"
+    },
+    {
+      "name": "Create ML sound classifier",
+      "source": "https://developer.apple.com/documentation/CreateML/MLSoundClassifier",
+      "approach": "Native on-device training and Core ML streaming inference",
+      "boundary": "Generic sound features; phonetic discrimination of short names must be demonstrated, not assumed"
+    }
+  ],
+  "required_acceptance": [
+    "Split original recordings and synthetic seeds before augmentation; no train/test siblings",
+    "Distinguish all enrolled roster names plus confusable negatives and background speech",
+    "Held-out natural microphone speech, including quiet speakers",
+    "False activation measurement on post-AEC bot playback and silent-room captures",
+    "Contact identity and training-data provenance bound to the model",
+    "No wake-name training or feature extraction stalls capture or model generation",
+    "Actual-app group handoff responds with the intended voice and retains group context",
+    "Cancellation and hang-up revoke pending detection and handoff work"
+  ],
+  "app_detector": "Not integrated; training candidates rejected for held-out confusion and false activations.",
+  "latest_rejection_baseline": {
+    "receipt": "rejection-baseline-02.json",
+    "scope": "Two-name synthetic held-out voice experiment; not app integration",
+    "correct_names": 14,
+    "wrong_names": 2,
+    "missed_names": 4,
+    "positive_clips": 20,
+    "false_activations": 0,
+    "negative_clips": 10,
+    "decision": "Reject for app use"
+  },
+  "full_roster_experiment": {
+    "dataset": "work/wake-name-rd/dataset-14-01",
+    "status": "Two complete feature/head evaluations; not accepted for routing",
+    "names": 14,
+    "labels": "stable contact UUIDs",
+    "note": "Ad de Jongh uses full-name candidate to avoid ordinary English add; no contact settings changed",
+    "baseline_receipt": "full-roster-baseline-01.json",
+    "position_corrected_receipt": "full-roster-position-02.json",
+    "augmentation_repair": "Uniform placement over all available window positions, never cropping original speech; same source/voice partitions preserved",
+    "latest": {
+      "correct": 69,
+      "wrong_name": 1,
+      "false_activation": 1,
+      "missed": 42,
+      "positive_clips": 112,
+      "negative_clips": 21
+    }
+  },
+  "streaming_feature_parity": "30 validation clips, no prediction changes between offline and 80ms chunked extraction; feature compute p95 1.33ms, not total detection latency.",
+  "validation_selection_04": {
+    "correct": 71,
+    "positive": 112,
+    "wrong": 0,
+    "negative": 21,
+    "test_scored": false,
+    "accepted": false,
+    "receipt": "validation-selection-04/receipt.json"
+  },
+  "nonlinear_validation_05": {
+    "selected": "linear pool C=.001",
+    "nonlinear_rejected": true,
+    "best_nonlinear_correct": 62,
+    "linear_correct": 71,
+    "positive_validation_clips": 112,
+    "wrong_validation_activations": 0,
+    "test_scored": false,
+    "app_enabled": false,
+    "next": "Improve training voice and acoustic coverage before more classifier capacity"
+  }
+}

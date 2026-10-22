@@ -1,0 +1,11 @@
+{
+  "source_revision": "210d6b6d21177115babfece0de5e1795cffec2a2",
+  "original_sha256": "36574022223ec0c70facdfc876b5f6d1f593eacbc132b313b832bd598a70de54",
+  "finding": "ANE step wrapper uses default exact GELU; loaded upstream transformer uses approximate=tanh.",
+  "validation": "Eleven teacher-forced frames with exact upstream initial cache; corrected wrapper max hidden RMSE < 2.7e-7, compared with up to 0.001665 before correction.",
+  "status": "Signed candidate running in normal visible app with real microphone and audible output. Muted 12B handoff cancellation and redial passed; speaker acceptance pending.",
+  "converted_validation": "Corrected fp32 CoreML step, exact upstream initial cache and teacher-forced prior latents: all 11 hidden outputs RMSE <= 4.8e-7. Second-frame latent RMSE falls from 0.10967 to 0.01851; remaining flow decoder precision isolated at 0.01707.",
+  "recipe": "export_step.py validates source hash, dependency versions and English configuration; disables GELU fusion and exports explicit tanh in float16.",
+  "hardware_diagnostic": "CoreML plan assigns explicit transformer operations to Neural Engine; free-running fixed 11-frame Hello audio correlation to upstream 0.998963; warm ABBA step medians original 4.360ms, corrected 4.325ms.",
+  "scope_limit": "Only generation exporter corrected; conditioning exporter formula mismatch remains to investigate and correct. Current diagnostic retains original bundled conditioners."
+}

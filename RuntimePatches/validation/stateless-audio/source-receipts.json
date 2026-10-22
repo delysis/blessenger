@@ -1,0 +1,128 @@
+{
+  "repository": "google-ai-edge/LiteRT-LM",
+  "revision": "5f25078c9439e176615af5ba42636ed904fca847",
+  "sources": [
+    {
+      "path": "runtime/executor/audio/audio_executor_base.h",
+      "git_blob": "45149690a9ca2e4094e589e361a05672085bd8ce",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio/audio_executor_base.h"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor.h",
+      "git_blob": "d46701579f7f3d54dc409a7c5edf4431b69cfcf5",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio_litert_compiled_model_executor.h"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor.cc",
+      "git_blob": "cb072781283cc3601ef232c8330a7aa832650158",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio_litert_compiled_model_executor.cc"
+    },
+    {
+      "path": "runtime/executor/audio_litert_compiled_model_executor_test.cc",
+      "git_blob": "da7b8c7568ab4e073eb3819477c4d7d0b2cdb93f",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio_litert_compiled_model_executor_test.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager.h",
+      "git_blob": "041c454a2520e0603792a3b7cadd7d1d3b50e5d8",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/resource_manager.h"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager.cc",
+      "git_blob": "ccbffc80f3498300a51d6b18561ec5e9a3cb9cd7",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/resource_manager.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/resource_manager_test.cc",
+      "git_blob": "d644242cabf5dc6db4e4f79e0e699a52dcd659a9",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/resource_manager_test.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/threaded_execution_manager.cc",
+      "git_blob": "ebd055d8a20c5d5f44ffb837f46498fe2da8d5fa",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/threaded_execution_manager.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/serial_execution_manager.cc",
+      "git_blob": "f5f78f346cce5905fb6761be22975feb8b04802b",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/serial_execution_manager.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/execution_manager_test.cc",
+      "git_blob": "f0e98393618ddc005a71c94eb1f7d878d4eae8a9",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/execution_manager_test.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/BUILD",
+      "git_blob": "5d9a7fa4ef08a280c0f74112e196f37ecce34cc5",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/BUILD"
+    },
+    {
+      "path": "runtime/executor/audio/audio_executor_utils.cc",
+      "git_blob": "e54401c911be620f4986b00bcbbb795973e7982e",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio/audio_executor_utils.cc"
+    },
+    {
+      "path": "runtime/executor/audio/audio_executor_settings.h",
+      "git_blob": "b5db8131845e313ae62b0d975a772b0200c92654",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/audio/audio_executor_settings.h"
+    },
+    {
+      "path": "runtime/core/audio_session_advanced.cc",
+      "git_blob": "27816582915925696f3fba8273fe22078667a27e",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/core/audio_session_advanced.cc"
+    },
+    {
+      "path": "support/util/io_types.h",
+      "git_blob": "cd524fad2b0671db312dd852c73eb5d765aabbd2",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/support/util/io_types.h"
+    }
+  ],
+  "test_fixture": {
+    "url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT-LM/5f25078c9439e176615af5ba42636ed904fca847/runtime/testdata/dummy_audio_no_mask.litertlm",
+    "git_blob": "de87e4b0b36963ee779a8bd98f5144739258b324",
+    "size": 18424,
+    "sections": [
+      {
+        "begin": 16384,
+        "end": 18424,
+        "metadata": {
+          "model_type": "tf_lite_audio_encoder_hw"
+        },
+        "signature": {
+          "serving_default": {
+            "subgraph_index": 0,
+            "inputs": {
+              "src_inputs": {
+                "shape": [
+                  1,
+                  10,
+                  8
+                ]
+              }
+            },
+            "outputs": {
+              "features": {
+                "shape": [
+                  1,
+                  5,
+                  5
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "artifact_receipts": [
+    "12b-audio-ranges.json",
+    "e4b-audio-ranges.json"
+  ],
+  "validation": {
+    "git_diff_check": "passed",
+    "native_tests": "not_run",
+    "syntax_check": "blocked_by_missing_real_dependency_headers; see syntax-check.json",
+    "device_audio_and_checkpoint_round_trip": "not_run"
+  }
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "clinical-age.wav",
+    "answer": "\\b(?:forty|40)\\b",
+    "minimumRetainedAudioSeconds": 2.5
+  },
+  {
+    "path": "clinical-work.wav",
+    "answer": "\\b(?:five|5)\\b",
+    "minimumRetainedAudioSeconds": 3.2
+  }
+]

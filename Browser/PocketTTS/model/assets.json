@@ -1,0 +1,20 @@
+{
+  "model": "kyutai/pocket-tts",
+  "revision": "19f95fe2df36e79fbd9f10008595cc4c977a0fcc",
+  "language": "english_2026-04",
+  "decodeSteps": 8,
+  "files": {
+    "config.json": {
+      "sha256": "6e0eb10addbbf4e6e098cd5c67d512195b979cd270671514feb95f45ec28fa4e",
+      "bytes": 991
+    },
+    "tokenizer.json": {
+      "sha256": "f498428e1eafee50492f7be13dc9bfafcfc12e508cd0eb1b01c92ecd5d8c6687",
+      "bytes": 245020
+    },
+    "model.safetensors": {
+      "sha256": "473f47d99560bd50eb8b4509d3cacfe7f316ab20bdca86505403a2e6a936a6e9",
+      "bytes": 219029196
+    }
+  }
+}

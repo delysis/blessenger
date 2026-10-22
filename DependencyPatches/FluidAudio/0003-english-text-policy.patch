@@ -1,0 +1,19 @@
+diff --git a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
+index 7e8c9be7..f8a6d25b 100644
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
+@@ -878,7 +878,13 @@ public struct PocketTtsSynthesizer {
+         let wordCount = result.split(separator: " ").count
+         let framesAfterEos: Int
+         if !isMidSentence, wordCount < PocketTtsConstants.shortTextWordThreshold {
+-            result = String(repeating: " ", count: 8) + result
++            // The English v2 weights match upstream english_2026-04,
++            // whose pad_with_spaces_for_short_inputs policy is false.
++            // Retain the short-text EOS tail; whitespace is model input,
++            // not silence padding, and introduces unwanted vocalizations.
++            if language != .english {
++                result = String(repeating: " ", count: 8) + result
++            }
+             framesAfterEos = PocketTtsConstants.shortTextPadFrames
+         } else {
+             framesAfterEos = PocketTtsConstants.longTextExtraFrames

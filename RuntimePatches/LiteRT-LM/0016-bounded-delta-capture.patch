@@ -1,0 +1,1243 @@
+diff --git a/c/conversation.cc b/c/conversation.cc
+index 13f6b7d..0702785 100644
+--- a/c/conversation.cc
++++ b/c/conversation.cc
+@@ -607,6 +607,7 @@ LiteRtLmStatusCode litert_lm_conversation_get_history(
+ 
+ struct LiteRtLmCacheSnapshot {
+   litert::lm::SessionCacheSnapshot value;
++  std::shared_ptr<litert::lm::CapturedCacheFile> file;
+ };
+ 
+ LiteRtLmStatusCode litert_lm_conversation_capture_cache(
+@@ -617,7 +618,27 @@ LiteRtLmStatusCode litert_lm_conversation_capture_cache(
+     return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid conversation.");
+   auto result = conversation->conversation->CaptureCache();
+   if (!result.ok()) return litert::lm::c::ToCStatus(result.status());
+-  *out_snapshot = new LiteRtLmCacheSnapshot{std::move(*result)};
++  *out_snapshot = new LiteRtLmCacheSnapshot{std::move(*result), nullptr};
++  return kLiteRtLmStatusOk;
++}
++
++LiteRtLmStatusCode litert_lm_conversation_capture_cache_bounded(
++    LiteRtLmConversation* conversation, const char* directory,
++    const LiteRtLmCacheSnapshot* previous, LiteRtLmCacheSnapshot** out_snapshot) {
++  LITERT_LM_C_RETURN_IF_NULL(out_snapshot);
++  *out_snapshot = nullptr;
++  LITERT_LM_C_RETURN_IF_NULL(directory);
++  if (!conversation || !conversation->conversation)
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid conversation.");
++  auto file = litert::lm::CapturedCacheFile::Create(directory,
++      previous ? previous->file : nullptr);
++  if (!file.ok()) return litert::lm::c::ToCStatus(file.status());
++  std::ostream output(file->get());
++  auto result = conversation->conversation->CaptureCache(&output);
++  if (!result.ok()) return litert::lm::c::ToCStatus(result.status());
++  auto status = (*file)->Finish();
++  if (!status.ok()) return litert::lm::c::ToCStatus(status);
++  *out_snapshot = new LiteRtLmCacheSnapshot{std::move(*result), std::move(*file)};
+   return kLiteRtLmStatusOk;
+ }
+ 
+@@ -628,6 +649,8 @@ LiteRtLmStatusCode litert_lm_cache_snapshot_write(
+   LITERT_LM_C_RETURN_IF_NULL(path);
+   LITERT_LM_C_RETURN_IF_NULL(compatibility_key);
+   const auto& value = snapshot->value;
++  if (snapshot->file) return litert::lm::c::ToCStatus(snapshot->file->Publish(
++      path, compatibility_key, value.last_prefill_token_id, value.metadata, out_written_bytes));
+   return litert::lm::c::ToCStatus(litert::lm::WriteSessionCacheFile(
+       path, compatibility_key, value.last_prefill_token_id, value.metadata,
+       value.state, previous_path ? previous_path : "", out_written_bytes, true));
+diff --git a/c/conversation.h b/c/conversation.h
+index a44b510..19fb928 100644
+--- a/c/conversation.h
++++ b/c/conversation.h
+@@ -742,6 +742,16 @@ typedef struct LiteRtLmCacheSnapshot LiteRtLmCacheSnapshot;
+ LITERT_LM_C_API_EXPORT
+ LiteRtLmStatusCode litert_lm_conversation_capture_cache(
+     LiteRtLmConversation* conversation, LiteRtLmCacheSnapshot** out_snapshot);
++// Captures immutable changed blocks with at most 32 MiB of payload in RAM;
++// excess bytes spill to an unlinked file. Indexes use 32 bytes per 4 KiB block.
++// Previous is optional and remains unchanged. Directory must exist on a local
++// writable filesystem. No snapshot owns live executor buffer views. Publication
++// materializes the snapshot off-thread; pending snapshots do not form a chain.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_capture_cache_bounded(
++    LiteRtLmConversation* conversation, const char* directory,
++    const LiteRtLmCacheSnapshot* previous, LiteRtLmCacheSnapshot** out_snapshot);
++
+ LITERT_LM_C_API_EXPORT
+ LiteRtLmStatusCode litert_lm_cache_snapshot_write(
+     const LiteRtLmCacheSnapshot* snapshot, const char* path,
+diff --git a/runtime/conversation/conversation.cc b/runtime/conversation/conversation.cc
+index 67f5d74..26ded51 100644
+--- a/runtime/conversation/conversation.cc
++++ b/runtime/conversation/conversation.cc
+@@ -1026,7 +1026,7 @@ absl::Status Conversation::SaveCache(absl::string_view path,
+   return session_->SaveCache(path, compatibility_key);
+ }
+ 
+-absl::StatusOr<SessionCacheSnapshot> Conversation::CaptureCache() {
++absl::StatusOr<SessionCacheSnapshot> Conversation::CaptureCache(std::ostream* output) {
+   ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
+   absl::MutexLock lock(history_mutex_);
+   if (is_appending_message_ || checkpoint_message_index_.has_value() ||
+@@ -1037,7 +1037,7 @@ absl::StatusOr<SessionCacheSnapshot> Conversation::CaptureCache() {
+         "Conversation cache requires a completed assistant turn.");
+   }
+   ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_));
+-  return session_->CaptureCache();
++  return session_->CaptureCache(output);
+ }
+ 
+ absl::Status Conversation::LoadCache(absl::string_view path,
+diff --git a/runtime/conversation/conversation.h b/runtime/conversation/conversation.h
+index 5327db5..1d65c23 100644
+--- a/runtime/conversation/conversation.h
++++ b/runtime/conversation/conversation.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CONVERSATION_CONVERSATION_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CONVERSATION_CONVERSATION_H_
+ 
++#include <ostream>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -672,7 +673,7 @@ class Conversation {
+   // Supports alternating user/assistant text or user audio turns. Prefilled
+   // prefaces, channel filtering, constraints, tools, and pending messages are
+   // not supported. Session::SaveCache restrictions also apply.
+-  absl::StatusOr<SessionCacheSnapshot> CaptureCache();
++  absl::StatusOr<SessionCacheSnapshot> CaptureCache(std::ostream* output = nullptr);
+   absl::Status SaveCache(absl::string_view path,
+                         absl::string_view compatibility_key);
+ 
+diff --git a/runtime/core/session_advanced.cc b/runtime/core/session_advanced.cc
+index 7772b68..346ef31 100644
+--- a/runtime/core/session_advanced.cc
++++ b/runtime/core/session_advanced.cc
+@@ -500,7 +500,7 @@ absl::Status SessionAdvanced::SaveCache(absl::string_view path,
+       snapshot.last_prefill_token_id, snapshot.metadata, snapshot.state);
+ }
+ 
+-absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache() {
++absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache(std::ostream* output) {
+   absl::MutexLock lock(mutex_);
+   if (session_state_ != SessionState::kDecoded) {
+     return absl::FailedPreconditionError(
+@@ -514,7 +514,7 @@ absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache() {
+   // can itself enqueue another session operation.
+   ABSL_ASSIGN_OR_RETURN(
+       auto context,
+-      manager->SerializeSessionContext(session_id_, last_task_ids_));
++      manager->SerializeSessionContext(session_id_, last_task_ids_, output));
+   return SessionCacheSnapshot{session_info_->last_prefill_token_id,
+                               std::move(context.metadata), std::move(context.state)};
+ }
+diff --git a/runtime/core/session_advanced.h b/runtime/core/session_advanced.h
+index 32354c9..840dcb7 100644
+--- a/runtime/core/session_advanced.h
++++ b/runtime/core/session_advanced.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_ADVANCED_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_ADVANCED_H_
+ 
++#include <ostream>
+ #include <atomic>
+ #include <memory>
+ #include <optional>
+@@ -166,7 +167,7 @@ class SessionAdvanced : public SessionInterface {
+ 
+   absl::StatusOr<BenchmarkInfo*> GetMutableBenchmarkInfo() override;
+ 
+-  absl::StatusOr<SessionCacheSnapshot> CaptureCache() override;
++  absl::StatusOr<SessionCacheSnapshot> CaptureCache(std::ostream* output = nullptr) override;
+   absl::Status SaveCache(absl::string_view path,
+                          absl::string_view compatibility_key) override
+       ABSL_LOCKS_EXCLUDED(mutex_);
+diff --git a/runtime/core/session_cache_file.cc b/runtime/core/session_cache_file.cc
+index 27b5b72..717bf1d 100644
+--- a/runtime/core/session_cache_file.cc
++++ b/runtime/core/session_cache_file.cc
+@@ -19,6 +19,7 @@
+ #include <cstring>
+ #if defined(__APPLE__)
+ #include <sys/clonefile.h>
++#include <CommonCrypto/CommonDigest.h>
+ #endif
+ #include <cerrno>
+ #include <chrono>
+@@ -106,6 +107,57 @@ absl::Status WriteAll(FILE* file, absl::string_view data) {
+   return absl::OkStatus();
+ }
+ 
++absl::Status PublishFile(FILE*& file, const std::filesystem::path& temporary,
++                         const std::filesystem::path& destination) {
++  if (std::fflush(file) != 0) {
++    return absl::ErrnoToStatus(errno, "Could not flush session cache.");
++  }
++#if defined(_WIN32)
++  const int sync_result = _commit(_fileno(file));
++#else
++  int sync_result;
++  do {
++    sync_result = fsync(fileno(file));
++  } while (sync_result != 0 && errno == EINTR);
++#endif
++  if (sync_result != 0) {
++    return absl::ErrnoToStatus(errno, "Could not sync session cache.");
++  }
++  const int close_result = std::fclose(std::exchange(file, nullptr));
++  if (close_result != 0) {
++    return absl::ErrnoToStatus(errno, "Could not close session cache.");
++  }
++#if defined(_WIN32)
++  if (!MoveFileExW(temporary.c_str(), destination.c_str(),
++                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
++    return absl::InternalError(
++        absl::StrCat("Could not publish session cache: ", GetLastError()));
++  }
++#else
++  if (std::rename(temporary.c_str(), destination.c_str()) != 0) {
++    return absl::ErrnoToStatus(errno, "Could not publish session cache.");
++  }
++  const auto parent = destination.has_parent_path()
++                          ? destination.parent_path()
++                          : std::filesystem::path(".");
++  const int dir_fd = open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  if (dir_fd < 0) {
++    return absl::ErrnoToStatus(
++        errno, "Cache published; directory durability could not be confirmed.");
++  }
++  do {
++    sync_result = fsync(dir_fd);
++  } while (sync_result != 0 && errno == EINTR);
++  const int sync_errno = errno;
++  close(dir_fd);
++  if (sync_result != 0) {
++    return absl::ErrnoToStatus(
++        sync_errno, "Cache published; directory durability is uncertain.");
++  }
++#endif
++  return absl::OkStatus();
++}
++
+ }  // namespace
+ 
+ absl::Status WriteSessionCacheFile(absl::string_view path,
+@@ -226,52 +278,7 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+   if (std::fflush(file) != 0 || ftruncate(fileno(file), state_offset + state.size()) != 0)
+     return absl::ErrnoToStatus(errno, "Could not size checkpoint.");
+ #endif
+-  if (std::fflush(file) != 0) {
+-    return absl::ErrnoToStatus(errno, "Could not flush session cache.");
+-  }
+-#if defined(_WIN32)
+-  const int sync_result = _commit(_fileno(file));
+-#else
+-  int sync_result;
+-  do {
+-    sync_result = fsync(fileno(file));
+-  } while (sync_result != 0 && errno == EINTR);
+-#endif
+-  if (sync_result != 0) {
+-    return absl::ErrnoToStatus(errno, "Could not sync session cache.");
+-  }
+-  const int close_result = std::fclose(std::exchange(file, nullptr));
+-  if (close_result != 0) {
+-    return absl::ErrnoToStatus(errno, "Could not close session cache.");
+-  }
+-#if defined(_WIN32)
+-  if (!MoveFileExW(temporary.c_str(), destination.c_str(),
+-                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+-    return absl::InternalError(
+-        absl::StrCat("Could not publish session cache: ", GetLastError()));
+-  }
+-#else
+-  if (std::rename(temporary.c_str(), destination.c_str()) != 0) {
+-    return absl::ErrnoToStatus(errno, "Could not publish session cache.");
+-  }
+-  const auto parent = destination.has_parent_path()
+-                          ? destination.parent_path()
+-                          : std::filesystem::path(".");
+-  const int dir_fd = open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+-  if (dir_fd < 0) {
+-    return absl::ErrnoToStatus(
+-        errno, "Cache published; directory durability could not be confirmed.");
+-  }
+-  do {
+-    sync_result = fsync(dir_fd);
+-  } while (sync_result != 0 && errno == EINTR);
+-  const int sync_errno = errno;
+-  close(dir_fd);
+-  if (sync_result != 0) {
+-    return absl::ErrnoToStatus(
+-        sync_errno, "Cache published; directory durability is uncertain.");
+-  }
+-#endif
++  ABSL_RETURN_IF_ERROR(PublishFile(file, temporary, destination));
+   if (written_bytes) *written_bytes = changed_bytes;
+   return absl::OkStatus();
+ }
+@@ -332,4 +339,293 @@ absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
+   return MappedSessionCache{std::move(mapping), metadata, bytes, token_id};
+ }
+ 
++
++namespace {
++absl::StatusOr<int> CaptureFD(absl::string_view directory, int previous_fd = -1) {
++#if defined(_WIN32)
++  return absl::UnimplementedError("Bounded cache capture requires POSIX files.");
++#else
++  if (directory.empty() || directory.find('\0') != absl::string_view::npos)
++    return absl::InvalidArgumentError("Invalid capture directory.");
++  std::string temporary = std::string(directory) + "/capture-XXXXXX";
++  if (!mkdtemp(temporary.data()))
++    return absl::ErrnoToStatus(errno, "Could not create private capture directory.");
++  const std::string path = temporary + "/state";
++  absl::Cleanup cleanup = [&] { unlink(path.c_str()); rmdir(temporary.c_str()); };
++  bool cloned = false;
++#if defined(__APPLE__)
++  if (previous_fd >= 0) {
++    if (fclonefileat(previous_fd, AT_FDCWD, path.c_str(), 0) == 0) cloned = true;
++    else return absl::ErrnoToStatus(errno, "Could not clone captured state.");
++  }
++#endif
++  const int fd = open(path.c_str(), O_RDWR | O_CLOEXEC | (cloned ? 0 : O_CREAT | O_EXCL), 0600);
++  if (fd < 0) return absl::ErrnoToStatus(errno, "Could not open captured state.");
++#if defined(__APPLE__)
++  if (fcntl(fd, F_NOCACHE, 1) != 0) {
++    const int error = errno; close(fd);
++    return absl::ErrnoToStatus(error, "Could not bound capture file caching.");
++  }
++#endif
++  return fd;
++#endif
++}
++
++absl::Status WriteAt(int fd, absl::string_view data, size_t position) {
++#if defined(_WIN32)
++  return absl::UnimplementedError("Bounded cache capture requires POSIX files.");
++#else
++  while (!data.empty()) {
++    const ssize_t n = pwrite(fd, data.data(), data.size(), position);
++    if (n < 0 && errno == EINTR) continue;
++    if (n <= 0) return absl::ErrnoToStatus(errno ? errno : EIO, "Could not write capture blocks.");
++    data.remove_prefix(n); position += n;
++  }
++  return absl::OkStatus();
++#endif
++}
++}  // namespace
++
++absl::StatusOr<std::shared_ptr<CapturedCacheFile>> CapturedCacheFile::Create(
++    absl::string_view directory, std::shared_ptr<const CapturedCacheFile> previous) {
++  ABSL_ASSIGN_OR_RETURN(int fd, CaptureFD(directory));
++  auto result = std::shared_ptr<CapturedCacheFile>(new CapturedCacheFile(fd, std::string(directory)));
++#if defined(__APPLE__)
++  if (previous) {
++    if (!previous->finished_) return absl::FailedPreconditionError("Capture base is unfinished.");
++    // Never wait for a pending materialization or retain a chain of deltas.
++    // A published base owns only a descriptor and hashes, not its ancestors.
++    result->base_ = std::atomic_load(&previous->materialized_);
++    if (!result->base_) result->base_ = previous->base_;
++    if (result->base_) result->hashes_->reserve(result->base_->hashes->size());
++  }
++#endif
++  return result;
++}
++
++CapturedCacheFile::Base::~Base() {
++#if !defined(_WIN32)
++  close(fd);
++#endif
++}
++
++CapturedCacheFile::~CapturedCacheFile() {
++#if !defined(_WIN32)
++  close(fd_);
++#endif
++}
++
++absl::Status CapturedCacheFile::FlushRun() {
++  if (!run_size_) return absl::OkStatus();
++  constexpr size_t kMemoryLimit = 32 * 1024 * 1024;
++  if (!spilled_ && delta_bytes_.size() + run_size_ > kMemoryLimit) {
++    for (const auto& delta : deltas_) {
++      ABSL_RETURN_IF_ERROR(WriteAt(fd_, absl::string_view(delta_bytes_).substr(delta.payload, delta.size),
++                                  kStateOffset + delta.offset));
++    }
++    bytes_written_ += delta_bytes_.size();
++    std::string().swap(delta_bytes_);
++    spilled_ = true;
++  }
++  if (spilled_) {
++    ABSL_RETURN_IF_ERROR(WriteAt(fd_, absl::string_view(compare_.data(), run_size_), kStateOffset + run_start_));
++    bytes_written_ += run_size_;
++  } else {
++    // Reserve a fixed maximum once, avoiding allocator growth peaks above the
++    // advertised bound. Physical pages are touched only for actual deltas.
++    if (delta_bytes_.capacity() < kMemoryLimit) delta_bytes_.reserve(kMemoryLimit);
++    delta_bytes_.append(compare_.data(), run_size_);
++  }
++  deltas_.push_back({run_start_, run_size_, payload_size_});
++  payload_size_ += run_size_;
++  run_size_ = 0;
++  return absl::OkStatus();
++}
++
++absl::Status CapturedCacheFile::Block(const char* data, size_t bytes) {
++#if defined(__APPLE__)
++  static const std::array<char, 4096> zero{};
++  static const auto zero_hash = [] {
++    std::array<unsigned char, 32> hash;
++    CC_SHA256(zero.data(), zero.size(), hash.data());
++    return hash;
++  }();
++  std::array<unsigned char, 32> hash;
++  const bool is_zero = std::memcmp(data, zero.data(), bytes) == 0;
++  if (is_zero && bytes == zero.size()) hash = zero_hash;
++  else CC_SHA256(data, static_cast<CC_LONG>(bytes), hash.data());
++  const size_t index = hashes_->size();
++  const bool unchanged = base_ && index < base_->hashes->size() &&
++                         (*base_->hashes)[index] == hash;
++  hashes_->push_back(hash);
++  // Compare strong content hashes, never CRCs, when reusing a cloned block.
++  // CRC32C remains the independent on-disk framing/integrity check.
++  const bool write = !unchanged && (base_ || !is_zero);
++#else
++  // Non-cloning platforms have no base: stream a complete sparse snapshot.
++  static const std::array<char, 4096> zero{};
++  const bool write = std::memcmp(data, zero.data(), bytes) != 0;
++#endif
++  if (!write || (run_size_ && run_start_ + run_size_ != position_) ||
++      run_size_ + bytes > compare_.size()) ABSL_RETURN_IF_ERROR(FlushRun());
++  if (write) {
++    if (run_size_ == 0) run_start_ = position_;
++    std::memcpy(compare_.data() + run_size_, data, bytes);
++    run_size_ += bytes;
++  }
++  crc_ = static_cast<uint32_t>(absl::ExtendCrc32c(absl::crc32c_t(crc_), absl::string_view(data, bytes)));
++  position_ += bytes;
++  return absl::OkStatus();
++}
++
++std::streamsize CapturedCacheFile::xsputn(const char* data, std::streamsize size) {
++#if defined(_WIN32)
++  return 0;
++#else
++  if (finished_ || !status_.ok() || size < 0 ||
++      static_cast<uint64_t>(size) > static_cast<uint64_t>(std::numeric_limits<off_t>::max()) -
++          kStateOffset - position_ - partial_size_) return 0;
++  size_t consumed = 0;
++  while (consumed < static_cast<size_t>(size)) {
++    const size_t remaining = static_cast<size_t>(size) - consumed;
++    if (partial_size_ == 0 && remaining >= partial_.size()) {
++      status_ = Block(data + consumed, partial_.size());
++      if (!status_.ok()) return consumed;
++      consumed += partial_.size();
++    } else {
++      const size_t count = std::min(partial_.size() - partial_size_, remaining);
++      std::memcpy(partial_.data() + partial_size_, data + consumed, count);
++      partial_size_ += count;
++      consumed += count;
++      if (partial_size_ == partial_.size()) {
++        status_ = Block(partial_.data(), partial_size_);
++        if (!status_.ok()) return 0;
++        partial_size_ = 0;
++      }
++    }
++  }
++  return size;
++#endif
++}
++
++absl::Status CapturedCacheFile::Finish() {
++  ABSL_RETURN_IF_ERROR(status_);
++  if (finished_ || position_ + partial_size_ == 0) return absl::FailedPreconditionError("Capture is empty or already finished.");
++  if (partial_size_) {
++    status_ = Block(partial_.data(), partial_size_);
++    ABSL_RETURN_IF_ERROR(status_);
++    partial_size_ = 0;
++  }
++  status_ = FlushRun();
++  ABSL_RETURN_IF_ERROR(status_);
++#if !defined(_WIN32)
++  if (spilled_ && !base_) {
++    // A first spilled capture already contains the complete sparse state.
++    // Promote it immediately, avoiding a duplicate full-history materialization
++    // and allowing the next capture to use its hashes before publication finishes.
++    if (ftruncate(fd_, kStateOffset + position_) != 0)
++      return absl::ErrnoToStatus(errno, "Could not size initial captured state.");
++    const int fd = fcntl(fd_, F_DUPFD_CLOEXEC, 0);
++    if (fd < 0) return absl::ErrnoToStatus(errno, "Could not retain initial captured state.");
++    std::shared_ptr<const Base> base(new Base{fd, hashes_});
++    std::atomic_store(&materialized_, base);
++  }
++#endif
++  finished_ = true;
++  return absl::OkStatus();
++}
++
++absl::StatusOr<std::shared_ptr<const CapturedCacheFile::Base>>
++CapturedCacheFile::Materialize() const {
++  if (auto existing = std::atomic_load(&materialized_)) return existing;
++  ABSL_ASSIGN_OR_RETURN(int fd, CaptureFD(directory_, base_ ? base_->fd : -1));
++  auto base = std::shared_ptr<const Base>(new Base{fd, hashes_});
++  std::array<char, 65536> buffer;
++  for (const auto& delta : deltas_) {
++    if (!spilled_) {
++      ABSL_RETURN_IF_ERROR(WriteAt(fd, absl::string_view(delta_bytes_).substr(delta.payload, delta.size),
++                                  kStateOffset + delta.offset));
++    } else {
++#if !defined(_WIN32)
++      for (size_t offset = 0; offset < delta.size;) {
++        const ssize_t n = pread(fd_, buffer.data(), std::min(buffer.size(), delta.size - offset), kStateOffset + delta.offset + offset);
++        if (n < 0 && errno == EINTR) continue;
++        if (n <= 0) return absl::ErrnoToStatus(errno ? errno : EIO, "Could not read spilled capture.");
++        ABSL_RETURN_IF_ERROR(WriteAt(fd, absl::string_view(buffer.data(), n), kStateOffset + delta.offset + offset));
++        offset += n;
++      }
++#endif
++    }
++  }
++#if !defined(_WIN32)
++  if (ftruncate(fd, kStateOffset + position_) != 0)
++    return absl::ErrnoToStatus(errno, "Could not size captured state.");
++#endif
++  std::atomic_store(&materialized_, base);
++  std::string().swap(delta_bytes_);
++  return base;
++}
++
++absl::Status CapturedCacheFile::Publish(absl::string_view path, absl::string_view key,
++    int last_token, absl::string_view metadata, size_t* written_bytes) const {
++#if defined(_WIN32)
++  return absl::UnimplementedError("Bounded cache capture requires POSIX files.");
++#else
++  if (written_bytes) *written_bytes = 0;
++  ABSL_RETURN_IF_ERROR(CheckArguments(path, key));
++  if (!finished_ || metadata.empty() || metadata.size() > kMaxMetadataSize)
++    return absl::InvalidArgumentError("Invalid captured cache payload.");
++  std::lock_guard<std::mutex> lock(publish_mutex_);
++  ABSL_ASSIGN_OR_RETURN(auto materialized, Materialize());
++  std::string header(kIncrementalMagic);
++  AppendLittleEndian(header, key.size(), 8);
++  AppendLittleEndian(header, metadata.size(), 8);
++  AppendLittleEndian(header, position_, 8);
++  AppendLittleEndian(header, static_cast<uint32_t>(last_token), 4);
++  auto crc = absl::ExtendCrc32c(absl::ComputeCrc32c(header), key);
++  crc = absl::ExtendCrc32c(crc, metadata);
++  crc = absl::ConcatCrc32c(crc, absl::crc32c_t(crc_), position_);
++  AppendLittleEndian(header, static_cast<uint32_t>(crc), 4);
++  const auto destination = std::filesystem::u8path(path.begin(), path.end());
++  std::string directory = destination.parent_path().empty() ? "." : destination.parent_path().string();
++  directory += "/publish-XXXXXX";
++  if (!mkdtemp(directory.data())) return absl::ErrnoToStatus(errno, "Could not create publication directory.");
++  const std::filesystem::path temporary = std::filesystem::path(directory) / "state";
++  FILE* file = nullptr;
++  absl::Cleanup cleanup = [&] {
++    if (file) std::fclose(file);
++    unlink(temporary.c_str()); rmdir(directory.c_str());
++  };
++  bool cloned = false;
++#if defined(__APPLE__)
++  if (fclonefileat(materialized->fd, AT_FDCWD, temporary.c_str(), 0) == 0) cloned = true;
++  else if (errno != EXDEV && errno != ENOTSUP)
++    return absl::ErrnoToStatus(errno, "Could not clone captured checkpoint.");
++#endif
++  file = std::fopen(temporary.c_str(), cloned ? "r+b" : "wbx");
++  if (!file) return absl::ErrnoToStatus(errno, "Could not open captured checkpoint.");
++  if (fchmod(fileno(file), 0600) != 0) return absl::ErrnoToStatus(errno, "Could not restrict checkpoint.");
++  size_t written = bytes_written_ + ((spilled_ && !base_) ? 0 : payload_size_);
++  if (!cloned) {
++    if (fseek(file, kStateOffset, SEEK_SET) != 0) return absl::ErrnoToStatus(errno, "Could not seek checkpoint.");
++    std::array<char, 65536> buffer;
++    for (size_t offset = 0; offset < position_;) {
++      const ssize_t n = pread(materialized->fd, buffer.data(), std::min(buffer.size(), position_ - offset), kStateOffset + offset);
++      if (n < 0 && errno == EINTR) continue;
++      if (n <= 0) return absl::ErrnoToStatus(errno ? errno : EIO, "Could not copy captured checkpoint.");
++      ABSL_RETURN_IF_ERROR(WriteAll(file, absl::string_view(buffer.data(), n)));
++      offset += n;
++      written += n;
++    }
++  }
++  if (fseek(file, 0, SEEK_SET) != 0) return absl::ErrnoToStatus(errno, "Could not seek checkpoint header.");
++  ABSL_RETURN_IF_ERROR(WriteAll(file, header));
++  ABSL_RETURN_IF_ERROR(WriteAll(file, key));
++  ABSL_RETURN_IF_ERROR(WriteAll(file, metadata));
++  ABSL_RETURN_IF_ERROR(PublishFile(file, temporary, destination));
++  if (written_bytes) *written_bytes = written + header.size() + key.size() + metadata.size();
++  return absl::OkStatus();
++#endif
++}
++
+ }  // namespace litert::lm
+diff --git a/runtime/core/session_cache_file.h b/runtime/core/session_cache_file.h
+index 05da7db..55e54f9 100644
+--- a/runtime/core/session_cache_file.h
++++ b/runtime/core/session_cache_file.h
+@@ -16,6 +16,13 @@
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_CACHE_FILE_H_
+ 
+ #include <memory>
++#include <mutex>
++#include <string>
++#include <utility>
++#include <array>
++#include <streambuf>
++#include <cstdint>
++#include <vector>
+ 
+ #include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/status/statusor.h"  // from @com_google_absl
+@@ -45,6 +52,55 @@ absl::Status WriteSessionCacheFile(absl::string_view path,
+                                   size_t* written_bytes = nullptr,
+                                   bool incremental = false);
+ 
++// Immutable bounded-delta capture. Retains at most 32 MiB of changed bytes
++// (larger deltas spill to an unlinked file), plus SHA-256 block indexes and a
++// 1 MiB working buffer. Background materialization clones a completed base;
++// pending captures never form an accumulating chain of deltas.
++class CapturedCacheFile final : public std::streambuf {
++ public:
++  static absl::StatusOr<std::shared_ptr<CapturedCacheFile>> Create(
++      absl::string_view directory, std::shared_ptr<const CapturedCacheFile> previous = nullptr);
++  ~CapturedCacheFile() override;
++  absl::Status Finish();
++  absl::Status Publish(absl::string_view path, absl::string_view key,
++      int last_token, absl::string_view metadata, size_t* written_bytes) const;
++  size_t bytes_written() const { return bytes_written_; }
++  size_t size() const { return position_; }
++ private:
++  explicit CapturedCacheFile(int fd, std::string directory) : fd_(fd), directory_(std::move(directory)) {}
++  std::streamsize xsputn(const char* data, std::streamsize size) override;
++  absl::Status Block(const char* data, size_t bytes);
++  absl::Status FlushRun();
++  using Hashes = std::vector<std::array<unsigned char, 32>>;
++  struct Base {
++    int fd;
++    std::shared_ptr<const Hashes> hashes;
++    ~Base();
++  };
++  struct Delta { size_t offset, size, payload; };
++  std::shared_ptr<const Base> base_;
++  mutable std::shared_ptr<const Base> materialized_;
++  mutable std::mutex publish_mutex_;
++  mutable std::string delta_bytes_;
++  std::vector<Delta> deltas_;
++  size_t payload_size_ = 0;
++  bool spilled_ = false;
++  std::string directory_;
++  absl::StatusOr<std::shared_ptr<const Base>> Materialize() const;
++  std::shared_ptr<Hashes> hashes_ = std::make_shared<Hashes>();
++  std::array<char, 4096> partial_{};
++  size_t partial_size_ = 0;
++  size_t run_start_ = 0;
++  size_t run_size_ = 0;
++  int fd_;
++  size_t position_ = 0;
++  size_t bytes_written_ = 0;
++  uint32_t crc_ = 0;
++  bool finished_ = false;
++  absl::Status status_;
++  std::array<char, 1024 * 1024> compare_{};
++};
++
+ // Checks framing, compatibility key, and checksum before returning any views.
+ // The application must not modify/truncate a published cache file in place.
+ absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
+diff --git a/runtime/core/session_cache_file_test.cc b/runtime/core/session_cache_file_test.cc
+index cc32009..ff61f0d 100644
+--- a/runtime/core/session_cache_file_test.cc
++++ b/runtime/core/session_cache_file_test.cc
+@@ -204,5 +204,131 @@ TEST_F(SessionCacheFileTest, ProcessDeathLeavesOnlyOldOrCompleteNewCheckpoint) {
+ }
+ #endif
+ 
++#if !defined(_WIN32)
++TEST_F(SessionCacheFileTest, BoundedCapturesPreserveParentsAndHandleChunkBoundaries) {
++  auto first = CapturedCacheFile::Create(directory_.string());
++  ASSERT_TRUE(first.ok()) << first.status();
++  std::string original(3 * 1024 * 1024 + 23, '\0');
++  original[10] = 'a'; original[65535] = 'b'; original.back() = 'c';
++  std::ostream output(first->get());
++  output.write(original.data(), 17);
++  output.write(original.data() + 17, original.size() - 17);
++  ASSERT_TRUE(output.good());
++  ASSERT_TRUE((*first)->Finish().ok());
++  ASSERT_TRUE((*first)->Publish(path_, "first", 1, "metadata", nullptr).ok());
++  auto second = CapturedCacheFile::Create(directory_.string(), *first);
++  ASSERT_TRUE(second.ok()) << second.status();
++  auto changed = original;
++  changed[10] = 0; changed[65536] = 'd'; changed.resize(changed.size() + 65536, 'e');
++  std::ostream next(second->get());
++  next.write(changed.data(), changed.size());
++  ASSERT_TRUE(next.good());
++  ASSERT_TRUE((*second)->Finish().ok());
++  const auto other = (directory_ / "second.cache").string();
++  size_t written = 0;
++  ASSERT_TRUE((*second)->Publish(other, "second", 2, "longer-metadata", &written).ok());
++#if defined(__APPLE__)
++  EXPECT_LT(written, changed.size() / 2);
++#endif
++  auto old = ReadSessionCacheFile(path_, "first");
++  auto restored = ReadSessionCacheFile(other, "second");
++  ASSERT_TRUE(old.ok()) << old.status();
++  ASSERT_TRUE(restored.ok()) << restored.status();
++  EXPECT_EQ(old->state, original);
++  EXPECT_EQ(restored->state, changed);
++  EXPECT_EQ(restored->metadata, "longer-metadata");
++  auto third = CapturedCacheFile::Create(directory_.string(), *second);
++  ASSERT_TRUE(third.ok()) << third.status();
++  std::ostream shrink(third->get());
++  shrink.write("tiny", 4);
++  ASSERT_TRUE((*third)->Finish().ok());
++  ASSERT_TRUE((*third)->Publish(other, "third", 3, "m", nullptr).ok());
++  auto small = ReadSessionCacheFile(other, "third");
++  ASSERT_TRUE(small.ok()) << small.status();
++  EXPECT_EQ(small->state, "tiny");
++  // Finished captures reject mutation, including while a writer uses the file.
++  shrink.write("bad", 3);
++  EXPECT_FALSE(shrink.good());
++  EXPECT_FALSE((*third)->Finish().ok());
++  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory_),
++                         std::filesystem::directory_iterator()), 2);
++}
++
++TEST_F(SessionCacheFileTest, BoundedCaptureDeathKeepsLastPublishedGeneration) {
++  const std::string old_state(2 * 1024 * 1024, 'a');
++  const std::string new_state(2 * 1024 * 1024, 'b');
++  for (const int delay_us : {0, 100, 1000, 5000, 20000, 100000}) {
++    auto base = CapturedCacheFile::Create(directory_.string());
++    ASSERT_TRUE(base.ok()) << base.status();
++    std::ostream output(base->get()); output.write(old_state.data(), old_state.size());
++    ASSERT_TRUE((*base)->Finish().ok());
++    ASSERT_TRUE((*base)->Publish(path_, "key", 1, "old", nullptr).ok());
++    const pid_t child = fork();
++    ASSERT_GE(child, 0);
++    if (child == 0) {
++      auto captured = CapturedCacheFile::Create(directory_.string(), *base);
++      if (!captured.ok()) _exit(1);
++      std::ostream next(captured->get()); next.write(new_state.data(), new_state.size());
++      if (!next.good() || !(*captured)->Finish().ok()) _exit(2);
++      _exit((*captured)->Publish(path_, "key", 2, "new", nullptr).ok() ? 0 : 3);
++    }
++    usleep(delay_us); kill(child, SIGKILL);
++    int status = 0; ASSERT_EQ(waitpid(child, &status, 0), child);
++    if (WIFEXITED(status)) EXPECT_EQ(WEXITSTATUS(status), 0);
++    auto restored = ReadSessionCacheFile(path_, "key");
++    ASSERT_TRUE(restored.ok()) << restored.status();
++    if (restored->last_prefill_token_id == 1) {
++      EXPECT_EQ(restored->metadata, "old"); EXPECT_EQ(restored->state, old_state);
++    } else {
++      EXPECT_EQ(restored->last_prefill_token_id, 2);
++      EXPECT_EQ(restored->metadata, "new"); EXPECT_EQ(restored->state, new_state);
++    }
++  }
++}
++#endif
++
++#if !defined(_WIN32)
++TEST_F(SessionCacheFileTest, PendingCaptureUsesCompletedBaseWithoutDependingOnSkippedDelta) {
++  const std::string initial(2 * 1024 * 1024, 'a');
++  auto first = CapturedCacheFile::Create(directory_.string());
++  ASSERT_TRUE(first.ok());
++  std::ostream a(first->get()); a.write(initial.data(), initial.size());
++  ASSERT_TRUE((*first)->Finish().ok());
++  ASSERT_TRUE((*first)->Publish(path_, "key", 1, "first", nullptr).ok());
++  auto middle = CapturedCacheFile::Create(directory_.string(), *first);
++  ASSERT_TRUE(middle.ok());
++  auto changed = initial; changed[5] = 'b';
++  std::ostream b(middle->get()); b.write(changed.data(), changed.size());
++  ASSERT_TRUE((*middle)->Finish().ok());
++  auto last = CapturedCacheFile::Create(directory_.string(), *middle);
++  ASSERT_TRUE(last.ok());
++  changed[4097] = 'c';
++  std::ostream c(last->get()); c.write(changed.data(), changed.size());
++  ASSERT_TRUE((*last)->Finish().ok());
++  first->reset(); middle->reset(); // Deliberately never publish the middle capture.
++  ASSERT_TRUE((*last)->Publish(path_, "key", 3, "last", nullptr).ok());
++  auto restored = ReadSessionCacheFile(path_, "key");
++  ASSERT_TRUE(restored.ok()) << restored.status();
++  EXPECT_EQ(restored->state, changed);
++}
++
++TEST_F(SessionCacheFileTest, OversizedDeltaSpillsAndRetriesAfterPublicationFailure) {
++  auto capture = CapturedCacheFile::Create(directory_.string());
++  ASSERT_TRUE(capture.ok());
++  std::ostream output(capture->get());
++  const std::string block(1024 * 1024, 'x');
++  for (int i = 0; i < 40; ++i) output.write(block.data(), block.size());
++  ASSERT_TRUE(output.good());
++  ASSERT_TRUE((*capture)->Finish().ok());
++  EXPECT_GE((*capture)->bytes_written(), 40 * 1024 * 1024);
++  EXPECT_FALSE((*capture)->Publish((directory_ / "missing/invalid").string(), "key", 1, "m", nullptr).ok());
++  ASSERT_TRUE((*capture)->Publish(path_, "key", 1, "m", nullptr).ok());
++  auto restored = ReadSessionCacheFile(path_, "key");
++  ASSERT_TRUE(restored.ok()) << restored.status();
++  ASSERT_EQ(restored->state.size(), 40 * block.size());
++  for (int i = 0; i < 40; ++i) EXPECT_EQ(restored->state.substr(i * block.size(), block.size()), block);
++}
++#endif
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/engine/engine.h b/runtime/engine/engine.h
+index 315e4b1..c529f8f 100644
+--- a/runtime/engine/engine.h
++++ b/runtime/engine/engine.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_ENGINE_ENGINE_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_ENGINE_ENGINE_H_
+ 
++#include <ostream>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -328,7 +329,7 @@ class SessionInterface {
+   // tokenizer, runtime/delegate build, and execution/session configuration.
+   // Reuse the identity verified at installation; a filename is not an identity.
+   // This saves model context, not Conversation history or named checkpoints.
+-  virtual absl::StatusOr<SessionCacheSnapshot> CaptureCache() {
++  virtual absl::StatusOr<SessionCacheSnapshot> CaptureCache(std::ostream* output = nullptr) {
+     return absl::UnimplementedError("Session cache snapshot not implemented.");
+   }
+   virtual absl::Status SaveCache(absl::string_view path,
+diff --git a/runtime/executor/litert/state.cc b/runtime/executor/litert/state.cc
+index 12a4c19..32a6588 100644
+--- a/runtime/executor/litert/state.cc
++++ b/runtime/executor/litert/state.cc
+@@ -252,6 +252,13 @@ absl::StatusOr<std::string> LitertState::Serialize() const {
+   return SerializeState(data.first, data.second);
+ }
+ 
++absl::Status LitertState::SerializeTo(std::ostream& output) const {
++  ABSL_ASSIGN_OR_RETURN(auto data,
++      SerializationData(batch_size_, num_entries_, allocation_policy_,
++                        bank_1_is_input_, bank_1_state_buffers_, bank_2_state_buffers_));
++  return SerializeState(data.first, data.second, &output).status();
++}
++
+ absl::Status LitertState::ValidateLoad(const ParsedSerializedState& state,
+                                       bool allow_dynamic_resize) const {
+   const auto& metadata = state.metadata;
+diff --git a/runtime/executor/litert/state.h b/runtime/executor/litert/state.h
+index 4591dde..6962f57 100644
+--- a/runtime/executor/litert/state.h
++++ b/runtime/executor/litert/state.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_H_
+ 
++#include <ostream>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -62,6 +63,7 @@ class LitertState : public StateInterface {
+   int GetBatchSize() const override { return batch_size_; }
+ 
+   absl::StatusOr<std::string> Serialize() const override;
++  absl::Status SerializeTo(std::ostream& output) const;
+ 
+   absl::Status Load(absl::string_view serialized_state) override;
+ 
+diff --git a/runtime/executor/litert/state_serialization.cc b/runtime/executor/litert/state_serialization.cc
+index 870c846..a9683ac 100644
+--- a/runtime/executor/litert/state_serialization.cc
++++ b/runtime/executor/litert/state_serialization.cc
+@@ -14,6 +14,7 @@
+ 
+ #include "runtime/executor/litert/state_serialization.h"
+ 
++#include <ostream>
+ #include <algorithm>
+ #if defined(__APPLE__)
+ #include "runtime/executor/litert/metal_snapshot.h"
+@@ -296,7 +297,8 @@ absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer) {
+ }
+ 
+ absl::StatusOr<std::string> SerializeState(
+-    const nlohmann::json& metadata, const StateTensorBuffers& buffers) {
++    const nlohmann::json& metadata, const StateTensorBuffers& buffers,
++    std::ostream* output) {
+   if (!metadata.is_object() || buffers.size() > kMaxTensors) {
+     return absl::InvalidArgumentError("Invalid state metadata or tensor count.");
+   }
+@@ -322,8 +324,8 @@ absl::StatusOr<std::string> SerializeState(
+   const bool physical_metal = !buffers.empty() &&
+       std::all_of(buffers.begin(), buffers.end(),
+                   [](const auto& item) { return IsPhysicalMetal(item.second); });
+-  const std::string header =
+-      nlohmann::json({{"version", physical_metal ? 2 : 1},
++  std::string header =
++      nlohmann::json({{"version", output ? 3 : (physical_metal ? 2 : 1)},
+                       {"byte_order", ByteOrder()},
+                       {"metadata", metadata},
+                       {"tensors", std::move(tensors)}})
+@@ -331,15 +333,35 @@ absl::StatusOr<std::string> SerializeState(
+   if (header.size() > kMaxHeaderBytes || !BoundedJsonDepth(header)) {
+     return absl::ResourceExhaustedError("Serialized state header is too large.");
+   }
++  if (output) {
++    if (!physical_metal) return absl::UnimplementedError(
++        "Bounded capture requires exact shared Metal buffers.");
++    // Keep payload offsets fixed as metadata digits change. JSON permits trailing
++    // whitespace; version 3 validates both canonical JSON and exact padding.
++    constexpr size_t kAlignedHeader = 65536 - kPrefixBytes;
++    if (header.size() > kAlignedHeader) return absl::ResourceExhaustedError(
++        "Bounded state header exceeds its reserved extent.");
++    header.resize(kAlignedHeader, ' ');
++  }
+   std::string result;
+   const size_t overhead = kPrefixBytes + header.size() + kChecksumBytes;
+   if (payload_bytes > result.max_size() - overhead) {
+     return absl::ResourceExhaustedError("Serialized state is too large.");
+   }
+-  result.reserve(overhead + payload_bytes);
+-  result.append(kMagic.data(), kMagic.size());
+-  AppendInteger(result, header.size(), 8);
+-  result += header;
++  if (!output) result.reserve(overhead + payload_bytes);
++  absl::crc32c_t crc = absl::ComputeCrc32c("");
++  auto append = [&](absl::string_view data) -> absl::Status {
++    crc = absl::ExtendCrc32c(crc, data);
++    if (output) {
++      output->write(data.data(), data.size());
++      if (!*output) return absl::InternalError("Bounded state output failed.");
++    } else { result.append(data.data(), data.size()); }
++    return absl::OkStatus();
++  };
++  std::string prefix(kMagic);
++  AppendInteger(prefix, header.size(), 8);
++  ABSL_RETURN_IF_ERROR(append(prefix));
++  ABSL_RETURN_IF_ERROR(append(header));
+   for (const auto& name : names) {
+     const auto& source = buffers.at(name);
+     LITERT_ASSIGN_OR_RETURN(size_t bytes, source.PackedSize());
+@@ -347,7 +369,7 @@ absl::StatusOr<std::string> SerializeState(
+     if (bytes != 0) {
+       if (physical_metal) {
+         ABSL_ASSIGN_OR_RETURN(void* data, PhysicalMetalBytes(source, bytes));
+-        result.append(static_cast<const char*>(data), bytes);
++        ABSL_RETURN_IF_ERROR(append(absl::string_view(static_cast<const char*>(data), bytes)));
+         continue;
+       }
+       // Duplicate only the handle, never the tensor payload.
+@@ -355,11 +377,16 @@ absl::StatusOr<std::string> SerializeState(
+       LITERT_RETURN_IF_ERROR(buffer.ReleaseHostStagingMemory());
+       ABSL_ASSIGN_OR_RETURN(
+           void* data, LockForTransfer(buffer, TensorBuffer::LockMode::kRead));
+-      result.append(static_cast<const char*>(data) + offset, bytes);
++      ABSL_RETURN_IF_ERROR(append(absl::string_view(static_cast<const char*>(data) + offset, bytes)));
+       ABSL_RETURN_IF_ERROR(UnlockAfterTransfer(buffer));
+     }
+   }
+-  AppendInteger(result, static_cast<uint32_t>(absl::ComputeCrc32c(result)), 4);
++  std::string checksum;
++  AppendInteger(checksum, static_cast<uint32_t>(crc), 4);
++  if (output) {
++    output->write(checksum.data(), checksum.size());
++    if (!*output) return absl::InternalError("Bounded state checksum output failed.");
++  } else { result += checksum; }
+   return result;
+ }
+ 
+@@ -380,7 +407,9 @@ absl::StatusOr<ParsedSerializedState> ParseSerializedState(
+           absl::ComputeCrc32c(serialized_state.substr(0, checksum_position)))) {
+     return absl::DataLossError("Serialized state checksum mismatch.");
+   }
+-  const auto header_text = serialized_state.substr(kPrefixBytes, header_bytes);
++  const auto padded_header = serialized_state.substr(kPrefixBytes, header_bytes);
++  auto header_text = padded_header;
++  while (!header_text.empty() && header_text.back() == ' ') header_text.remove_suffix(1);
+   if (!BoundedJsonDepth(header_text)) {
+     return absl::DataLossError("Invalid serialized state JSON depth.");
+   }
+@@ -394,11 +423,15 @@ absl::StatusOr<ParsedSerializedState> ParseSerializedState(
+     return absl::DataLossError("Invalid serialized state JSON header.");
+   }
+   uint64_t version;
+-  if (!UnsignedInteger(header["version"], version) || (version != 1 && version != 2) ||
++  if (!UnsignedInteger(header["version"], version) || (version != 1 && version != 2 && version != 3) ||
+       !header["byte_order"].is_string() || header["byte_order"] != ByteOrder()) {
+     return absl::FailedPreconditionError("Incompatible serialized state format.");
+   }
+-  ParsedSerializedState result{std::move(header["metadata"]), {}, version == 2};
++  if ((version == 3 && header_bytes != 65536 - kPrefixBytes) ||
++      (version != 3 && header_text.size() != padded_header.size())) {
++    return absl::DataLossError("Invalid state header padding.");
++  }
++  ParsedSerializedState result{std::move(header["metadata"]), {}, version >= 2};
+   size_t position = kPrefixBytes + header_bytes;
+   for (auto& tensor : header["tensors"]) {
+     if (!tensor.is_object() || tensor.size() != 4 ||
+diff --git a/runtime/executor/litert/state_serialization.h b/runtime/executor/litert/state_serialization.h
+index 2c43491..afd08c8 100644
+--- a/runtime/executor/litert/state_serialization.h
++++ b/runtime/executor/litert/state_serialization.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_SERIALIZATION_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_SERIALIZATION_H_
+ 
++#include <ostream>
+ #include <string>
+ #include <vector>
+ 
+@@ -51,7 +52,8 @@ absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer);
+ // in name order and a CRC32C covering the header and payload. It preserves
+ // declared tensor types; a hardware buffer's storage type is not its dtype.
+ absl::StatusOr<std::string> SerializeState(
+-    const nlohmann::json& metadata, const StateTensorBuffers& buffers);
++    const nlohmann::json& metadata, const StateTensorBuffers& buffers,
++    std::ostream* output = nullptr);
+ 
+ // Checks the complete framing, checksum, descriptors and lengths. The result
+ // borrows tensor bytes from serialized_state, which must outlive the result.
+diff --git a/runtime/executor/litert/state_serialization_test.cc b/runtime/executor/litert/state_serialization_test.cc
+index 096d981..dea1a94 100644
+--- a/runtime/executor/litert/state_serialization_test.cc
++++ b/runtime/executor/litert/state_serialization_test.cc
+@@ -87,14 +87,15 @@ LiteRtStatus FinishMappedTestMemory(HwMemoryInfoPtr) {
+ // Rewrite a valid header and update the checksum so malformed-metadata tests
+ // exercise parsing and validation instead of stopping at the corruption check.
+ std::string ReplaceHeader(absl::string_view state,
+-                          const nlohmann::json& header) {
++                          const nlohmann::json& header, size_t padded_size = 0, char padding = ' ') {
+   uint64_t old_size = 0;
+   for (int i = 0; i < 8; ++i) {
+     old_size |= static_cast<uint64_t>(static_cast<uint8_t>(state[8 + i]))
+                 << (8 * i);
+   }
+   std::string result(state.data(), 8);
+-  const std::string text = header.dump();
++  std::string text = header.dump();
++  if (padded_size > text.size()) text.resize(padded_size, padding);
+   for (int i = 0; i < 8; ++i) {
+     result.push_back(
+         static_cast<char>((static_cast<uint64_t>(text.size()) >> (8 * i)) & 255));
+@@ -284,7 +285,7 @@ TEST_F(StateSerializationTest, RejectsDuplicateNamesAndUnsupportedVersion) {
+   header["tensors"][1]["name"] = "a";
+   EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header)).ok());
+   header = Header(serialized);
+-  header["version"] = 3;
++  header["version"] = 4;
+   EXPECT_THAT(ParseSerializedState(ReplaceHeader(serialized, header)),
+               StatusIs(absl::StatusCode::kFailedPrecondition));
+   header = Header(serialized);
+@@ -293,6 +294,21 @@ TEST_F(StateSerializationTest, RejectsDuplicateNamesAndUnsupportedVersion) {
+               StatusIs(absl::StatusCode::kFailedPrecondition));
+ }
+ 
++TEST_F(StateSerializationTest, VersionThreeRequiresExactCanonicalPadding) {
++  StateTensorBuffers buffers;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "a", ElementType::UInt8, {4}, 1));
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeState(nlohmann::json::object(), buffers));
++  auto header = Header(serialized);
++  header["version"] = 3;
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(ReplaceHeader(serialized, header, 65536 - 16)));
++  EXPECT_TRUE(parsed.physical_metal);
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header)).ok());
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header, 65536 - 17)).ok());
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header, 65536 - 16, '\t')).ok());
++  header["version"] = 2;
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header, 65536 - 16)).ok());
++}
++
+ TEST_F(StateSerializationTest, BoundsMetadataNesting) {
+   ASSERT_OK_AND_ASSIGN(auto serialized,
+                        SerializeState(nlohmann::json::object(), {}));
+diff --git a/runtime/executor/llm_executor_base.h b/runtime/executor/llm_executor_base.h
+index 99c6fbc..e305df4 100644
+--- a/runtime/executor/llm_executor_base.h
++++ b/runtime/executor/llm_executor_base.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_EXECUTOR_BASE_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_EXECUTOR_BASE_H_
+ 
++#include <ostream>
+ #include <cstdint>
+ #include <memory>
+ #include <optional>
+@@ -203,6 +204,10 @@ class LlmExecutorBase {
+   // sequence; loading uses the target session's sampling configuration.
+   // Built-in backends require speculative decoding to be disabled: a verifier
+   // may write recurrent/ring state past the visible turn's boundary.
++  virtual absl::StatusOr<SerializedLlmContext> SerializeContextTo(std::ostream& output) const {
++    return absl::UnimplementedError("Bounded serialization is not supported.");
++  }
++
+   virtual absl::StatusOr<SerializedLlmContext> SerializeContext() const {
+     return absl::UnimplementedError(absl::StrCat(
+         "SerializeContext not implemented for backend: ", ExecutorBackendName()));
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index bf2915a..7fd6692 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -1720,6 +1720,16 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::ValidateMtpCacheForPersistence(
+ 
+ absl::StatusOr<SerializedLlmContext>
+ LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
++  return SerializeContextImpl(nullptr);
++}
++
++absl::StatusOr<SerializedLlmContext>
++LlmLiteRtCompiledModelExecutorBase::SerializeContextTo(std::ostream& output) const {
++  return SerializeContextImpl(&output);
++}
++
++absl::StatusOr<SerializedLlmContext>
++LlmLiteRtCompiledModelExecutorBase::SerializeContextImpl(std::ostream* output) const {
+   if (llm_context_ == nullptr) {
+     return absl::FailedPreconditionError("No context to serialize.");
+   }
+@@ -1762,7 +1772,13 @@ LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+       SerializeContextMetadata(
+           executor_settings_, llm_context_->processed_context().processed_tokens(),
+           runtime.current_step, runtime.ran_decode, std::move(backend)));
+-  ABSL_ASSIGN_OR_RETURN(result.state, active->Serialize());
++  if (output) {
++    const auto* state = dynamic_cast<const LitertState*>(active);
++    if (!state) return absl::UnimplementedError("State has no bounded serializer.");
++    ABSL_RETURN_IF_ERROR(state->SerializeTo(*output));
++  } else {
++    ABSL_ASSIGN_OR_RETURN(result.state, active->Serialize());
++  }
+   return result;
+ }
+ 
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.h b/runtime/executor/llm_litert_compiled_model_executor.h
+index 222729a..4b0cda4 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.h
++++ b/runtime/executor/llm_litert_compiled_model_executor.h
+@@ -97,6 +97,8 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
+ 
+   // State/context management APIs:
+   absl::StatusOr<SerializedLlmContext> SerializeContext() const override;
++  absl::StatusOr<SerializedLlmContext> SerializeContextTo(std::ostream& output) const override;
++  absl::StatusOr<SerializedLlmContext> SerializeContextImpl(std::ostream* output) const;
+ 
+   absl::Status LoadContext(absl::string_view metadata,
+                           absl::string_view state) override;
+diff --git a/runtime/framework/resource_management/execution_manager.h b/runtime/framework/resource_management/execution_manager.h
+index 0dc7ec6..9255b39 100644
+--- a/runtime/framework/resource_management/execution_manager.h
++++ b/runtime/framework/resource_management/execution_manager.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_EXECUTION_MANAGER_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_EXECUTION_MANAGER_H_
+ 
++#include <ostream>
+ #include <atomic>
+ #include <limits>
+ #include <memory>
+@@ -267,7 +268,7 @@ class ExecutionManager {
+   // admissions until this call returns. Implementations reject active/failed
+   // work and hold the existing executor lease only while transferring state.
+   virtual absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
+-      SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++      SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks, std::ostream* output = nullptr) {
+     return absl::UnimplementedError("Session cache persistence not implemented.");
+   }
+ 
+diff --git a/runtime/framework/resource_management/resource_manager.cc b/runtime/framework/resource_management/resource_manager.cc
+index f52e427..deaac47 100644
+--- a/runtime/framework/resource_management/resource_manager.cc
++++ b/runtime/framework/resource_management/resource_manager.cc
+@@ -396,6 +396,10 @@ class LockedLlmExecutor : public LlmExecutor {
+     return llm_executor_->CloneContext();
+   }
+ 
++  absl::StatusOr<SerializedLlmContext> SerializeContextTo(std::ostream& output) const override {
++    return llm_executor_->SerializeContextTo(output);
++  }
++
+   absl::StatusOr<SerializedLlmContext> SerializeContext() const override {
+     return llm_executor_->SerializeContext();
+   }
+diff --git a/runtime/framework/resource_management/serial_execution_manager.cc b/runtime/framework/resource_management/serial_execution_manager.cc
+index 3f163b8..648c98e 100644
+--- a/runtime/framework/resource_management/serial_execution_manager.cc
++++ b/runtime/framework/resource_management/serial_execution_manager.cc
+@@ -1181,7 +1181,7 @@ absl::Status SerialExecutionManager::SetCurrentStep(
+ 
+ absl::StatusOr<SerializedLlmContext>
+ SerialExecutionManager::SerializeSessionContext(
+-    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks, std::ostream* output) {
+   std::shared_ptr<SessionInfo> session;
+   {
+     const auto found = session_lookup_.find(session_id);
+@@ -1209,7 +1209,7 @@ SerialExecutionManager::SerializeSessionContext(
+   ABSL_ASSIGN_OR_RETURN(auto executor,
+                         resource_manager_->TryAcquireExecutorWithContextHandler(
+                             session->context_handler));
+-  return executor->SerializeContext();
++  return output ? executor->SerializeContextTo(*output) : executor->SerializeContext();
+ }
+ 
+ absl::Status SerialExecutionManager::LoadSessionContext(
+diff --git a/runtime/framework/resource_management/serial_execution_manager.h b/runtime/framework/resource_management/serial_execution_manager.h
+index 12aa473..6b1080a 100644
+--- a/runtime/framework/resource_management/serial_execution_manager.h
++++ b/runtime/framework/resource_management/serial_execution_manager.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_SERIAL_EXECUTION_MANAGER_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_SERIAL_EXECUTION_MANAGER_H_
+ 
++#include <ostream>
+ #include <atomic>
+ #include <deque>
+ #include <memory>
+@@ -225,7 +226,7 @@ class SerialExecutionManager : public ExecutionManager {
+ 
+   absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
+       SessionId session_id,
+-      const absl::flat_hash_set<TaskId>& completed_tasks) override;
++      const absl::flat_hash_set<TaskId>& completed_tasks, std::ostream* output = nullptr) override;
+ 
+   absl::Status LoadSessionContext(
+       SessionId session_id, absl::string_view metadata, absl::string_view state,
+diff --git a/runtime/framework/resource_management/threaded_execution_manager.cc b/runtime/framework/resource_management/threaded_execution_manager.cc
+index f71826d..c3bc13d 100644
+--- a/runtime/framework/resource_management/threaded_execution_manager.cc
++++ b/runtime/framework/resource_management/threaded_execution_manager.cc
+@@ -1327,7 +1327,7 @@ absl::Status ThreadedExecutionManager::SetCurrentStep(
+ 
+ absl::StatusOr<SerializedLlmContext>
+ ThreadedExecutionManager::SerializeSessionContext(
+-    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks, std::ostream* output) {
+   std::shared_ptr<SessionInfo> session;
+   {
+     absl::MutexLock lock(session_and_task_lookup_mutex_);
+@@ -1356,7 +1356,7 @@ ThreadedExecutionManager::SerializeSessionContext(
+   ABSL_ASSIGN_OR_RETURN(auto executor,
+                         resource_manager_->TryAcquireExecutorWithContextHandler(
+                             session->context_handler));
+-  return executor->SerializeContext();
++  return output ? executor->SerializeContextTo(*output) : executor->SerializeContext();
+ }
+ 
+ absl::Status ThreadedExecutionManager::LoadSessionContext(
+diff --git a/runtime/framework/resource_management/threaded_execution_manager.h b/runtime/framework/resource_management/threaded_execution_manager.h
+index 38ad430..cc92928 100644
+--- a/runtime/framework/resource_management/threaded_execution_manager.h
++++ b/runtime/framework/resource_management/threaded_execution_manager.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_THREADED_EXECUTION_MANAGER_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_THREADED_EXECUTION_MANAGER_H_
+ 
++#include <ostream>
+ #include <atomic>
+ #include <memory>
+ #include <optional>
+@@ -244,7 +245,7 @@ class ThreadedExecutionManager : public ExecutionManager {
+ 
+   absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
+       SessionId session_id,
+-      const absl::flat_hash_set<TaskId>& completed_tasks) override;
++      const absl::flat_hash_set<TaskId>& completed_tasks, std::ostream* output = nullptr) override;
+ 
+   absl::Status LoadSessionContext(
+       SessionId session_id, absl::string_view metadata, absl::string_view state,

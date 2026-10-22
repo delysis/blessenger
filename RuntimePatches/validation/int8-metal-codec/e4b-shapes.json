@@ -1,0 +1,4195 @@
+{
+  "e4b-target": {
+    "decode": {
+      "subgraph_index": 0,
+      "inputs": {
+        "embeddings": {
+          "shape": [
+            1,
+            1,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "input_pos": {
+          "shape": [
+            1
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "mask": {
+          "shape": [
+            1,
+            1,
+            1,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 6
+        },
+        "param_tensor": {
+          "shape": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "per_layer_embeddings": {
+          "shape": [
+            1,
+            1,
+            42,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      },
+      "outputs": {
+        "activations": {
+          "shape": [
+            1,
+            1,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "logits": {
+          "shape": [
+            1,
+            1,
+            262144
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      }
+    },
+    "prefill_1024": {
+      "subgraph_index": 1,
+      "inputs": {
+        "embeddings": {
+          "shape": [
+            1,
+            1024,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "input_pos": {
+          "shape": [
+            1024
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "mask": {
+          "shape": [
+            1,
+            1,
+            1024,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 6
+        },
+        "param_tensor": {
+          "shape": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "per_layer_embeddings": {
+          "shape": [
+            1,
+            1024,
+            42,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      },
+      "outputs": {
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        }
+      }
+    },
+    "prefill_128": {
+      "subgraph_index": 2,
+      "inputs": {
+        "embeddings": {
+          "shape": [
+            1,
+            128,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "input_pos": {
+          "shape": [
+            128
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "mask": {
+          "shape": [
+            1,
+            1,
+            128,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 6
+        },
+        "param_tensor": {
+          "shape": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "per_layer_embeddings": {
+          "shape": [
+            1,
+            128,
+            42,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      },
+      "outputs": {
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        }
+      }
+    },
+    "verify": {
+      "subgraph_index": 3,
+      "inputs": {
+        "embeddings": {
+          "shape": [
+            1,
+            4,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "input_pos": {
+          "shape": [
+            4
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "mask": {
+          "shape": [
+            1,
+            1,
+            4,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 6
+        },
+        "param_tensor": {
+          "shape": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "per_layer_embeddings": {
+          "shape": [
+            1,
+            4,
+            42,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      },
+      "outputs": {
+        "activations": {
+          "shape": [
+            1,
+            4,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "kv_cache_k_0": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_1": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_10": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_11": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_12": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_13": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_14": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_15": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_16": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_17": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_18": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_19": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_2": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_20": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_21": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_3": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_4": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_5": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_6": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_7": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_8": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_9": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_0": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_1": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_10": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_11": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_12": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_13": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_14": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_15": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_16": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_17": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_18": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_19": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_2": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_20": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_21": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_3": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_4": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_5": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_6": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_7": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_8": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_9": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "logits": {
+          "shape": [
+            1,
+            4,
+            262144
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      }
+    }
+  },
+  "e4b-draft": {
+    "mtp_drafter": {
+      "subgraph_index": 0,
+      "inputs": {
+        "activations": {
+          "shape": [
+            1,
+            1,
+            5120
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "input_pos": {
+          "shape": [
+            1
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        },
+        "kv_cache_k_22": {
+          "shape": [
+            1,
+            2,
+            32003,
+            256
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_k_23": {
+          "shape": [
+            1,
+            2,
+            32003,
+            512
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_22": {
+          "shape": [
+            1,
+            2,
+            256,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "kv_cache_v_23": {
+          "shape": [
+            1,
+            2,
+            512,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 9
+        },
+        "mask": {
+          "shape": [
+            1,
+            1,
+            1,
+            32003
+          ],
+          "shape_signature": [],
+          "tensor_type": 6
+        },
+        "param_tensor": {
+          "shape": [
+            1,
+            1,
+            1,
+            7
+          ],
+          "shape_signature": [],
+          "tensor_type": 2
+        }
+      },
+      "outputs": {
+        "logits": {
+          "shape": [
+            1,
+            1,
+            262144
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        },
+        "projected_activations": {
+          "shape": [
+            1,
+            1,
+            2560
+          ],
+          "shape_signature": [],
+          "tensor_type": 0
+        }
+      }
+    }
+  }
+}

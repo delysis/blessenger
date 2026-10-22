@@ -1,0 +1,63 @@
+diff --git a/runtime/core/session_advanced.cc b/runtime/core/session_advanced.cc
+index 346ef31..06239bb 100644
+--- a/runtime/core/session_advanced.cc
++++ b/runtime/core/session_advanced.cc
+@@ -502,9 +502,9 @@ absl::Status SessionAdvanced::SaveCache(absl::string_view path,
+ 
+ absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache(std::ostream* output) {
+   absl::MutexLock lock(mutex_);
+-  if (session_state_ != SessionState::kDecoded) {
++  if (session_state_ == SessionState::kFresh) {
+     return absl::FailedPreconditionError(
+-        "SaveCache requires a completed decode turn.");
++        "SaveCache requires a completed prefill or decode operation.");
+   }
+   auto manager = execution_manager_.lock();
+   if (manager == nullptr) {
+@@ -515,6 +515,11 @@ absl::StatusOr<SessionCacheSnapshot> SessionAdvanced::CaptureCache(std::ostream*
+   ABSL_ASSIGN_OR_RETURN(
+       auto context,
+       manager->SerializeSessionContext(session_id_, last_task_ids_, output));
++  // The next prompt-template operation depends on session phase. Replayed
++  // history is prefilled, not decoded; preserve that distinction independently
++  // of the executor state. The envelope is versioned and checksum-protected.
++  context.metadata.insert(0, session_state_ == SessionState::kDecoded
++                                 ? "LRTLMSS1D\n" : "LRTLMSS1P\n");
+   return SessionCacheSnapshot{session_info_->last_prefill_token_id,
+                               std::move(context.metadata), std::move(context.state)};
+ }
+@@ -530,9 +535,19 @@ absl::Status SessionAdvanced::LoadCache(absl::string_view path,
+     return absl::FailedPreconditionError("Execution manager is not available.");
+   }
+   ABSL_ASSIGN_OR_RETURN(auto cache, ReadSessionCacheFile(path, compatibility_key));
++  // Reject missing/unknown phases before mutating the executor. Rebuild old
++  // snapshots from canonical history rather than guessing their session phase.
++  constexpr absl::string_view decoded = "LRTLMSS1D\n";
++  constexpr absl::string_view prefilled = "LRTLMSS1P\n";
++  const auto prefix = cache.metadata.substr(0, decoded.size());
++  if (prefix != decoded && prefix != prefilled) {
++    return absl::InvalidArgumentError("Invalid session cache phase metadata.");
++  }
+   ABSL_RETURN_IF_ERROR(manager->LoadSessionContext(
+-      session_id_, cache.metadata, cache.state, cache.last_prefill_token_id));
+-  session_state_ = SessionState::kDecoded;
++      session_id_, cache.metadata.substr(decoded.size()), cache.state,
++      cache.last_prefill_token_id));
++  session_state_ = prefix == decoded ? SessionState::kDecoded
++                                     : SessionState::kPrefilled;
+   return absl::OkStatus();
+ }
+ 
+diff --git a/runtime/engine/engine.h b/runtime/engine/engine.h
+index c529f8f..f608bf4 100644
+--- a/runtime/engine/engine.h
++++ b/runtime/engine/engine.h
+@@ -319,7 +319,7 @@ class SessionInterface {
+       absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) {
+     return absl::UnimplementedError("Not implemented.");
+   };
+-  // Persists an idle session after a successful completed decode. All device
++  // Persists an idle session after a successful prefill or decode operation. All device
+   // transfers and file I/O happen in this explicit call. The file is replaced
+   // atomically; the destination directory must be owned by the application.
+   // A busy shared executor is rejected. Speculative decoding is unsupported

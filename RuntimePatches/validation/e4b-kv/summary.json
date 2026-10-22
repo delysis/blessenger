@@ -1,0 +1,29 @@
+{
+  "repository": "litert-community/gemma-4-E4B-it-litert-lm",
+  "revision": "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+  "file": "gemma-4-E4B-it.litertlm",
+  "url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b/gemma-4-E4B-it.litertlm",
+  "model_sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+  "model_bytes": 3659530240,
+  "target_begin": 1354334208,
+  "draft_begin": 3614392320,
+  "verifier_steps": 4,
+  "executor_metadata_section_present": false,
+  "kv_storage": "INT8 full-position",
+  "capacity_placeholder": 32003,
+  "counts": {
+    "('kv_cache_k', 9, [1, 2, 32003, 256])": 20,
+    "('kv_cache_k', 9, [1, 2, 32003, 512])": 4,
+    "('kv_cache_v', 9, [1, 2, 256, 32003])": 20,
+    "('kv_cache_v', 9, [1, 2, 512, 32003])": 4
+  },
+  "source_schema": {
+    "repository": "google-ai-edge/LiteRT",
+    "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+    "path": "tflite/converter/schema/schema.fbs",
+    "git_blob": "b8ba7991738a67551849a483124e48f663439e5f",
+    "sha256": "21f07309ed88d9192696d05ddbf8a1fa4a60a741a86258f4965caaac6d10c784"
+  },
+  "recorded_ranges": 634,
+  "recorded_bytes": 10383264
+}

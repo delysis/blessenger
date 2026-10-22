@@ -1,0 +1,8 @@
+{
+  "command": [
+    "/workspace/scratch/09e99beaae67/native-state-tests/build/state_serialization_parser_test"
+  ],
+  "exit_code": 0,
+  "scope": "Existing real codec metadata/parser tests; no TensorBuffer provider transfer or Metal execution",
+  "source_sha256": "f3a2e165d6be0e1a9117da3a3fbb58281c48c81c73c42cfb54ab82199d8fb0fa"
+}

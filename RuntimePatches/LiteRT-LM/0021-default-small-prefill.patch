@@ -1,0 +1,69 @@
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index fb38156..f0b0f85 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -790,7 +790,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
+               start_step,
+               /*steps=*/prefill_length + input_idx, attn_params.local_type,
+               token_ids_span, attn_params.sliding_window_size,
+-              RingBufferAttentionMaskMode::kPrefill));
++              prefill_signature == "verify" ? RingBufferAttentionMaskMode::kVerify
++                                            : RingBufferAttentionMaskMode::kPrefill));
+         }
+       }
+       if (gpu_optimized_single_buffer_cache_) {
+@@ -2332,17 +2333,45 @@ absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
+                                               prefill_signature_map_,
+                                               ids.size(), remaining_capacity,
+                                               /*use_greedy_chunking=*/is_cpu));
+-  // Qualification-only switch: exercise the one-token graph without sampling.
+-  // The regular prefill path still owns pending-token bookkeeping and KV writes.
+-  if (std::getenv("CALL_GEMMA_QUALIFY_SINGLE_TOKEN_PREFILL") != nullptr &&
+-      ids.size() == 1 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
+-    work_groups = {{std::string(kDecodeSignatureRunner), 1}};
+-  }
+-  // Qualification only: compare short suffixes against the padded prefill graph.
+-  if (std::getenv("CALL_GEMMA_QUALIFY_SHORT_PREFILL") != nullptr &&
+-      ids.size() <= 16 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
++  // A padded 128-token graph cannot keep up with one-token streaming audio.
++  // Reuse the causal decode/verifier graphs for short, known-token prefixes.
++  // PrefillInternal still owns pending-token bookkeeping and dirty KV ranges.
++  const bool small_prefill = ids.size() <= 16 && output_heads == 1 &&
++      gpu_optimized_single_buffer_cache_ &&
++      std::getenv("CALL_GEMMA_DISABLE_SMALL_PREFILL") == nullptr;
++  if (small_prefill) {
+     work_groups.assign(ids.size(), {std::string(kDecodeSignatureRunner), 1});
+   }
++  if (small_prefill && ids.size() > 1) {
++    const auto [pending_step, pending_tokens] = llm_context_->processed_context()
++                             .processed_tokens().GetNextUnprocessedToken();
++    if (!pending_tokens.empty()) {
++      // Models without a verifier retain the single-token path. Inspect the
++      // actual exported shape; do not assume that every model exports width 4.
++      int width = 0;
++      for (int index = 0; index < compiled_model_->GetNumSignatures(); ++index) {
++        LITERT_ASSIGN_OR_RETURN(auto signature, compiled_model_->GetSignature(index));
++        if (signature.Key() != "verify") continue;
++        LITERT_ASSIGN_OR_RETURN(auto positions, signature.InputTensorType("input_pos"));
++        const auto dimensions = positions.Layout().Dimensions();
++        if (dimensions.size() == 1 && dimensions[0] > 1 && dimensions[0] <= 16) {
++          width = dimensions[0];
++        }
++        break;
++      }
++      if (width > 0) {
++        work_groups.clear();
++        size_t remaining = ids.size();
++        while (remaining >= width) {
++          work_groups.emplace_back("verify", width);
++          remaining -= width;
++        }
++        // Active-token bounds exclude padding from attention and cache writes.
++        if (remaining > 1) work_groups.emplace_back("verify", remaining);
++        else if (remaining == 1) work_groups.emplace_back(std::string(kDecodeSignatureRunner), 1);
++      }
++    }
++  }
+   const bool trace_prefill = std::getenv("CALL_GEMMA_TRACE_PREFILL") != nullptr;
+   for (int i = 0; i < work_groups.size(); ++i) {
+     const auto prefill_started = std::chrono::steady_clock::now();

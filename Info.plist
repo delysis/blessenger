@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleIdentifier</key><string>local.callgemma.app</string>
+    <key>CFBundleName</key><string>Blessenger</string>
+    <key>CFBundleDisplayName</key><string>Blessenger</string>
+    <key>CFBundleExecutable</key><string>CallGemma</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>LSMinimumSystemVersion</key><string>26.0</string>
+    <key>NSMicrophoneUsageDescription</key><string>Blessenger uses your microphone for the on-device voice call.</string>
+    <key>NSLocalNetworkUsageDescription</key><string>Blessenger connects your paired iPhone to this Mac over Wi-Fi.</string>
+    <key>NSBonjourServices</key><array><string>_blessenger._tcp</string></array>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>

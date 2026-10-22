@@ -1,0 +1,83 @@
+Portable qualification-harness validation
+
+Host: Linux x86_64; GCC 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04).
+Actual command, exit status 0:
+
+bash CallGemma/Qualification/portable-checks.sh \
+  --headers /workspace/scratch/09e99beaae67/LiteRT-LM \
+  --out /tmp/call-gemma-qualification-final
+
+Both actual C++ translation units compiled with C++17, -O3, -DNDEBUG,
+-Wall -Wextra -Werror, and -pthread. The driver uses dlopen; it was linked
+with Linux libdl and no runtime implementation or fake model library.
+
+The actual selected C headers are recorded in Validation/driver.d and
+Validation/source-sha256.txt. These include the pinned/patched engine and
+conversation headers and the materialized api_export/error_reporter headers.
+Validation/compile-commands.sh preserves the two exact compile commands;
+compiler.txt preserves the actual compiler identity. No generated mock header
+or substitute runtime was used.
+
+Passed checks (actual output in Validation/portable.log):
+- Capacity 4n+r alignment and invalid-capacity rejection.
+- Paired block bootstrap statistics, strict PASS/FAIL/INCONCLUSIVE decisions,
+  memory-difference gate, required 12-group matrices for both ring and
+  full-position long workloads, trial mode/library/load-status admission,
+  and TSV field parsing.
+- Shell syntax for all four scripts.
+- Valid predeclared gate parameters accepted.
+- Too few measured blocks/resamples, nonfinite or trailing-junk confidence,
+  zero save budget, negative memory allowance, and unknown options rejected.
+- Model runner and Metal runner refused this non-Mac environment.
+
+NOT RUN here:
+- Apple Clang or native Swift app compilation; macOS SDK/Metal linking.
+- Upstream Bazel baseline/patched runtime builds and real XCTest execution.
+- Model inference, direct-audio encoding, MTP or cross-MTP comparisons.
+- Session/Conversation cache save, process restart, load, corruption/history
+  admission, count_tokens purity, cancellation, or native app tests.
+- Any performance, restoration-latency, memory-retention, or GPU-byte gate.
+
+The synthetic self-test is a test of the qualification program. It is not
+baseline-vs-patched model data and supplies no native qualification result.
+
+Continuation: cancellation callback lifetime correction
+-----------------------------------------------------
+The driver now retains callback storage through session and engine destruction.
+Unlike the Session destructor's bounded wait, engine destruction joins the
+execution/callback pools. Callback accessor/start failures terminate the isolated
+qualification process instead of reporting a fictitious final callback or
+unwinding storage that the runtime might still borrow.
+
+After this driver-only correction, both actual C++ translation units compiled
+again against the same real headers with the flags above, and the analyzer
+self-tests passed. Actual command, exit status 0:
+
+bash CallGemma/Qualification/build.sh \
+  --headers /workspace/scratch/09e99beaae67/LiteRT-LM \
+  --out /tmp/callgemma-callback-handoff-review
+
+The earlier Validation/ source digest files identify the original portable run;
+they are not a claim that native cancellation was tested after this correction.
+Native cancellation, worker joins and all native gates remain NOT RUN.
+
+Continuation: portable production Swift tests
+-------------------------------------------
+The actual buffer/policy/input sources passed 19 tests in three Swift Testing
+suites under Swift 6.2.3 on Linux. Complete concurrency checking, warnings as
+errors for our targets, and actor runtime checks were enabled. The successful
+command used CALL_GEMMA_SWIFT to select the installed Swift binary:
+
+bash CallGemma/Tools/test-portable-swift.sh /tmp/callgemma-swift-continuation-3
+
+Validation/swift-portable contains the unchanged tested-source SHA-256 values,
+actual build/test log, XML results and toolchain identity. The script copies
+exact production files without mocks into a dependency-free test package.
+Swift Testing avoids an observed Linux XCTest discovery cast failure; the
+integrated Swift driver avoids a separate compiler-driver crash in this host.
+Neither workaround disables production concurrency checking.
+
+These tests do not compile the full app or qualify Apple frameworks, native
+handle behavior, Metal, model inference, ANE, audio hardware or performance.
+The four new VoiceSample file-decoder tests use actual WAV/AAC codecs and remain
+unrun here, along with eight other Apple-dependent app tests.

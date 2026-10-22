@@ -1,0 +1,697 @@
+diff --git a/c/engine.cc b/c/engine.cc
+index 40119e74004c122d5975808522d2ecb598e184de..3727a164e4caa4cf782cc6c8ed240f4c89b516b9 100644
+--- a/c/engine.cc
++++ b/c/engine.cc
+@@ -1106,6 +1106,26 @@ LiteRtLmStatusCode litert_lm_session_cancel_process(LiteRtLmSession* session) {
+   return kLiteRtLmStatusOk;
+ }
+ 
++LiteRtLmStatusCode litert_lm_session_save_cache(
++    LiteRtLmSession* session, const char* path, const char* compatibility_key) {
++  if (!session || !session->session || !path || !compatibility_key) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                     "Invalid session, cache path, or key.");
++  }
++  return litert::lm::c::ToCStatus(
++      session->session->SaveCache(path, compatibility_key));
++}
++
++LiteRtLmStatusCode litert_lm_session_load_cache(
++    LiteRtLmSession* session, const char* path, const char* compatibility_key) {
++  if (!session || !session->session || !path || !compatibility_key) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                     "Invalid session, cache path, or key.");
++  }
++  return litert::lm::c::ToCStatus(
++      session->session->LoadCache(path, compatibility_key));
++}
++
+ LiteRtLmStatusCode litert_lm_session_save_checkpoint(LiteRtLmSession* session,
+                                                      const char* label) {
+   if (!session || !session->session || !label) {
+diff --git a/c/engine.h b/c/engine.h
+index eec75355ffe879047f3148335a0670935b7aa219..4da86c11a06e2efc4d44b6f4d45eabce3b6e7fc9 100644
+--- a/c/engine.h
++++ b/c/engine.h
+@@ -1205,6 +1205,24 @@ void litert_lm_session_delete(LiteRtLmSession* session);
+ LITERT_LM_C_API_EXPORT
+ LiteRtLmStatusCode litert_lm_session_cancel_process(LiteRtLmSession* session);
+ 
++// Persists an idle session after a successful completed decode to an atomically
++// replaced file. The directory must be owned by the application.
++// compatibility_key must identify verified model/adapter/tokenizer contents,
++// runtime/delegate build and execution/session configuration, not a filename.
++// Conversation history and named rewind checkpoints are not included.
++// A busy executor is rejected. Speculative decoding is not supported.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_session_save_cache(
++    LiteRtLmSession* session, const char* path, const char* compatibility_key);
++
++// Restores model context into a newly created session with the same verified
++// compatibility_key. The next operation starts a new turn, using the target's
++// sampling seed. On a device-transfer or allocation failure, recreate the target
++// engine and session before further inference.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_session_load_cache(
++    LiteRtLmSession* session, const char* path, const char* compatibility_key);
++
+ // Saves the current state of the session to a checkpoint with the given label.
+ //
+ // @param session The session to save checkpoint for.
+diff --git a/runtime/core/BUILD b/runtime/core/BUILD
+index a3f2976e55c1a2aa448c7e37b634e28819272dcc..1aa77a69e71d0c549d2f4d1c463e2736b2be58a2 100644
+--- a/runtime/core/BUILD
++++ b/runtime/core/BUILD
+@@ -353,6 +353,7 @@ cc_library(
+         "//conditions:default": [],
+     }),
+     deps = [
++        ":session_cache_file",
+         ":session_utils",
+         "@com_google_absl//absl/base:core_headers",
+         "@com_google_absl//absl/base:nullability",
+diff --git a/runtime/core/session_advanced.cc b/runtime/core/session_advanced.cc
+index ddc3d7b7560fb8fa55dec58f7468969e4b985c16..b4629c4d2a58720fe8d4ba7e5a7156400689d157 100644
+--- a/runtime/core/session_advanced.cc
++++ b/runtime/core/session_advanced.cc
+@@ -36,6 +36,7 @@
+ #include "absl/strings/string_view.h"  // from @com_google_absl
+ #include "absl/synchronization/mutex.h"  // from @com_google_absl
+ #include "litert/cc/litert_environment.h"  // from @litert  // IWYU pragma: keep
++#include "runtime/core/session_cache_file.h"
+ #include "runtime/core/session_utils.h"
+ #include "runtime/engine/engine.h"
+ #include "runtime/engine/engine_settings.h"
+@@ -492,6 +493,44 @@ SessionAdvanced::~SessionAdvanced() {
+   }
+ };
+ 
++absl::Status SessionAdvanced::SaveCache(absl::string_view path,
++                                       absl::string_view compatibility_key) {
++  absl::MutexLock lock(mutex_);
++  if (session_state_ != SessionState::kDecoded) {
++    return absl::FailedPreconditionError(
++        "SaveCache requires a completed decode turn.");
++  }
++  auto manager = execution_manager_.lock();
++  if (manager == nullptr) {
++    return absl::FailedPreconditionError("Execution manager is not available.");
++  }
++  // Reject active work rather than waiting under mutex_: a completion callback
++  // can itself enqueue another session operation.
++  ABSL_ASSIGN_OR_RETURN(
++      auto context,
++      manager->SerializeSessionContext(session_id_, last_task_ids_));
++  return WriteSessionCacheFile(path, compatibility_key,
++                              session_info_->last_prefill_token_id,
++                              context.metadata, context.state);
++}
++
++absl::Status SessionAdvanced::LoadCache(absl::string_view path,
++                                       absl::string_view compatibility_key) {
++  absl::MutexLock lock(mutex_);
++  if (session_state_ != SessionState::kFresh || !last_task_ids_.empty()) {
++    return absl::FailedPreconditionError("LoadCache requires a new session.");
++  }
++  auto manager = execution_manager_.lock();
++  if (manager == nullptr) {
++    return absl::FailedPreconditionError("Execution manager is not available.");
++  }
++  ABSL_ASSIGN_OR_RETURN(auto cache, ReadSessionCacheFile(path, compatibility_key));
++  ABSL_RETURN_IF_ERROR(manager->LoadSessionContext(
++      session_id_, cache.metadata, cache.state, cache.last_prefill_token_id));
++  session_state_ = SessionState::kDecoded;
++  return absl::OkStatus();
++}
++
+ absl::Status SessionAdvanced::SaveCheckpoint(absl::string_view label) {
+   absl::MutexLock lock(mutex_);
+   auto execution_manager_lock = execution_manager_.lock();
+diff --git a/runtime/core/session_advanced.h b/runtime/core/session_advanced.h
+index 9340f63efd54467daf79def9d742a888ecc2b1f3..b47a908407ac52205cbed477ab1ebc05f0a3d4df 100644
+--- a/runtime/core/session_advanced.h
++++ b/runtime/core/session_advanced.h
+@@ -166,6 +166,14 @@ class SessionAdvanced : public SessionInterface {
+ 
+   absl::StatusOr<BenchmarkInfo*> GetMutableBenchmarkInfo() override;
+ 
++  absl::Status SaveCache(absl::string_view path,
++                         absl::string_view compatibility_key) override
++      ABSL_LOCKS_EXCLUDED(mutex_);
++
++  absl::Status LoadCache(absl::string_view path,
++                         absl::string_view compatibility_key) override
++      ABSL_LOCKS_EXCLUDED(mutex_);
++
+   // Save the current step with the name `label`. You can later rewind to this
+   // checkpoint using `RewindToCheckpoint(label)`. If the checkpoint name
+   // already exists, the step number will be overwritten. Returns the saved
+diff --git a/runtime/engine/engine.h b/runtime/engine/engine.h
+index d844e4b137bce073c4d2e99c3a7b40ef257b8893..89173e0a2bb69b652e5d23902f65df0753b7bc76 100644
+--- a/runtime/engine/engine.h
++++ b/runtime/engine/engine.h
+@@ -310,6 +310,32 @@ class SessionInterface {
+       absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) {
+     return absl::UnimplementedError("Not implemented.");
+   };
++  // Persists an idle session after a successful completed decode. All device
++  // transfers and file I/O happen in this explicit call. The file is replaced
++  // atomically; the destination directory must be owned by the application.
++  // A busy shared executor is rejected. Speculative decoding is unsupported
++  // until its verifier commits state at the session's visible token boundary.
++  //
++  // compatibility_key must identify the verified model/adapter contents,
++  // tokenizer, runtime/delegate build, and execution/session configuration.
++  // Reuse the identity verified at installation; a filename is not an identity.
++  // This saves model context, not Conversation history or named checkpoints.
++  virtual absl::Status SaveCache(absl::string_view path,
++                                absl::string_view compatibility_key) {
++    return absl::UnimplementedError("Session cache persistence not implemented.");
++  }
++
++  // Loads a cache into a newly created session with the same compatibility key.
++  // The next operation starts a new turn; sampling starts from the target
++  // session's seed. Interrupted generation and streaming audio are not resumed.
++  // Malformed/incompatible input is rejected before copying serialized tensor
++  // bytes. If a device transfer or allocation fails, recreate the engine and
++  // session; device/compiled-signature changes cannot be rolled back.
++  virtual absl::Status LoadCache(absl::string_view path,
++                                absl::string_view compatibility_key) {
++    return absl::UnimplementedError("Session cache persistence not implemented.");
++  }
++
+   // Save the current step with the name `label`. You can later rewind to this
+   // checkpoint using `RewindToCheckpoint(label)`. If the checkpoint name
+   // already exists, the step number will be overwritten.
+diff --git a/runtime/framework/resource_management/BUILD b/runtime/framework/resource_management/BUILD
+index 5d9a7fa4ef08a280c0f74112e196f37ecce34cc5..3a62edd98f4ff681b9d07d8f076ae0956bd1cd66 100644
+--- a/runtime/framework/resource_management/BUILD
++++ b/runtime/framework/resource_management/BUILD
+@@ -45,6 +45,7 @@ cc_library(
+         "//runtime/engine:engine_settings",
+         "//runtime/engine:io_types",
+         "//runtime/executor:llm_executor_io_types",
++        "//runtime/executor:llm_executor_base",
+         "//runtime/framework/resource_management/context_handler",
+     ],
+ )
+@@ -244,6 +245,7 @@ cc_test(
+         "//runtime/executor:audio_executor_settings",
+         "//runtime/executor:executor_settings_base",
+         "//runtime/executor:fake_llm_executor",
++        "//runtime/executor:llm_executor_base",
+         "//runtime/executor:llm_executor_io_types",
+         "//runtime/executor:llm_executor_settings",
+         "//runtime/proto:token_cc",
+@@ -324,10 +326,13 @@ cc_test(
+     deps = [
+         ":resource_manager",
+         "@com_google_googletest//:gtest_main",
++        "@com_google_absl//absl/status",
+         "@com_google_absl//absl/time",
++        "//runtime/engine:engine_settings",
+         "//runtime/executor:executor_stats",
+         "//runtime/executor:fake_llm_executor",
+         "//runtime/executor:llm_executor",
++        "//runtime/framework/resource_management/context_handler",
+         "//runtime/util:test_utils",
+     ],
+ )
+diff --git a/runtime/framework/resource_management/execution_manager.h b/runtime/framework/resource_management/execution_manager.h
+index 28d2104514586a694b30995931f2f25d3bd3a37c..0dc7ec60ad180d347dcfd11c0de9d6f48fb7d4f4 100644
+--- a/runtime/framework/resource_management/execution_manager.h
++++ b/runtime/framework/resource_management/execution_manager.h
+@@ -38,6 +38,7 @@
+ #include "runtime/components/stop_token_detector.h"
+ #include "runtime/engine/engine_settings.h"
+ #include "runtime/engine/io_types.h"
++#include "runtime/executor/llm_executor_base.h"
+ #include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/framework/resource_management/context_handler/context_handler.h"
+ 
+@@ -262,6 +263,20 @@ class ExecutionManager {
+   virtual absl::Status SetCurrentStep(const SessionInfo& session_info,
+                                       int target_step) = 0;
+ 
++  // Explicit persistence operations. The caller must prevent new session
++  // admissions until this call returns. Implementations reject active/failed
++  // work and hold the existing executor lease only while transferring state.
++  virtual absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
++      SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++    return absl::UnimplementedError("Session cache persistence not implemented.");
++  }
++
++  virtual absl::Status LoadSessionContext(
++      SessionId session_id, absl::string_view metadata, absl::string_view state,
++      int last_prefill_token_id) {
++    return absl::UnimplementedError("Session cache persistence not implemented.");
++  }
++
+   // Saves the processed context of the session.
+   virtual absl::StatusOr<std::unique_ptr<ProcessedContext>> SaveContext(
+       const SessionInfo& session_info) = 0;
+diff --git a/runtime/framework/resource_management/execution_manager_test.cc b/runtime/framework/resource_management/execution_manager_test.cc
+index f0e98393618ddc005a71c94eb1f7d878d4eae8a9..0fc13bfe6eb50d73f0175358d6579d8123dcb1c5 100644
+--- a/runtime/framework/resource_management/execution_manager_test.cc
++++ b/runtime/framework/resource_management/execution_manager_test.cc
+@@ -49,6 +49,7 @@
+ #include "runtime/executor/audio/audio_executor_settings.h"
+ #include "runtime/executor/executor_settings_base.h"
+ #include "runtime/executor/fake_llm_executor.h"
++#include "runtime/executor/llm_executor_base.h"
+ #include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/executor/llm_executor_settings.h"
+ #include "runtime/framework/resource_management/serial_execution_manager.h"
+@@ -199,6 +200,17 @@ enum class ExecutionManagerType {
+   kSerial,
+ };
+ 
++class CacheTestLlmExecutor : public FakeLlmExecutor {
++ public:
++  CacheTestLlmExecutor()
++      : FakeLlmExecutor(kVocabSize, {{1, 2, 3}}, {{4}, {5}, {6}}) {}
++
++  MOCK_METHOD(absl::StatusOr<SerializedLlmContext>, SerializeContext, (),
++              (const, override));
++  MOCK_METHOD(absl::Status, LoadContext,
++              (absl::string_view metadata, absl::string_view state), (override));
++};
++
+ class ExecutionManagerTest
+     : public ::testing::TestWithParam<ExecutionManagerType> {
+  protected:
+@@ -293,6 +305,65 @@ class ExecutionManagerTest
+   std::unique_ptr<ExecutionManager> execution_manager_;
+ };
+ 
++TEST_P(ExecutionManagerTest, CacheOperationsReachTheLeasedExecutor) {
++  auto executor = std::make_unique<CacheTestLlmExecutor>();
++  auto* executor_ptr = executor.get();
++  CreateExecutionManager(std::move(executor));
++  ASSERT_OK_AND_ASSIGN(auto config, CreateDefaultSessionConfig());
++  ASSERT_OK_AND_ASSIGN(auto id, execution_manager_->RegisterNewSession(config));
++  ASSERT_OK_AND_ASSIGN(auto info, execution_manager_->GetSessionInfo(id));
++  const int original_token = info->last_prefill_token_id;
++  EXPECT_CALL(*executor_ptr, LoadContext("metadata", "state"))
++      .WillOnce(Return(absl::DataLossError("Invalid snapshot.")))
++      .WillOnce(Return(absl::OkStatus()));
++  EXPECT_THAT(execution_manager_->LoadSessionContext(id, "metadata", "state", 7),
++              testing::status::StatusIs(absl::StatusCode::kDataLoss));
++  EXPECT_EQ(info->last_prefill_token_id, original_token);
++  ASSERT_OK(execution_manager_->LoadSessionContext(id, "metadata", "state", 7));
++  EXPECT_EQ(info->last_prefill_token_id, 7);
++
++  const std::string state("\0\xff", 2);
++  EXPECT_CALL(*executor_ptr, SerializeContext())
++      .WillOnce(Return(SerializedLlmContext{"metadata", state}));
++  ASSERT_OK_AND_ASSIGN(auto result,
++                       execution_manager_->SerializeSessionContext(id, {}));
++  EXPECT_EQ(result.metadata, "metadata");
++  EXPECT_EQ(result.state, state);
++}
++
++TEST_P(ExecutionManagerTest, CacheSaveRejectsUnfinishedDependency) {
++  auto executor = std::make_unique<CacheTestLlmExecutor>();
++  EXPECT_CALL(*executor, SerializeContext()).Times(0);
++  CreateExecutionManager(std::move(executor));
++  ASSERT_OK_AND_ASSIGN(auto config, CreateDefaultSessionConfig());
++  ASSERT_OK_AND_ASSIGN(auto id, execution_manager_->RegisterNewSession(config));
++  ASSERT_OK_AND_ASSIGN(auto task_id, execution_manager_->GetNewTaskId());
++  EXPECT_THAT(execution_manager_->SerializeSessionContext(id, {task_id}),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++}
++
++TEST_P(ExecutionManagerTest, CacheLoadRejectsAUsedSessionRewoundToZero) {
++  auto executor = std::make_unique<CacheTestLlmExecutor>();
++  EXPECT_CALL(*executor, LoadContext(testing::_, testing::_)).Times(0);
++  CreateExecutionManager(std::move(executor));
++  ASSERT_OK_AND_ASSIGN(auto config, CreateDefaultSessionConfig());
++  ASSERT_OK_AND_ASSIGN(auto id, execution_manager_->RegisterNewSession(config));
++  ASSERT_OK_AND_ASSIGN(auto info, execution_manager_->GetSessionInfo(id));
++  ASSERT_OK_AND_ASSIGN(auto input,
++                       tokenizer_->TokenIdsToTensorBuffer({1, 2, 3}));
++  std::vector<InputData> inputs;
++  inputs.push_back(InputText(std::move(input)));
++  ASSERT_OK_AND_ASSIGN(auto task_id, execution_manager_->GetNewTaskId());
++  ASSERT_OK(execution_manager_->AddPrefillTask(
++      id, task_id, std::move(inputs), {},
++      std::make_shared<std::atomic<bool>>(false),
++      [](absl::StatusOr<Responses> responses) { EXPECT_OK(responses); }));
++  ASSERT_OK(execution_manager_->WaitUntilDone(task_id, absl::Seconds(3)));
++  ASSERT_OK(execution_manager_->SetCurrentStep(*info, 0));
++  EXPECT_THAT(execution_manager_->LoadSessionContext(id, "metadata", "state", 7),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++}
++
+ TEST_P(ExecutionManagerTest, CanGetMutableBenchmarkInfo) {
+   CreateExecutionManager(CreateDefaultFakeLlmExecutor());
+   ASSERT_OK_AND_ASSIGN(auto session_config, CreateDefaultSessionConfig());
+diff --git a/runtime/framework/resource_management/resource_manager.cc b/runtime/framework/resource_management/resource_manager.cc
+index ccbffc80f3498300a51d6b18561ec5e9a3cb9cd7..cfc4892577271475ebd7d09b4d1af45ab856b155 100644
+--- a/runtime/framework/resource_management/resource_manager.cc
++++ b/runtime/framework/resource_management/resource_manager.cc
+@@ -391,6 +391,16 @@ class LockedLlmExecutor : public LlmExecutor {
+     return llm_executor_->CloneContext();
+   }
+ 
++  absl::StatusOr<SerializedLlmContext> SerializeContext() const override {
++    return llm_executor_->SerializeContext();
++  }
++
++  absl::Status LoadContext(absl::string_view metadata,
++                          absl::string_view state) override {
++    ABSL_RETURN_IF_ERROR(MaybeTruncateProcessedTokens());
++    return llm_executor_->LoadContext(metadata, state);
++  }
++
+   absl::Status RestoreContext(
+       std::unique_ptr<LlmContext> llm_context) override {
+     return llm_executor_->RestoreContext(std::move(llm_context));
+@@ -753,6 +763,30 @@ ResourceManager::AcquireExecutorWithContextHandler(
+       << "The provided context handler should not be null.";
+ 
+   MovableMutexLock lock(&executor_mutex_);
++  return AcquireExecutorWithContextHandlerLocked(std::move(new_context_handler),
++                                                 std::move(lock));
++}
++
++absl::StatusOr<std::unique_ptr<LlmExecutor>>
++ResourceManager::TryAcquireExecutorWithContextHandler(
++    std::shared_ptr<ContextHandler> new_context_handler) {
++  RET_CHECK_NE(new_context_handler, nullptr);
++  if (!executor_mutex_.TryLock()) {
++    return absl::FailedPreconditionError("Executor is busy.");
++  }
++  MovableMutexLock lock(&executor_mutex_, std::adopt_lock);
++  if (new_context_handler->HasAudioContext() ||
++      (current_handler_ != nullptr && current_handler_->HasAudioContext())) {
++    return absl::UnimplementedError(
++        "A streaming audio context cannot be persisted as an LLM cache.");
++  }
++  return AcquireExecutorWithContextHandlerLocked(std::move(new_context_handler),
++                                                 std::move(lock));
++}
++
++absl::StatusOr<std::unique_ptr<LlmExecutor>>
++ResourceManager::AcquireExecutorWithContextHandlerLocked(
++    std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock) {
+   RET_CHECK_NE(llm_executor_, nullptr) << "Llm executor should not be null, "
+                                           "please do not delete the shared "
+                                           "executor in ResourceManager at "
+diff --git a/runtime/framework/resource_management/resource_manager.h b/runtime/framework/resource_management/resource_manager.h
+index 041c454a2520e0603792a3b7cadd7d1d3b50e5d8..ce818ef78fe13f2c7e397f53aff4d054c5a8b271 100644
+--- a/runtime/framework/resource_management/resource_manager.h
++++ b/runtime/framework/resource_management/resource_manager.h
+@@ -38,6 +38,7 @@
+ #include "runtime/executor/vision/vision_executor.h"
+ #include "runtime/executor/vision/vision_executor_settings.h"
+ #include "runtime/framework/resource_management/context_handler/context_handler.h"
++#include "runtime/framework/resource_management/utils/movable_mutex_lock.h"
+ 
+ namespace litert::lm {
+ 
+@@ -126,6 +127,14 @@ class ResourceManager {
+       ABSL_LOCKS_EXCLUDED(executor_mutex_)
+           ABSL_LOCKS_EXCLUDED(audio_executor_mutex_);
+ 
++  // Nonblocking acquisition for explicit cache IO. Rejects an occupied executor
++  // and streaming audio contexts, whose context switch requires another lease.
++  absl::StatusOr<std::unique_ptr<LlmExecutor>>
++  TryAcquireExecutorWithContextHandler(
++      std::shared_ptr<ContextHandler> new_context_handle)
++      ABSL_LOCKS_EXCLUDED(executor_mutex_)
++          ABSL_LOCKS_EXCLUDED(audio_executor_mutex_);
++
+   // Try to load the vision executor if the vision executor is not loaded.
+   absl::Status TryLoadingVisionExecutor()
+       ABSL_LOCKS_EXCLUDED(vision_executor_mutex_);
+@@ -163,6 +172,12 @@ class ResourceManager {
+       ABSL_LOCKS_EXCLUDED(executor_mutex_);
+ 
+  private:
++  absl::StatusOr<std::unique_ptr<LlmExecutor>>
++  AcquireExecutorWithContextHandlerLocked(
++      std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock)
++      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executor_mutex_)
++          ABSL_LOCKS_EXCLUDED(audio_executor_mutex_);
++
+   // Creates the litert environment if it is not created yet.
+   absl::Status MaybeCreateLitertEnv();
+ 
+diff --git a/runtime/framework/resource_management/resource_manager_test.cc b/runtime/framework/resource_management/resource_manager_test.cc
+index d644242cabf5dc6db4e4f79e0e699a52dcd659a9..52f19f6ee05ca9a9121c064de94683cd1b778641 100644
+--- a/runtime/framework/resource_management/resource_manager_test.cc
++++ b/runtime/framework/resource_management/resource_manager_test.cc
+@@ -17,10 +17,13 @@
+ #include <memory>
+ #include <optional>
+ #include <string>
++#include <utility>
+ 
+ #include <gmock/gmock.h>
+ #include <gtest/gtest.h>
++#include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/time/time.h"  // from @com_google_absl
++#include "runtime/engine/engine_settings.h"
+ #include "runtime/executor/executor_stats.h"
+ #include "runtime/executor/fake_llm_executor.h"
+ #include "runtime/executor/llm_executor.h"
+@@ -72,5 +75,32 @@ TEST(ResourceManagerTest, AcquiredExecutorForwardsExecutorStats) {
+   EXPECT_EQ(num_resets, 1);
+ }
+ 
++TEST(ResourceManagerTest, CacheLeaseRejectsBusyExecutorAndCanBeRetried) {
++  int num_resets = 0;
++  ASSERT_OK_AND_ASSIGN(
++      auto manager,
++      ResourceManager::Create(
++          /*model_resources=*/nullptr,
++          std::make_unique<StatsFakeLlmExecutor>(&num_resets),
++          /*vision_executor_settings=*/nullptr,
++          /*audio_executor_settings=*/nullptr, /*litert_env=*/nullptr));
++  ASSERT_OK_AND_ASSIGN(
++      auto owned_handler,
++      manager->CreateContextHandler(SessionConfig::CreateDefault()));
++  std::shared_ptr<ContextHandler> handler(std::move(owned_handler));
++  {
++    ASSERT_OK_AND_ASSIGN(auto lease, manager->AcquireExecutor());
++    EXPECT_THAT(manager->TryAcquireExecutorWithContextHandler(handler),
++                testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  }
++  {
++    ASSERT_OK_AND_ASSIGN(
++        auto lease, manager->TryAcquireExecutorWithContextHandler(handler));
++    EXPECT_THAT(manager->TryAcquireExecutorWithContextHandler(handler),
++                testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  }
++  EXPECT_OK(manager->TryAcquireExecutorWithContextHandler(handler));
++}
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/framework/resource_management/serial_execution_manager.cc b/runtime/framework/resource_management/serial_execution_manager.cc
+index f5f78f346cce5905fb6761be22975feb8b04802b..4c74134f2939916ff79988392129883efdb40007 100644
+--- a/runtime/framework/resource_management/serial_execution_manager.cc
++++ b/runtime/framework/resource_management/serial_execution_manager.cc
+@@ -1179,6 +1179,66 @@ absl::Status SerialExecutionManager::SetCurrentStep(
+   return llm_executor->SetCurrentStep(target_step);
+ }
+ 
++absl::StatusOr<SerializedLlmContext>
++SerialExecutionManager::SerializeSessionContext(
++    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++  std::shared_ptr<SessionInfo> session;
++  {
++    const auto found = session_lookup_.find(session_id);
++    if (found == session_lookup_.end()) {
++      return absl::NotFoundError("Session not found.");
++    }
++    session = found->second;
++    if (!session->active_tasks.empty()) {
++      return absl::FailedPreconditionError("Session is busy.");
++    }
++    for (TaskId task_id : completed_tasks) {
++      const auto task = task_lookup_.find(task_id);
++      if (task == task_lookup_.end() ||
++          (task->second.task_state != TaskState::kDone &&
++           task->second.task_state != TaskState::kMaxNumTokensReached)) {
++        return absl::FailedPreconditionError(
++            "Session did not complete successfully.");
++      }
++    }
++  }
++  ABSL_ASSIGN_OR_RETURN(auto executor,
++                        resource_manager_->TryAcquireExecutorWithContextHandler(
++                            session->context_handler));
++  return executor->SerializeContext();
++}
++
++absl::Status SerialExecutionManager::LoadSessionContext(
++    SessionId session_id, absl::string_view metadata, absl::string_view state,
++    int last_prefill_token_id) {
++  std::shared_ptr<SessionInfo> session;
++  {
++    const auto found = session_lookup_.find(session_id);
++    if (found == session_lookup_.end()) {
++      return absl::NotFoundError("Session not found.");
++    }
++    session = found->second;
++    if (!session->active_tasks.empty()) {
++      return absl::FailedPreconditionError("Session is busy.");
++    }
++    for (const auto& [task_id, task] : task_lookup_) {
++      if (task.session_id == session_id) {
++        return absl::FailedPreconditionError("LoadCache requires a new session.");
++      }
++    }
++  }
++  ABSL_ASSIGN_OR_RETURN(auto executor,
++                        resource_manager_->TryAcquireExecutorWithContextHandler(
++                            session->context_handler));
++  ABSL_ASSIGN_OR_RETURN(int step, executor->GetCurrentStep());
++  if (step != 0) {
++    return absl::FailedPreconditionError("LoadCache requires a new LLM session.");
++  }
++  ABSL_RETURN_IF_ERROR(executor->LoadContext(metadata, state));
++  session->last_prefill_token_id = last_prefill_token_id;
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<ProcessedContext>>
+ SerialExecutionManager::SaveContext(const SessionInfo& session_info) {
+   ABSL_ASSIGN_OR_RETURN(auto llm_executor,
+diff --git a/runtime/framework/resource_management/serial_execution_manager.h b/runtime/framework/resource_management/serial_execution_manager.h
+index 8bc5d61469ce469963b87273f1b877144c0b276c..12aa473a865279ea2bd4fca924f1d066cd390b84 100644
+--- a/runtime/framework/resource_management/serial_execution_manager.h
++++ b/runtime/framework/resource_management/serial_execution_manager.h
+@@ -223,6 +223,14 @@ class SerialExecutionManager : public ExecutionManager {
+   absl::Status SetCurrentStep(const SessionInfo& session_info,
+                               int target_step) override;
+ 
++  absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
++      SessionId session_id,
++      const absl::flat_hash_set<TaskId>& completed_tasks) override;
++
++  absl::Status LoadSessionContext(
++      SessionId session_id, absl::string_view metadata, absl::string_view state,
++      int last_prefill_token_id) override;
++
+   // Saves the processed context of the session.
+   absl::StatusOr<std::unique_ptr<ProcessedContext>> SaveContext(
+       const SessionInfo& session_info) override;
+diff --git a/runtime/framework/resource_management/threaded_execution_manager.cc b/runtime/framework/resource_management/threaded_execution_manager.cc
+index ebd055d8a20c5d5f44ffb837f46498fe2da8d5fa..2c09bbfb6c2d7febdc3b0f9d716e1c213467ff4b 100644
+--- a/runtime/framework/resource_management/threaded_execution_manager.cc
++++ b/runtime/framework/resource_management/threaded_execution_manager.cc
+@@ -1325,6 +1325,68 @@ absl::Status ThreadedExecutionManager::SetCurrentStep(
+   return llm_executor->SetCurrentStep(target_step);
+ }
+ 
++absl::StatusOr<SerializedLlmContext>
++ThreadedExecutionManager::SerializeSessionContext(
++    SessionId session_id, const absl::flat_hash_set<TaskId>& completed_tasks) {
++  std::shared_ptr<SessionInfo> session;
++  {
++    absl::MutexLock lock(session_and_task_lookup_mutex_);
++    const auto found = session_lookup_.find(session_id);
++    if (found == session_lookup_.end()) {
++      return absl::NotFoundError("Session not found.");
++    }
++    session = found->second;
++    if (!session->active_tasks.empty()) {
++      return absl::FailedPreconditionError("Session is busy.");
++    }
++    for (TaskId task_id : completed_tasks) {
++      const auto task = task_lookup_.find(task_id);
++      if (task == task_lookup_.end() ||
++          (task->second.task_state != TaskState::kDone &&
++           task->second.task_state != TaskState::kMaxNumTokensReached)) {
++        return absl::FailedPreconditionError(
++            "Session did not complete successfully.");
++      }
++    }
++  }
++  ABSL_ASSIGN_OR_RETURN(auto executor,
++                        resource_manager_->TryAcquireExecutorWithContextHandler(
++                            session->context_handler));
++  return executor->SerializeContext();
++}
++
++absl::Status ThreadedExecutionManager::LoadSessionContext(
++    SessionId session_id, absl::string_view metadata, absl::string_view state,
++    int last_prefill_token_id) {
++  std::shared_ptr<SessionInfo> session;
++  {
++    absl::MutexLock lock(session_and_task_lookup_mutex_);
++    const auto found = session_lookup_.find(session_id);
++    if (found == session_lookup_.end()) {
++      return absl::NotFoundError("Session not found.");
++    }
++    session = found->second;
++    if (!session->active_tasks.empty()) {
++      return absl::FailedPreconditionError("Session is busy.");
++    }
++    for (const auto& [task_id, task] : task_lookup_) {
++      if (task.session_id == session_id) {
++        return absl::FailedPreconditionError("LoadCache requires a new session.");
++      }
++    }
++  }
++  ABSL_ASSIGN_OR_RETURN(auto executor,
++                        resource_manager_->TryAcquireExecutorWithContextHandler(
++                            session->context_handler));
++  ABSL_ASSIGN_OR_RETURN(int step, executor->GetCurrentStep());
++  if (step != 0) {
++    return absl::FailedPreconditionError("LoadCache requires a new LLM session.");
++  }
++  ABSL_RETURN_IF_ERROR(executor->LoadContext(metadata, state));
++  session->last_prefill_token_id = last_prefill_token_id;
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<ProcessedContext>>
+ ThreadedExecutionManager::SaveContext(const SessionInfo& session_info) {
+   ABSL_ASSIGN_OR_RETURN(auto llm_executor,
+diff --git a/runtime/framework/resource_management/threaded_execution_manager.h b/runtime/framework/resource_management/threaded_execution_manager.h
+index 71adc9ae73c608c94982adab9bddad68322471bf..38ad43043438e4877702d564e094c5d50cfaabb3 100644
+--- a/runtime/framework/resource_management/threaded_execution_manager.h
++++ b/runtime/framework/resource_management/threaded_execution_manager.h
+@@ -242,6 +242,14 @@ class ThreadedExecutionManager : public ExecutionManager {
+   absl::Status SetCurrentStep(const SessionInfo& session_info,
+                               int target_step) override;
+ 
++  absl::StatusOr<SerializedLlmContext> SerializeSessionContext(
++      SessionId session_id,
++      const absl::flat_hash_set<TaskId>& completed_tasks) override;
++
++  absl::Status LoadSessionContext(
++      SessionId session_id, absl::string_view metadata, absl::string_view state,
++      int last_prefill_token_id) override;
++
+   // Saves the processed context of the session.
+   absl::StatusOr<std::unique_ptr<ProcessedContext>> SaveContext(
+       const SessionInfo& session_info) override;
+diff --git a/runtime/framework/resource_management/utils/movable_mutex_lock.h b/runtime/framework/resource_management/utils/movable_mutex_lock.h
+index 8924eb22463a25310e857202ed39399ab628c421..76e47a6781c0ca3803743839bf697211dee7bbe7 100644
+--- a/runtime/framework/resource_management/utils/movable_mutex_lock.h
++++ b/runtime/framework/resource_management/utils/movable_mutex_lock.h
+@@ -15,6 +15,7 @@
+ #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_UTILS_MOVABLE_MUTEX_LOCK_H_
+ #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_FRAMEWORK_RESOURCE_MANAGEMENT_UTILS_MOVABLE_MUTEX_LOCK_H_
+ 
++#include <mutex>
+ #include <utility>
+ 
+ #include "absl/base/nullability.h"  // from @com_google_absl
+@@ -35,6 +36,11 @@ class ABSL_SCOPED_LOCKABLE MovableMutexLock {
+     mutex_->lock();
+   }
+ 
++  // Takes ownership of a lock already acquired by the caller.
++  MovableMutexLock(absl::Mutex* absl_nonnull mutex, std::adopt_lock_t)
++      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex)
++      : mutex_(mutex) {}
++
+   // MovableMutexLock is movable.
+   MovableMutexLock(MovableMutexLock&& other) ABSL_NO_THREAD_SAFETY_ANALYSIS
+       : mutex_(other.mutex_) {

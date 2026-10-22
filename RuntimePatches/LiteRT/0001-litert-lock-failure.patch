@@ -1,0 +1,147 @@
+diff --git a/litert/runtime/tensor_buffer.cc b/litert/runtime/tensor_buffer.cc
+--- a/litert/runtime/tensor_buffer.cc
++++ b/litert/runtime/tensor_buffer.cc
+@@ -1049,8 +1049,11 @@
+   LITERT_RETURN_IF_ERROR(is_locked_ == false,
+                          Unexpected(kLiteRtStatusErrorRuntimeFailure,
+                                     "Tensor buffer is already locked."));
+-  is_locked_ = true;
+-  lock_mode_ = mode;
++  const auto locked = [this, mode](void* host_memory) {
++    is_locked_ = true;
++    lock_mode_ = mode;
++    return host_memory;
++  };
+   if (event_ != nullptr) {
+     // Only AHWB supports waiting on an input sync fence when locking the
+     // buffer. For all other buffer types we wait here.
+@@ -1062,13 +1065,16 @@
+   switch (buffer_type()) {
+     case kLiteRtTensorBufferTypeHostMemory: {
+       LITERT_ASSIGN_OR_ABORT(auto host_buffer, GetHostBuffer());
+-      return host_buffer;
++      return locked(host_buffer);
+     }
+     case kLiteRtTensorBufferTypeAhwb: {
+ #if LITERT_HAS_AHWB_SUPPORT
+       LITERT_ASSIGN_OR_ABORT(auto ahwb_buffer, GetAhwbBuffer());
+-      return litert::internal::AhwbBuffer::Lock(
+-          ahwb_buffer, event_ != nullptr ? event_.get() : nullptr);
++      LITERT_ASSIGN_OR_RETURN(
++          void* const host_memory_ptr,
++          litert::internal::AhwbBuffer::Lock(
++              ahwb_buffer, event_ != nullptr ? event_.get() : nullptr));
++      return locked(host_memory_ptr);
+ #else
+       return Unexpected(kLiteRtStatusErrorRuntimeFailure,
+                          "AHardwareBuffer is not supported");
+@@ -1076,7 +1082,7 @@
+     }
+     case kLiteRtTensorBufferTypeIon: {
+       LITERT_ASSIGN_OR_ABORT(auto ion_buffer, GetIonBuffer());
+-      return ion_buffer.first;
++      return locked(ion_buffer.first);
+     }
+     case kLiteRtTensorBufferTypeDmaBuf: {
+       LITERT_ASSIGN_OR_ABORT(auto dma_buffer, GetDmaBufBuffer());
+@@ -1084,18 +1090,18 @@
+       LITERT_RETURN_IF_ERROR(
+           ::litert::internal::DmaBufBuffer::Lock(dma_buffer.second, mode));
+ #endif
+-      return dma_buffer.first;
++      return locked(dma_buffer.first);
+     }
+     case kLiteRtTensorBufferTypeFastRpc: {
+       LITERT_ASSIGN_OR_ABORT(auto fastrpc_buffer, GetFastRpcBuffer());
+-      return fastrpc_buffer.first;
++      return locked(fastrpc_buffer.first);
+     }
+     case kLiteRtTensorBufferTypeGlBuffer: {
+ #if LITERT_HAS_OPENGL_SUPPORT
+       LITERT_ASSIGN_OR_RETURN(auto gl_buffer, GetGlBuffer());
+       LITERT_ASSIGN_OR_RETURN(float* const host_memory_ptr,
+                               gl_buffer->Lock<float>(mode));
+-      return host_memory_ptr;
++      return locked(host_memory_ptr);
+ #else
+       return Unexpected(kLiteRtStatusErrorRuntimeFailure,
+                         "OpenGL buffers are not supported");
+@@ -1130,7 +1136,7 @@
+       LITERT_ASSIGN_OR_RETURN(auto custom_buffer, GetCustomBuffer());
+       LITERT_ASSIGN_OR_RETURN(void* const host_memory_ptr,
+                               custom_buffer->Lock(mode));
+-      return host_memory_ptr;
++      return locked(host_memory_ptr);
+     }
+     case kLiteRtTensorBufferTypeGlTexture:
+     case kLiteRtTensorBufferTypeUnknown:
+@@ -1139,7 +1145,7 @@
+         LITERT_ASSIGN_OR_RETURN(auto custom_buffer, GetCustomBuffer());
+         LITERT_ASSIGN_OR_RETURN(void* const host_memory_ptr,
+                                 custom_buffer->Lock(mode));
+-        return host_memory_ptr;
++        return locked(host_memory_ptr);
+       }
+       return Unexpected(kLiteRtStatusErrorRuntimeFailure,
+                         "Unexpected tensor buffer type");
+diff --git a/litert/runtime/tensor_buffer_registry_test.cc b/litert/runtime/tensor_buffer_registry_test.cc
+--- a/litert/runtime/tensor_buffer_registry_test.cc
++++ b/litert/runtime/tensor_buffer_registry_test.cc
+@@ -37,6 +37,7 @@
+ struct CustomHwMemoryInfo : public HwMemoryInfo {
+   size_t bytes;
+   void* mapped_ptr;
++  bool fail_next_lock = false;
+ };
+ 
+ static int kDummyHandleStorage = 0;
+@@ -72,6 +73,10 @@
+                                       LiteRtTensorBufferLockMode mode,
+                                       void** host_memory_ptr) {
+   auto hw_info = reinterpret_cast<CustomHwMemoryInfo*>(hw_memory_info);
++  if (hw_info->fail_next_lock) {
++    hw_info->fail_next_lock = false;
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
+   if (!hw_info->mapped_ptr) {
+     LITERT_LOG(LITERT_INFO, "Allocating mapped ptr for %zu bytes",
+                hw_info->bytes);
+@@ -119,6 +124,38 @@
+   EXPECT_TRUE(tensor_buffer->Unlock());
+ }
+ 
++TEST(TensorBufferRegistryTest, FailedLockCanBeRetried) {
++  LITERT_ASSIGN_OR_ABORT(litert::Environment env,
++                         litert::Environment::Create({}));
++  litert::internal::TensorBufferRegistry* registry = nullptr;
++  LITERT_ASSERT_OK(LiteRtGetTensorBufferRegistry(
++      env.Get(), reinterpret_cast<void**>(&registry)));
++  LITERT_ASSERT_OK(registry->RegisterHandlers(
++      kLiteRtTensorBufferTypeUserCustomBuffer,
++      {.create_func = CreateMyCustomTensorBuffer,
++       .destroy_func = DestroyMyCustomTensorBuffer,
++       .lock_func = LockMyCustomTensorBuffer,
++       .unlock_func = UnlockMyCustomTensorBuffer}));
++  constexpr LiteRtRankedTensorType kTensorType = {
++      kLiteRtElementTypeInt32, litert::BuildLayout({8})};
++  LITERT_ASSIGN_OR_ABORT(auto tensor_buffer,
++                         LiteRtTensorBufferT::CreateManaged(
++                             env.Get(), kLiteRtTensorBufferTypeUserCustomBuffer,
++                             kTensorType, 32));
++  LITERT_ASSIGN_OR_ABORT(auto custom_buffer, tensor_buffer->GetCustomBuffer());
++  auto* memory_info =
++      static_cast<CustomHwMemoryInfo*>(custom_buffer->hw_memory_info());
++  memory_info->fail_next_lock = true;
++
++  EXPECT_FALSE(tensor_buffer->Lock(kLiteRtTensorBufferLockModeRead));
++  LITERT_ASSERT_OK_AND_ASSIGN(
++      void* data, tensor_buffer->Lock(kLiteRtTensorBufferLockModeRead));
++  ASSERT_NE(data, nullptr);
++  EXPECT_FALSE(tensor_buffer->Lock(kLiteRtTensorBufferLockModeRead));
++  LITERT_EXPECT_OK(tensor_buffer->Unlock());
++  EXPECT_FALSE(tensor_buffer->Unlock());
++}
++
+ TEST(TensorBufferRegistryTest, RegistryOwnership) {
+   LITERT_ASSIGN_OR_ABORT(litert::Environment env,
+                          litert::Environment::Create({}));

@@ -1,0 +1,202 @@
+diff --git a/runtime/executor/BUILD b/runtime/executor/BUILD
+index 46f3f8c58ce1b5b03c143d786a470bbd894abe35..3bcc221ce6803415b793869c64820b90ab3d19b4 100644
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -339,6 +339,20 @@ cc_test(
+     ],
+ )
+ 
++cc_library(
++    name = "mtp_cache",
++    hdrs = ["mtp_cache.h"],
++)
++
++cc_test(
++    name = "mtp_cache_test",
++    srcs = ["mtp_cache_test.cc"],
++    deps = [
++        ":mtp_cache",
++        "@com_google_googletest//:gtest_main",
++    ],
++)
++
+ cc_library(
+     name = "llm_litert_compiled_model_executor",
+     srcs = ["llm_litert_compiled_model_executor.cc"],
+diff --git a/runtime/executor/mtp_cache.h b/runtime/executor/mtp_cache.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..10e92daab62e92cb6388da9591f8bbc4c13f035a
+--- /dev/null
++++ b/runtime/executor/mtp_cache.h
+@@ -0,0 +1,46 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_MTP_CACHE_H_
++#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_MTP_CACHE_H_
++
++#include <cstdint>
++
++namespace litert::lm {
++
++// A verifier beginning at P writes through P + verify_steps - 1. Stopping on
++// the preceding cold-prime token can make the next prefill replay P - 1, whose
++// oldest required history row is P - window_size. Keep that row outside the
++// verifier's overwritten ring slots. This is a sufficient bound for any
++// accepted prefix, including a stop within the returned batch. Reserve further
++// rows when the saved logical position has been rewound behind its token history.
++constexpr bool IsMtpRingSnapshotSafe(int64_t ring_size, int64_t window_size,
++                                     int64_t verify_steps,
++                                     int64_t rollback_steps = 0) {
++  return window_size > 0 && verify_steps > 0 && ring_size >= window_size &&
++         verify_steps <= ring_size - window_size && rollback_steps >= 0 &&
++         rollback_steps <= ring_size - window_size - verify_steps;
++}
++
++// Check before constructing masks or writing any verifier input/state. Use
++// subtraction so malformed sizes cannot overflow the bound check.
++constexpr bool MtpBatchFits(int64_t start, int64_t verify_steps,
++                            int64_t capacity) {
++  return start >= 0 && verify_steps > 0 && capacity >= verify_steps &&
++         start <= capacity - verify_steps;
++}
++
++}  // namespace litert::lm
++
++#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_MTP_CACHE_H_
+diff --git a/runtime/executor/mtp_cache_test.cc b/runtime/executor/mtp_cache_test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..43da0e583fd6778cff22897fc928554627d94694
+--- /dev/null
++++ b/runtime/executor/mtp_cache_test.cc
+@@ -0,0 +1,119 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/mtp_cache.h"
++
++#include <cstdint>
++#include <limits>
++#include <vector>
++
++#include <gtest/gtest.h>
++
++namespace litert::lm {
++namespace {
++
++TEST(MtpCacheTest, Gemma4TwelveBHasRoomForSpeculationAndLogicalRollback) {
++  EXPECT_TRUE(IsMtpRingSnapshotSafe(1152, 1024, 4));
++  EXPECT_TRUE(IsMtpRingSnapshotSafe(1152, 1024, 4, 124));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(1152, 1024, 4, 125));
++}
++
++TEST(MtpCacheTest, RetainsEveryHistoryRowNeededAfterAnyAcceptedPrefix) {
++  // Each slot records the absolute position of its last write. Acceptance and
++  // stop handling can resume anywhere from the previous cold-prime input to
++  // the pending bonus token after a fully accepted batch. Unaccepted future
++  // positions are masked and overwritten as the next prefill advances.
++  for (int64_t window = 2; window <= 8; ++window) {
++    for (int64_t verify = 1; verify <= 6; ++verify) {
++      for (int64_t rollback = 0; rollback <= 3; ++rollback) {
++        for (int64_t size = window; size <= window + verify + rollback + 2;
++             ++size) {
++          if (!IsMtpRingSnapshotSafe(size, window, verify, rollback)) continue;
++          for (int64_t start = 2 * size; start < 3 * size; ++start) {
++            std::vector<int64_t> snapshot(size, -1);
++            for (int64_t position = 0; position < start + verify; ++position) {
++              snapshot[position % size] = position;
++            }
++            for (int64_t resume = start - 1 - rollback;
++                 resume <= start + verify; ++resume) {
++              auto restored = snapshot;
++              // Cross two further wraps, including the first replayed input.
++              for (int64_t query = resume; query < resume + 2 * size; ++query) {
++                restored[query % size] = query;
++                for (int64_t history = query - window + 1; history <= query;
++                     ++history) {
++                  ASSERT_EQ(restored[history % size], history)
++                      << "window=" << window << " verify=" << verify
++                      << " rollback=" << rollback << " ring=" << size
++                      << " start=" << start << " resume=" << resume
++                      << " query=" << query;
++                }
++              }
++            }
++          }
++        }
++      }
++    }
++  }
++}
++
++TEST(MtpCacheTest, OneRowShortCanDestroyHistoryBeforeAStopOnThePrimeToken) {
++  constexpr int64_t kWindow = 8;
++  constexpr int64_t kVerify = 4;
++  constexpr int64_t kRing = 11;
++  constexpr int64_t kStart = 29;
++  std::vector<int64_t> ring(kRing, -1);
++  for (int64_t position = 0; position < kStart + kVerify; ++position) {
++    ring[position % kRing] = position;
++  }
++  // Replaying kStart - 1 still needs kStart - kWindow. The last speculative
++  // write has replaced that row, even though every draft token may be rejected.
++  EXPECT_NE(ring[(kStart - kWindow) % kRing], kStart - kWindow);
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(kRing, kWindow, kVerify));
++  EXPECT_TRUE(IsMtpRingSnapshotSafe(kRing + 1, kWindow, kVerify));
++}
++
++TEST(MtpCacheTest, RejectsInvalidAndOverflowingRingGeometry) {
++  constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(-1, 1, 1));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(8, 0, 1));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(8, 1, 0));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(8, 1, 1, -1));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(8, 9, 1));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(kMax, kMax, 1));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(kMax, 1, kMax));
++  EXPECT_FALSE(IsMtpRingSnapshotSafe(kMax, 1, 1, kMax));
++  EXPECT_TRUE(IsMtpRingSnapshotSafe(kMax, 1, 1, kMax - 2));
++}
++
++TEST(MtpCacheTest, VerifierBatchMustFitBeforeAnyInputOrCacheWrite) {
++  EXPECT_TRUE(MtpBatchFits(0, 4, 4));
++  EXPECT_TRUE(MtpBatchFits(12, 4, 16));
++  EXPECT_FALSE(MtpBatchFits(13, 4, 16));
++  EXPECT_FALSE(MtpBatchFits(0, 4, 3));
++  EXPECT_FALSE(MtpBatchFits(-1, 4, 16));
++  EXPECT_FALSE(MtpBatchFits(0, 0, 16));
++  EXPECT_FALSE(MtpBatchFits(0, -1, 16));
++  EXPECT_FALSE(MtpBatchFits(0, 1, -1));
++  // Reserve one logical token for the pending bonus after accepting all drafts.
++  EXPECT_TRUE(MtpBatchFits(11, 4, 16 - 1));
++  EXPECT_FALSE(MtpBatchFits(12, 4, 16 - 1));
++  constexpr int64_t kMax = std::numeric_limits<int64_t>::max();
++  EXPECT_TRUE(MtpBatchFits(kMax - 4, 4, kMax));
++  EXPECT_FALSE(MtpBatchFits(kMax - 3, 4, kMax));
++  EXPECT_FALSE(MtpBatchFits(kMax, kMax, kMax));
++}
++
++}  // namespace
++}  // namespace litert::lm

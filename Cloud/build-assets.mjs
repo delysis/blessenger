@@ -1,0 +1,5 @@
+import fs from 'node:fs';
+const mapping={'/':'companion.html','app.js':'companion.js','rtc.js':'companion-rtc.js','style.css':'companion.css','manifest.webmanifest':'companion.webmanifest','sw.js':'companion-sw.js','recorder.js':'companion-recorder.js','call-audio.js':'companion-call-audio.js','runtime.js':'companion-runtime.js','speech-check.html':'speech-check.html','speech-check.js':'speech-check.js','icon.png':'companion-icon.png'};
+fs.mkdirSync(new URL('./public/',import.meta.url),{recursive:true});
+for(const [dest,source] of Object.entries(mapping))fs.copyFileSync(new URL('../Sources/CallGemma/Resources/Web/'+source,import.meta.url),new URL('./public/'+(dest==='/'?'index.html':dest),import.meta.url));
+fs.writeFileSync(new URL('./public/_headers',import.meta.url),`/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Content-Security-Policy: default-src 'self'; img-src 'self' blob:; media-src 'self' blob:; style-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; frame-ancestors 'none'\n  Permissions-Policy: microphone=(self), camera=()\n`);

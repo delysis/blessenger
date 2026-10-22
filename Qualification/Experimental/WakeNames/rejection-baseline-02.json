@@ -1,0 +1,95 @@
+{
+  "scope": "Synthetic held-out voice test only; not streaming or acoustic acceptance",
+  "rejection": {
+    "threshold": 0,
+    "margin": 0.1,
+    "validation_wrong_activations": 0,
+    "validation_correct_detections": 17,
+    "test_correct_detections": 14,
+    "test_wrong_name_detections": 2,
+    "test_false_activations": 0,
+    "test_missed_names": 4,
+    "test_positive_clips": 20,
+    "test_negative_clips": 10
+  },
+  "feature_seconds": 6.5194399589672685,
+  "embedding_shape": [
+    360,
+    41,
+    96
+  ],
+  "validation_trials": [
+    {
+      "features": "flatten",
+      "C": 0.001,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "flatten",
+      "C": 0.01,
+      "validation_accuracy": 0.8666666666666667
+    },
+    {
+      "features": "flatten",
+      "C": 0.1,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "flatten",
+      "C": 1,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "pool",
+      "C": 0.001,
+      "validation_accuracy": 0.8333333333333334
+    },
+    {
+      "features": "pool",
+      "C": 0.01,
+      "validation_accuracy": 0.8333333333333334
+    },
+    {
+      "features": "pool",
+      "C": 0.1,
+      "validation_accuracy": 0.7333333333333333
+    },
+    {
+      "features": "pool",
+      "C": 1,
+      "validation_accuracy": 0.6666666666666666
+    }
+  ],
+  "chosen": {
+    "features": "flatten",
+    "C": 0.001
+  },
+  "test_accuracy": 0.8,
+  "classes": [
+    "gabor",
+    "other",
+    "peter"
+  ],
+  "test_confusion": [
+    [
+      9,
+      1,
+      0
+    ],
+    [
+      1,
+      8,
+      1
+    ],
+    [
+      2,
+      1,
+      7
+    ]
+  ],
+  "files": {
+    "work/wake-name-rd/models/embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+    "work/wake-name-rd/models/melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+    "work/wake-name-rd/dataset-01/manifest.json": "bd657abbb1cbb012ec759b44b126c458f43bf17157014b149000dbcf47d0f5fd"
+  }
+}

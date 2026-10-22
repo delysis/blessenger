@@ -1,0 +1,34 @@
+[
+  {
+    "path": "./fixtures/original-0.f32",
+    "answer": "\\b(?:four|4)\\b"
+  },
+  {
+    "path": "./fixtures/original-1.f32",
+    "answer": "\\b(?:eight|8)\\b"
+  },
+  {
+    "path": "./fixtures/original-2.f32",
+    "answer": "\\bParis\\b"
+  },
+  {
+    "path": "./fixtures/original-3.f32",
+    "answer": "\\b(?:seven|7)\\b"
+  },
+  {
+    "path": "./fixtures/original-4.f32",
+    "answer": "\\b(?:nine|9)\\b"
+  },
+  {
+    "path": "./fixtures/original-5.f32",
+    "answer": "\\bEarth\\b"
+  },
+  {
+    "path": "./fixtures/clinical-age.f32",
+    "answer": "\\b(?:forty|40)\\b"
+  },
+  {
+    "path": "./fixtures/clinical-work.f32",
+    "answer": "\\b(?:five|5)\\b"
+  }
+]

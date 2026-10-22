@@ -1,0 +1,5 @@
+archive_sha256	bd26459881a0e7d16dacf3bf81ff7e22f7c2a2cfad288df64b732699c1b4920c
+source_manifest_sha256	8e4029de61e3e4a2dc846cbff7daaa31183d8d09abc5a996ab4acac06e87440c
+flags	--config=ios_arm64 -c opt //swift:CLiteRTLM
+Xcode 27.0
+Build version 27A266a

@@ -1,0 +1,995 @@
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_allgpu_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_allgpu_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_allgpu_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_allgpu_accelerator.cc
+@@ -136,6 +136,8 @@
+ 
+   static LiteRtStatus ClearGpuMemory(HwMemoryInfoPtr hw_memory_info);
+ 
++  static LiteRtStatus ReleaseHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
++
+   static LiteRtStatus ImportGpuMemory(LiteRtGpuDeviceId device_id,
+                                       LiteRtGpuQueueId queue_id,
+                                       const LiteRtRankedTensorType* tensor_type,
+@@ -271,6 +273,18 @@
+   }
+ }
+ 
++LiteRtStatus GpuAccelerator::ReleaseHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* wrapper = static_cast<HybridMemoryInfo*>(hw_memory_info);
++  if (wrapper->backend == kLiteRtGpuBackendWebGpu) {
++    return LiteRtReleaseWebGpuHostStagingMemory(wrapper->real_info);
++  }
++  return LiteRtReleaseOpenClHostStagingMemory(wrapper->real_info);
++}
++
+ LiteRtStatus GpuAccelerator::ClearGpuMemory(HwMemoryInfoPtr hw_memory_info) {
+   auto* wrapper = static_cast<HybridMemoryInfo*>(hw_memory_info);
+   if (wrapper->backend == kLiteRtGpuBackendWebGpu) {
+@@ -323,12 +337,12 @@
+ // Discovery C object for the GPU accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuAccelerator::GetName,
+@@ -374,6 +388,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = GpuAccelerator::ReleaseHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -381,7 +400,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_cl_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_cl_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_cl_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_cl_accelerator.cc
+@@ -114,12 +114,12 @@
+ // Discovery C object for the GPU OpenCL accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuOpenClAccelerator::GetName,
+@@ -154,6 +154,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = LiteRtReleaseOpenClHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -161,7 +166,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_cl_gl_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_cl_gl_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_cl_gl_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_cl_gl_accelerator.cc
+@@ -137,12 +137,12 @@
+ // Discovery C function for the GPU OpenCL/OpenGL accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuAccelerator::GetName,
+@@ -177,6 +177,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = LiteRtReleaseOpenClHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -184,7 +189,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_gpu_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_gpu_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_gpu_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_gpu_accelerator.cc
+@@ -155,6 +155,8 @@
+ 
+   static LiteRtStatus ClearGpuMemory(HwMemoryInfoPtr hw_memory_info);
+ 
++  static LiteRtStatus ReleaseHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
++
+   static LiteRtStatus ImportGpuMemory(LiteRtGpuDeviceId device_id,
+                                       LiteRtGpuQueueId queue_id,
+                                       const LiteRtRankedTensorType* tensor_type,
+@@ -282,6 +284,18 @@
+   }
+ }
+ 
++LiteRtStatus GpuAccelerator::ReleaseHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* wrapper = static_cast<HybridMemoryInfo*>(hw_memory_info);
++  if (wrapper->backend == kLiteRtGpuBackendWebGpu) {
++    return LiteRtReleaseWebGpuHostStagingMemory(wrapper->real_info);
++  }
++  return LiteRtReleaseOpenClHostStagingMemory(wrapper->real_info);
++}
++
+ LiteRtStatus GpuAccelerator::ClearGpuMemory(HwMemoryInfoPtr hw_memory_info) {
+   auto* wrapper = static_cast<HybridMemoryInfo*>(hw_memory_info);
+   if (wrapper->backend == kLiteRtGpuBackendWebGpu) {
+@@ -321,12 +335,12 @@
+ // Discovery C object for the GPU accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuAccelerator::GetName,
+@@ -368,6 +382,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = GpuAccelerator::ReleaseHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -375,7 +394,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_metal_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_metal_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_metal_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_metal_accelerator.cc
+@@ -126,12 +126,12 @@
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+ // The symbol is exported by runtime/accelerators/gpu/macos_exported_symbols.lds
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuMetalAccelerator::GetName,
+@@ -164,6 +164,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = LiteRtReleaseMetalHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -171,7 +176,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_vulkan_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_vulkan_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_vulkan_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_vulkan_accelerator.cc
+@@ -103,12 +103,12 @@
+ // Discovery C object for the GPU Vulkan accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuVulkanAccelerator::GetName,
+@@ -143,6 +143,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = LiteRtReleaseVulkanHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -150,7 +155,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/runtime/accelerators/gpu/ml_drift_webgpu_accelerator.cc b/litert/runtime/accelerators/gpu/ml_drift_webgpu_accelerator.cc
+--- a/litert/runtime/accelerators/gpu/ml_drift_webgpu_accelerator.cc
++++ b/litert/runtime/accelerators/gpu/ml_drift_webgpu_accelerator.cc
+@@ -111,12 +111,12 @@
+ // Discovery C object for the GPU WebGPU accelerator by LiteRT.
+ // This object is used by the LiteRT environment constructor and the
+ // object name is looked up by dlsym().
+-extern "C" const LiteRtAcceleratorDef LiteRtAcceleratorImpl = {
++constexpr LiteRtAcceleratorDef kAcceleratorDefV1 = {
+     .abi_header =
+         {
+-            .struct_size = sizeof(LiteRtAcceleratorDefV1),
++            .struct_size = sizeof(LiteRtAcceleratorDefV1_1),
+             .major_version = 1,
+-            .minor_version = 0,
++            .minor_version = 1,
+             .reserved = 0,
+         },
+     .get_name = GpuWebGpuAccelerator::GetName,
+@@ -151,6 +151,11 @@
+         },
+ };
+ 
++extern "C" const LiteRtAcceleratorDefV1_1 LiteRtAcceleratorImpl = {
++    .v1 = kAcceleratorDefV1,
++    .release_host_staging_memory = LiteRtReleaseWebGpuHostStagingMemory,
++};
++
+ #if defined(LITERT_USE_STATIC_LINKED_GPU_ACCELERATOR)
+ 
+ namespace {
+@@ -158,7 +163,7 @@
+ class StaticGpuAcceleratorInitializer {
+  public:
+   StaticGpuAcceleratorInitializer() {
+-    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl;
++    LiteRtStaticLinkedAcceleratorGpuDef = &LiteRtAcceleratorImpl.v1;
+   }
+ };
+ 
+diff --git a/litert/vendors/intel_openvino/dispatch/dispatch_api.cc b/litert/vendors/intel_openvino/dispatch/dispatch_api.cc
+--- a/litert/vendors/intel_openvino/dispatch/dispatch_api.cc
++++ b/litert/vendors/intel_openvino/dispatch/dispatch_api.cc
+@@ -82,6 +82,12 @@
+ 
+ LiteRtStatus UnlockOpenVinoTensorBuffer(HwMemoryInfoPtr hw_memory_info) {
+   return kLiteRtStatusOk;
++}
++
++LiteRtStatus ReleaseOpenVinoHostStagingMemory(HwMemoryInfoPtr hw_memory_info) {
++  // The mapped host tensor is canonical storage, not an optional mirror.
++  return hw_memory_info == nullptr ? kLiteRtStatusErrorInvalidArgument
++                                   : kLiteRtStatusOk;
+ }
+ 
+ LiteRtStatus LockOpenVinoTensorBuffer(HwMemoryInfoPtr hw_memory_info,
+@@ -451,7 +457,8 @@
+     .check_runtime_compatibility = litert::openvino::CheckRuntimeCompatibility,
+ };
+ 
+-LiteRtCustomTensorBufferHandlersDef TheTensorBufferHandlers = {
++constexpr LiteRtCustomTensorBufferHandlersDef kTensorBufferHandlersV1 = {
++    .abi_header = {sizeof(LiteRtCustomTensorBufferHandlersDefV1_1), 1, 1, 0},
+     .create_func = litert::openvino::CreateOpenVinoTensorBuffer,
+     .destroy_func = litert::openvino::DestroyOpenVinoTensorBuffer,
+     .lock_func = litert::openvino::LockOpenVinoTensorBuffer,
+@@ -464,6 +471,12 @@
+     .supported_buffer_types = {kLiteRtTensorBufferTypeOpenVINOTensorBuffer},
+ };
+ 
++LiteRtCustomTensorBufferHandlersDefV1_1 TheTensorBufferHandlers = {
++    .v1 = kTensorBufferHandlersV1,
++    .release_host_staging_memory =
++        litert::openvino::ReleaseOpenVinoHostStagingMemory,
++};
++
+ LiteRtDispatchApi TheApi = {
+     .version = {.major = LITERT_API_VERSION_MAJOR,
+                 .minor = LITERT_API_VERSION_MINOR,
+@@ -471,7 +484,7 @@
+     .interface = &TheInterface,
+     .async_interface = nullptr,
+     .graph_interface = nullptr,
+-    .tensor_buffer_handlers_def = &TheTensorBufferHandlers,
++    .tensor_buffer_handlers_def = &TheTensorBufferHandlers.v1,
+ };
+ 
+ }  // namespace
+diff --git a/litert/vendors/nvidia/dispatch/BUILD b/litert/vendors/nvidia/dispatch/BUILD
+--- a/litert/vendors/nvidia/dispatch/BUILD
++++ b/litert/vendors/nvidia/dispatch/BUILD
+@@ -320,6 +320,7 @@
+         "//litert/c:litert_custom_tensor_buffer",
+         "//litert/c:litert_model_types",
+         "//litert/c:litert_tensor_buffer_requirements",
++        "//litert/c/internal:litert_custom_tensor_buffer_handlers_def",
+         "//litert/c/internal:litert_runtime_context_header",
+         "//litert/cc:litert_expected",
+         "//litert/cc:litert_macros",
+diff --git a/litert/vendors/nvidia/dispatch/aot_engine_residency_test.cc b/litert/vendors/nvidia/dispatch/aot_engine_residency_test.cc
+--- a/litert/vendors/nvidia/dispatch/aot_engine_residency_test.cc
++++ b/litert/vendors/nvidia/dispatch/aot_engine_residency_test.cc
+@@ -29,6 +29,7 @@
+ 
+ #include <gtest/gtest.h>
+ #include "cuda_runtime_api.h"
++#include "litert/c/internal/litert_custom_tensor_buffer_handlers_def.h"
+ #include "litert/c/internal/litert_runtime_context.h"
+ #include "litert/c/litert_common.h"
+ #include "litert/c/litert_custom_tensor_buffer.h"
+@@ -614,6 +615,61 @@
+   Run(a_, 20.0f, 1.0f);
+ }
+ 
++TEST_F(AotEngineResidencyTest, CachelessAliasReleaseCompletesHostWrites) {
++  ScopedEnvironment deferred("LITERT_NVIDIA_DISPATCH_DEFERRED_UPLOAD", "1");
++  const auto* handlers = api_.tensor_buffer_handlers_def;
++  ASSERT_NE(handlers, nullptr);
++  const auto release =
++      LiteRtGetCustomTensorBufferHostStagingMemoryHandler(handlers);
++  ASSERT_NE(release, nullptr);
++  auto type = TensorType();
++  HwMemoryInfoPtr raw = nullptr;
++  ASSERT_EQ(handlers->create_func(nullptr, nullptr, &type, kCudaBufferType,
++                                  kBytes, kBytes, &raw),
++            kLiteRtStatusOk);
++  std::unique_ptr<HwMemoryInfo, DestroyCustomTensorBuffer> writer(
++      raw, handlers->destroy_func);
++  ASSERT_EQ(handlers->clear_func(writer.get()), kLiteRtStatusOk);
++  ASSERT_EQ(handlers->import_func(nullptr, nullptr, &type, kCudaBufferType,
++                                  writer->memory_handle, kBytes, kBytes, &raw),
++            kLiteRtStatusOk);
++  std::unique_ptr<HwMemoryInfo, DestroyCustomTensorBuffer> alias(
++      raw, handlers->destroy_func);
++  void* host = nullptr;
++  ASSERT_EQ(handlers->lock_func(writer.get(), kLiteRtTensorBufferLockModeWrite,
++                                &host),
++            kLiteRtStatusOk);
++  ASSERT_NE(host, nullptr);
++  for (int i = 0; i < kElements; ++i) {
++    static_cast<float*>(host)[i] = 5.0f + i;
++  }
++  ASSERT_EQ(handlers->unlock_func(writer.get()), kLiteRtStatusOk);
++
++  // The alias has never been mapped. Release must still upload the writer's
++  // dirty staging, and preserve the caller's device even when it differs.
++  int allocation_device, device_count;
++  ASSERT_EQ(cudaGetDevice(&allocation_device), cudaSuccess);
++  ASSERT_EQ(cudaGetDeviceCount(&device_count), cudaSuccess);
++  const int caller_device = (allocation_device + 1) % device_count;
++  ASSERT_EQ(cudaSetDevice(caller_device), cudaSuccess);
++  const auto status = release(alias.get());
++  int current_device = -1;
++  EXPECT_EQ(cudaGetDevice(&current_device), cudaSuccess);
++  EXPECT_EQ(current_device, caller_device);
++  EXPECT_EQ(cudaSetDevice(allocation_device), cudaSuccess);
++  ASSERT_EQ(status, kLiteRtStatusOk);
++  ASSERT_EQ(handlers->lock_func(alias.get(), kLiteRtTensorBufferLockModeRead,
++                                &host),
++            kLiteRtStatusOk);
++  ASSERT_NE(host, nullptr);
++  for (int i = 0; i < kElements; ++i) {
++    EXPECT_FLOAT_EQ(static_cast<const float*>(host)[i], 5.0f + i) << i;
++  }
++  ASSERT_EQ(handlers->unlock_func(alias.get()), kLiteRtStatusOk);
++  EXPECT_EQ(release(alias.get()), kLiteRtStatusOk);
++  EXPECT_EQ(release(writer.get()), kLiteRtStatusOk);
++}
++
+ TEST_F(AotEngineResidencyTest, UploadsHostWritesWhenAnInvocationReadsThem) {
+   ScopedEnvironment eager("LITERT_NVIDIA_DISPATCH_LAZY_AOT_ENGINES", "0");
+   const auto* handlers = api_.tensor_buffer_handlers_def;
+diff --git a/litert/vendors/nvidia/dispatch/dispatch_api.cc b/litert/vendors/nvidia/dispatch/dispatch_api.cc
+--- a/litert/vendors/nvidia/dispatch/dispatch_api.cc
++++ b/litert/vendors/nvidia/dispatch/dispatch_api.cc
+@@ -287,6 +287,38 @@
+     return kLiteRtStatusOk;
+   }
+ 
++  // Checkpoint transfers keep dirty flags until the upload has completed, so
++  // a failed checkpoint does not silently discard a pending host write.
++  LiteRtStatus CompleteHostWrites(void* handle) {
++    std::lock_guard<std::mutex> lock(mutex_);
++    const auto range = buffers_.equal_range(handle);
++    LiteRtStatus status = kLiteRtStatusOk;
++    for (auto it = range.first; it != range.second; ++it) {
++      auto* info = it->second;
++      if (info->host_dirty && info->host_cache != nullptr) {
++        status = CudaStatus(cudaMemcpyAsync(
++                                info->memory_handle, info->host_cache,
++                                CopyBytes(*info), cudaMemcpyHostToDevice,
++                                /*stream=*/nullptr),
++                            "checkpoint CUDA host upload");
++        if (status != kLiteRtStatusOk) {
++          break;
++        }
++      }
++    }
++    const auto wait_status =
++        CudaStatus(cudaDeviceSynchronize(), "complete host staging upload");
++    if (status == kLiteRtStatusOk) {
++      status = wait_status;
++    }
++    if (status == kLiteRtStatusOk) {
++      for (auto it = range.first; it != range.second; ++it) {
++        it->second->host_dirty = false;
++      }
++    }
++    return status;
++  }
++
+   // The device copy of the buffers at `handle` is about to be overwritten.
+   void Discard(void* handle) {
+     std::lock_guard<std::mutex> lock(mutex_);
+@@ -497,6 +529,52 @@
+     }
+   }
+   info->locked = false;
++  return status;
++}
++
++LiteRtStatus ReleaseCudaHostStagingMemory(HwMemoryInfoPtr hw_memory_info) {
++  auto* info = AsCudaTensorBufferInfo(hw_memory_info);
++  if (info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  if (info->locked) {
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
++  cudaPointerAttributes attributes;
++  LITERT_RETURN_IF_ERROR(CudaStatus(
++      cudaPointerGetAttributes(&attributes, info->memory_handle),
++      "cudaPointerGetAttributes release host staging"));
++  int previous_device;
++  LITERT_RETURN_IF_ERROR(
++      CudaStatus(cudaGetDevice(&previous_device), "cudaGetDevice host staging"));
++  if (previous_device != attributes.device) {
++    LITERT_RETURN_IF_ERROR(CudaStatus(cudaSetDevice(attributes.device),
++                                      "cudaSetDevice host staging"));
++  }
++
++  // A cacheless imported alias may still have pending writes through another
++  // wrapper of this allocation. Complete those before returning success.
++  // A device wait also protects pinned staging read by earlier async uploads.
++  LiteRtStatus status =
++      CudaTensorBufferRegistry::Get().CompleteHostWrites(info->memory_handle);
++  if (status == kLiteRtStatusOk && info->host_cache != nullptr) {
++    if (info->host_cache_pinned) {
++      status = CudaStatus(cudaFreeHost(info->host_cache), "release host staging");
++    } else {
++      std::free(info->host_cache);
++    }
++    if (status == kLiteRtStatusOk) {
++      info->host_cache = nullptr;
++      info->host_cache_pinned = false;
++    }
++  }
++  if (previous_device != attributes.device) {
++    const auto restore_status = CudaStatus(cudaSetDevice(previous_device),
++                                           "restore CUDA device");
++    if (status == kLiteRtStatusOk) {
++      status = restore_status;
++    }
++  }
+   return status;
+ }
+ 
+@@ -2954,12 +3032,12 @@
+     /*.invocation_context_set_options=*/InvocationContextSetOptions,
+ };
+ 
+-LiteRtCustomTensorBufferHandlersDef NvidiaTensorBufferHandlers = {
++constexpr LiteRtCustomTensorBufferHandlersDef kNvidiaTensorBufferHandlersV1 = {
+     /*.abi_header=*/
+     {
+-        /*.struct_size=*/sizeof(LiteRtCustomTensorBufferHandlersDef),
++        /*.struct_size=*/sizeof(LiteRtCustomTensorBufferHandlersDefV1_1),
+         /*.major_version=*/1,
+-        /*.minor_version=*/0,
++        /*.minor_version=*/1,
+         /*.reserved=*/0,
+     },
+     /*.create_func=*/CreateCudaTensorBuffer,
+@@ -2972,6 +3050,11 @@
+     /*.queue_tag=*/kLiteRtEnvOptionTagNull,
+     /*.num_supported_buffer_types=*/1,
+     /*.supported_buffer_types=*/{kNvidiaCudaTensorBufferType},
++};
++
++LiteRtCustomTensorBufferHandlersDefV1_1 NvidiaTensorBufferHandlers = {
++    /*.v1=*/kNvidiaTensorBufferHandlersV1,
++    /*.release_host_staging_memory=*/ReleaseCudaHostStagingMemory,
+ };
+ 
+ LiteRtDispatchApi NvidiaApi = {
+@@ -2989,7 +3072,7 @@
+     /*.interface=*/&NvidiaInterface,
+     /*.async_interface=*/nullptr,
+     /*.graph_interface=*/nullptr,
+-    /*.tensor_buffer_handlers_def=*/&NvidiaTensorBufferHandlers,
++    /*.tensor_buffer_handlers_def=*/&NvidiaTensorBufferHandlers.v1,
+ };
+ 
+ }  // namespace
+diff --git a/ml_drift_delegate/delegate/BUILD b/ml_drift_delegate/delegate/BUILD
+--- a/ml_drift_delegate/delegate/BUILD
++++ b/ml_drift_delegate/delegate/BUILD
+@@ -1094,6 +1094,7 @@
+         "//litert/runtime:tensor_buffer_lockstate",
+         "@com_google_absl//absl/cleanup",
+         "@com_google_absl//absl/log:absl_log",
++        "@com_google_absl//absl/time",
+         "@dawn//:webgpu_headers",
+         "@ml_drift//ml_drift/common:util",
+         "@ml_drift//ml_drift/webgpu:buffer",
+diff --git a/ml_drift_delegate/delegate/buffer_handler_metal.h b/ml_drift_delegate/delegate/buffer_handler_metal.h
+--- a/ml_drift_delegate/delegate/buffer_handler_metal.h
++++ b/ml_drift_delegate/delegate/buffer_handler_metal.h
+@@ -45,6 +45,7 @@
+                                    LiteRtTensorBufferLockMode mode,
+                                    void** host_memory_ptr);
+ LiteRtStatus LiteRtUnlockMetalMemory(HwMemoryInfoPtr hw_memory_info);
++LiteRtStatus LiteRtReleaseMetalHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtClearMetalMemory(HwMemoryInfoPtr hw_memory_info);
+ 
+ // Import an existing Metal memory buffer. This function creates the
+diff --git a/ml_drift_delegate/delegate/buffer_handler_metal.mm b/ml_drift_delegate/delegate/buffer_handler_metal.mm
+--- a/ml_drift_delegate/delegate/buffer_handler_metal.mm
++++ b/ml_drift_delegate/delegate/buffer_handler_metal.mm
+@@ -21,6 +21,7 @@
+ #include <cstddef>
+ #include <cstdlib>
+ #include <cstring>
++#include <limits>
+ #include <memory>
+ #include <utility>
+ 
+@@ -382,6 +383,50 @@
+   LITERT_RETURN_IF_ERROR(absl_status);
+ 
+   memory_info->lock_state = new_lock_state;
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus LiteRtReleaseMetalHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* memory_info = static_cast<MetalMemoryInfo*>(hw_memory_info);
++  if (memory_info->lock_state != LockState::kUnlocked) {
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
++  if (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBufferPacked) {
++    id<MTLBuffer> buffer = memory_info->metal_tensor.GetBufferHandle();
++    if (buffer == nil) {
++      return kLiteRtStatusErrorInvalidArgument;
++    }
++    // The private/managed packed transfer helpers do not propagate the actual
++    // command's errors. Only direct shared-memory transfers are checkpointable.
++    if (buffer.storageMode != MTLStorageModeShared ||
++        memory_info->packed_bytes > static_cast<size_t>(std::numeric_limits<int>::max())) {
++      return kLiteRtStatusErrorUnsupported;
++    }
++    if ([buffer contents] == nullptr || memory_info->packed_bytes > buffer.length) {
++      return kLiteRtStatusErrorInvalidArgument;
++    }
++  }
++  if (memory_info->host_memory == nullptr) {
++    return kLiteRtStatusOk;
++  }
++  @autoreleasepool {
++    id<MTLCommandBuffer> completion =
++        [memory_info->command_queue commandBuffer];
++    if (completion == nil) {
++      return kLiteRtStatusErrorRuntimeFailure;
++    }
++    [completion commit];
++    [completion waitUntilCompleted];
++    if (completion.status != MTLCommandBufferStatusCompleted) {
++      return kLiteRtStatusErrorRuntimeFailure;
++    }
++  }
++  litert_aligned_free(memory_info->host_memory);
++  memory_info->host_memory = nullptr;
+   return kLiteRtStatusOk;
+ }
+ 
+diff --git a/ml_drift_delegate/delegate/buffer_handler_metal_test.mm b/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
+--- a/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
++++ b/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
+@@ -383,6 +383,58 @@
+   XCTAssertEqual(status, kLiteRtStatusOk);
+ }
+ 
++- (void)testReleaseSharedPackedMetalHostStagingMemory {
++  if (!_device) return;
++
++  LiteRtRankedTensorType tensorType = {};
++  tensorType.element_type = kLiteRtElementTypeFloat32;
++  tensorType.layout.rank = 1;
++  tensorType.layout.dimensions[0] = 4;
++  const float initial[] = {1.0f, 2.0f, 3.0f, 4.0f};
++  const size_t bytes = sizeof(initial);
++  id<MTLBuffer> buffer = [_device newBufferWithBytes:initial
++                                             length:bytes
++                                            options:MTLResourceStorageModeShared];
++  XCTAssertNotNil(buffer);
++  HwMemoryInfoPtr memoryInfo = nullptr;
++  XCTAssertEqual(LiteRtImportMetalMemory(
++                     (__bridge void*)_device, (__bridge void*)_commandQueue, &tensorType,
++                     kLiteRtTensorBufferTypeMetalBufferPacked, (__bridge void*)buffer,
++                     bytes, bytes, &memoryInfo),
++                 kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
++  void* hostMemory = nullptr;
++  XCTAssertEqual(LiteRtLockMetalMemory(memoryInfo, kLiteRtTensorBufferLockModeRead,
++                                       &hostMemory),
++                 kLiteRtStatusOk);
++  for (int i = 0; i < 4; ++i) {
++    XCTAssertEqual(static_cast<float*>(hostMemory)[i], initial[i]);
++  }
++  XCTAssertEqual(LiteRtUnlockMetalMemory(memoryInfo), kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
++
++  XCTAssertEqual(LiteRtLockMetalMemory(memoryInfo, kLiteRtTensorBufferLockModeWrite,
++                                       &hostMemory),
++                 kLiteRtStatusOk);
++  for (int i = 0; i < 4; ++i) {
++    static_cast<float*>(hostMemory)[i] = initial[i] + 10.0f;
++  }
++  XCTAssertEqual(LiteRtUnlockMetalMemory(memoryInfo), kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
++  hostMemory = nullptr;
++  XCTAssertEqual(LiteRtLockMetalMemory(memoryInfo, kLiteRtTensorBufferLockModeRead,
++                                       &hostMemory),
++                 kLiteRtStatusOk);
++  for (int i = 0; i < 4; ++i) {
++    XCTAssertEqual(static_cast<float*>(hostMemory)[i], initial[i] + 10.0f);
++    XCTAssertEqual(static_cast<float*>([buffer contents])[i], initial[i] + 10.0f);
++  }
++  XCTAssertEqual(LiteRtUnlockMetalMemory(memoryInfo), kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtDestroyMetalMemory(memoryInfo), kLiteRtStatusOk);
++}
++
+ - (void)testImportMetalMemoryWithPrivateStorageMode {
+   if (!_device) return;
+ 
+@@ -402,12 +454,17 @@
+       kLiteRtTensorBufferTypeMetalBufferPacked, (__bridge void*)buffer, bytes, bytes, &memoryInfo);
+   XCTAssertEqual(status, kLiteRtStatusOk);
+   XCTAssertTrue(memoryInfo != nullptr);
++  // Preflight rejects before any host mapping or transfer. Ordinary mapping
++  // still works and preserves the device allocation and contents below.
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo),
++                 kLiteRtStatusErrorUnsupported);
+ 
+   // Write data to the private buffer via Lock/Unlock (which triggers WriteDataToBuffer).
+   void* hostMemory = nullptr;
+   status = LiteRtLockMetalMemory(memoryInfo, kLiteRtTensorBufferLockModeWrite, &hostMemory);
+   XCTAssertEqual(status, kLiteRtStatusOk);
+   XCTAssertTrue(hostMemory != nullptr);
++  XCTAssertNotEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo), kLiteRtStatusOk);
+ 
+   float* floatMemory = (float*)hostMemory;
+   for (int i = 0; i < 4; ++i) {
+@@ -416,6 +473,8 @@
+ 
+   status = LiteRtUnlockMetalMemory(memoryInfo);
+   XCTAssertEqual(status, kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo),
++                 kLiteRtStatusErrorUnsupported);
+ 
+   // Read back.
+   hostMemory = nullptr;
+@@ -429,6 +488,8 @@
+ 
+   status = LiteRtUnlockMetalMemory(memoryInfo);
+   XCTAssertEqual(status, kLiteRtStatusOk);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo),
++                 kLiteRtStatusErrorUnsupported);
+ 
+   status = LiteRtDestroyMetalMemory(memoryInfo);
+   XCTAssertEqual(status, kLiteRtStatusOk);
+@@ -454,6 +515,8 @@
+       kLiteRtTensorBufferTypeMetalBufferPacked, (__bridge void*)buffer, bytes, bytes, &memoryInfo);
+   XCTAssertEqual(status, kLiteRtStatusOk);
+   XCTAssertTrue(memoryInfo != nullptr);
++  XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memoryInfo),
++                 kLiteRtStatusErrorUnsupported);
+ 
+   // Write data.
+   void* hostMemory = nullptr;
+diff --git a/ml_drift_delegate/delegate/buffer_handler_opencl.cc b/ml_drift_delegate/delegate/buffer_handler_opencl.cc
+--- a/ml_drift_delegate/delegate/buffer_handler_opencl.cc
++++ b/ml_drift_delegate/delegate/buffer_handler_opencl.cc
+@@ -180,9 +180,12 @@
+   auto& gpu_tensor = memory_info->cl_tensor;
+ 
+   if (memory_info->buffer_type == kLiteRtTensorBufferTypeOpenClBufferPacked) {
+-    ::ml_drift::cl::clEnqueueUnmapMemObject(
++    const cl_int status = ::ml_drift::cl::clEnqueueUnmapMemObject(
+         memory_info->command_queue, gpu_tensor.GetMemoryPtr(),
+         memory_info->host_memory, 0, nullptr, nullptr);
++    if (status != CL_SUCCESS) {
++      return kLiteRtStatusErrorRuntimeFailure;
++    }
+     memory_info->host_memory = nullptr;
+     return kLiteRtStatusOk;
+   }
+@@ -207,6 +210,38 @@
+     ABSL_LOG(ERROR) << "Failed to upload data to tensor: " << status;
+     return kLiteRtStatusErrorRuntimeFailure;
+   }
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus LiteRtReleaseOpenClHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* memory_info = static_cast<OpenClMemoryInfo*>(hw_memory_info);
++  if (memory_info->lock_state != LockState::kUnlocked) {
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
++  if (memory_info->host_memory == nullptr &&
++      memory_info->buffer_type != kLiteRtTensorBufferTypeOpenClBufferPacked) {
++    return kLiteRtStatusOk;
++  }
++  // Packed buffers use an OpenCL mapping, not a separately allocated mirror.
++  if (memory_info->buffer_type == kLiteRtTensorBufferTypeOpenClBufferPacked &&
++      memory_info->host_memory != nullptr) {
++    const cl_int status = ::ml_drift::cl::clEnqueueUnmapMemObject(
++        memory_info->command_queue, memory_info->cl_tensor.GetMemoryPtr(),
++        memory_info->host_memory, 0, nullptr, nullptr);
++    if (status != CL_SUCCESS) {
++      return kLiteRtStatusErrorRuntimeFailure;
++    }
++    memory_info->host_memory = nullptr;
++  }
++  ::ml_drift::cl::CLCommandQueue queue(memory_info->command_queue,
++                                       /*has_ownership=*/false);
++  LITERT_RETURN_IF_ERROR(queue.WaitForCompletion());
++  litert_aligned_free(memory_info->host_memory);
++  memory_info->host_memory = nullptr;
+   return kLiteRtStatusOk;
+ }
+ 
+diff --git a/ml_drift_delegate/delegate/buffer_handler_opencl.h b/ml_drift_delegate/delegate/buffer_handler_opencl.h
+--- a/ml_drift_delegate/delegate/buffer_handler_opencl.h
++++ b/ml_drift_delegate/delegate/buffer_handler_opencl.h
+@@ -39,6 +39,7 @@
+                                     LiteRtTensorBufferLockMode mode,
+                                     void** host_memory_ptr);
+ LiteRtStatus LiteRtUnlockOpenClMemory(HwMemoryInfoPtr hw_memory_info);
++LiteRtStatus LiteRtReleaseOpenClHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtClearOpenClMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtImportOpenClMemory(LiteRtGpuDeviceId device_id,
+                                       LiteRtGpuQueueId queue_id,
+diff --git a/ml_drift_delegate/delegate/buffer_handler_opencl_test.cc b/ml_drift_delegate/delegate/buffer_handler_opencl_test.cc
+--- a/ml_drift_delegate/delegate/buffer_handler_opencl_test.cc
++++ b/ml_drift_delegate/delegate/buffer_handler_opencl_test.cc
+@@ -157,6 +157,41 @@
+   ASSERT_EQ(status, kLiteRtStatusOk);
+ }
+ 
++TEST_F(BufferHandlerOpenClTest, HostStagingReleasePreservesDeviceContents) {
++  LiteRtRankedTensorType tensor_type = {};
++  tensor_type.element_type = kLiteRtElementTypeFloat32;
++  tensor_type.layout.rank = 1;
++  tensor_type.layout.dimensions[0] = 4;
++  for (auto type : {kLiteRtTensorBufferTypeOpenClBuffer,
++                    kLiteRtTensorBufferTypeOpenClBufferPacked}) {
++    HwMemoryInfoPtr info = nullptr;
++    constexpr size_t bytes = 4 * sizeof(float);
++    ASSERT_EQ(LiteRtCreateOpenClMemory(env_.context().context(),
++                                      env_.queue()->queue(), &tensor_type,
++                                      type, bytes, bytes, &info),
++              kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtReleaseOpenClHostStagingMemory(info), kLiteRtStatusOk);
++    void* data = nullptr;
++    ASSERT_EQ(LiteRtLockOpenClMemory(info, kLiteRtTensorBufferLockModeWrite,
++                                    &data), kLiteRtStatusOk);
++    for (int i = 0; i < 4; ++i) {
++      static_cast<float*>(data)[i] = i + 1;
++    }
++    EXPECT_NE(LiteRtReleaseOpenClHostStagingMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtUnlockOpenClMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtReleaseOpenClHostStagingMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtReleaseOpenClHostStagingMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtLockOpenClMemory(info, kLiteRtTensorBufferLockModeRead,
++                                    &data), kLiteRtStatusOk);
++    for (int i = 0; i < 4; ++i) {
++      EXPECT_FLOAT_EQ(static_cast<float*>(data)[i], i + 1);
++    }
++    ASSERT_EQ(LiteRtUnlockOpenClMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtReleaseOpenClHostStagingMemory(info), kLiteRtStatusOk);
++    ASSERT_EQ(LiteRtDestroyOpenClMemory(info), kLiteRtStatusOk);
++  }
++}
++
+ TEST_F(BufferHandlerOpenClTest, TestClearOpenClMemory) {
+   LiteRtRankedTensorType tensorType;
+   tensorType.element_type = kLiteRtElementTypeFloat32;
+diff --git a/ml_drift_delegate/delegate/buffer_handler_vulkan.cc b/ml_drift_delegate/delegate/buffer_handler_vulkan.cc
+--- a/ml_drift_delegate/delegate/buffer_handler_vulkan.cc
++++ b/ml_drift_delegate/delegate/buffer_handler_vulkan.cc
+@@ -258,6 +258,29 @@
+   }
+ 
+   memory_info->lock_state = new_lock_state;
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus LiteRtReleaseVulkanHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* memory_info = static_cast<VulkanMemoryInfo*>(hw_memory_info);
++  if (memory_info->lock_state != LockState::kUnlocked) {
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
++  if (memory_info->host_memory == nullptr &&
++      !memory_info->staging_buffer.IsValid()) {
++    return kLiteRtStatusOk;
++  }
++  // Unlock records the upload in the shared command buffer. Submit it before
++  // releasing either the CPU mirror or the Vulkan transfer allocation.
++  LITERT_RETURN_IF_ERROR(memory_info->vk_env->SubmitCommandBuffer(
++      /*wait_for_completion=*/true));
++  memory_info->staging_buffer = ::ml_drift::syrtis::StagingBuffer();
++  litert_aligned_free(memory_info->host_memory);
++  memory_info->host_memory = nullptr;
+   return kLiteRtStatusOk;
+ }
+ 
+diff --git a/ml_drift_delegate/delegate/buffer_handler_vulkan.h b/ml_drift_delegate/delegate/buffer_handler_vulkan.h
+--- a/ml_drift_delegate/delegate/buffer_handler_vulkan.h
++++ b/ml_drift_delegate/delegate/buffer_handler_vulkan.h
+@@ -39,6 +39,7 @@
+                                     LiteRtTensorBufferLockMode mode,
+                                     void** host_memory_ptr);
+ LiteRtStatus LiteRtUnlockVulkanMemory(HwMemoryInfoPtr hw_memory_info);
++LiteRtStatus LiteRtReleaseVulkanHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtClearVulkanMemory(HwMemoryInfoPtr hw_memory_info);
+ 
+ #ifdef __cplusplus
+diff --git a/ml_drift_delegate/delegate/buffer_handler_webgpu.cc b/ml_drift_delegate/delegate/buffer_handler_webgpu.cc
+--- a/ml_drift_delegate/delegate/buffer_handler_webgpu.cc
++++ b/ml_drift_delegate/delegate/buffer_handler_webgpu.cc
+@@ -22,6 +22,7 @@
+ 
+ #include "absl/cleanup/cleanup.h"  // from @com_google_absl
+ #include "absl/log/absl_log.h"  // from @com_google_absl
++#include "absl/time/time.h"  // from @com_google_absl
+ #include "ml_drift/common/util.h"  // from @ml_drift
+ #include "ml_drift/webgpu/buffer.h"  // from @ml_drift
+ #include "ml_drift/webgpu/spatial_tensor.h"  // from @ml_drift
+@@ -215,6 +216,25 @@
+   }
+ 
+   memory_info->lock_state = new_lock_state;
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus LiteRtReleaseWebGpuHostStagingMemory(
++    HwMemoryInfoPtr hw_memory_info) {
++  if (hw_memory_info == nullptr) {
++    return kLiteRtStatusErrorInvalidArgument;
++  }
++  auto* memory_info = static_cast<WebGpuMemoryInfo*>(hw_memory_info);
++  if (memory_info->lock_state != LockState::kUnlocked) {
++    return kLiteRtStatusErrorRuntimeFailure;
++  }
++  if (memory_info->host_memory == nullptr) {
++    return kLiteRtStatusOk;
++  }
++  LITERT_RETURN_IF_ERROR(::ml_drift::webgpu::WaitUntilCompleted(
++      memory_info->queue, memory_info->device, absl::Seconds(10)));
++  litert_aligned_free(memory_info->host_memory);
++  memory_info->host_memory = nullptr;
+   return kLiteRtStatusOk;
+ }
+ 
+diff --git a/ml_drift_delegate/delegate/buffer_handler_webgpu.h b/ml_drift_delegate/delegate/buffer_handler_webgpu.h
+--- a/ml_drift_delegate/delegate/buffer_handler_webgpu.h
++++ b/ml_drift_delegate/delegate/buffer_handler_webgpu.h
+@@ -39,6 +39,7 @@
+                                     LiteRtTensorBufferLockMode mode,
+                                     void** host_memory_ptr);
+ LiteRtStatus LiteRtUnlockWebGpuMemory(HwMemoryInfoPtr hw_memory_info);
++LiteRtStatus LiteRtReleaseWebGpuHostStagingMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtClearWebGpuMemory(HwMemoryInfoPtr hw_memory_info);
+ LiteRtStatus LiteRtImportWebGpuMemory(LiteRtGpuDeviceId device_id,
+                                       LiteRtGpuQueueId queue_id,

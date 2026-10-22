@@ -1,0 +1,12 @@
+[package]
+name = "blessenger-browser-vad"
+version = "0.1.0"
+edition = "2024"
+[lib]
+crate-type = ["cdylib", "rlib"]
+[dependencies]
+earshot = { git = "https://github.com/pykeio/earshot.git", rev = "ffd32d426f556c55a8c84490c12745743ee4bd79", default-features = false, features = ["libm"] }
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = true

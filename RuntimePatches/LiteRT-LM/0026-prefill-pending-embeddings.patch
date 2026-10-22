@@ -1,0 +1,18 @@
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -593,6 +593,15 @@
+           .processed_tokens()
+           .GetNextUnprocessedToken();
+ 
++  // Decode leaves its final sampled token pending as an ID. Embedding-input
++  // graphs need the actual vectors before prefill consumes that token; writing
++  // the integer ID into the float buffer corrupts the next conversation turn.
++  // Reuse decode's lookup, which preserves already embedded multimodal tokens.
++  if (!pending_input_token_initial.empty() &&
++      signatures_.input_embeddings.has_value()) {
++    ABSL_RETURN_IF_ERROR(GetTokenToDecode(ExecutorInputs()).status());
++  }
++
+   {
+     // Fill the input buffers with scoped locks.
+     auto& prefill_input_pos =

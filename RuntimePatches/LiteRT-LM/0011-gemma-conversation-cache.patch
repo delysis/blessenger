@@ -1,0 +1,286 @@
+diff --git a/c/conversation.cc b/c/conversation.cc
+index 34b2455b6912b8858970df9b2a967a859c7fc607..7f954866d6a290f56097db1b0ff67ccfe0f47eee 100644
+--- a/c/conversation.cc
++++ b/c/conversation.cc
+@@ -18,6 +18,7 @@
+ #include <optional>
+ #include <string>
+ #include <utility>
++#include <vector>
+ 
+ #include "absl/functional/any_invocable.h"  // from @com_google_absl
+ #include "absl/log/absl_log.h"  // from @com_google_absl
+@@ -575,7 +576,7 @@ LiteRtLmStatusCode litert_lm_conversation_clone(
+   *out_conversation = nullptr;
+   if (!conversation || !conversation->conversation) {
+     return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
+-                                      "Invalid conversation.");
++                                    "Invalid conversation.");
+   }
+   auto cloned = conversation->conversation->Clone();
+   if (!cloned.ok()) {
+@@ -588,6 +589,53 @@ LiteRtLmStatusCode litert_lm_conversation_clone(
+   return kLiteRtLmStatusOk;
+ }
+ 
++LiteRtLmStatusCode litert_lm_conversation_get_history(
++    LiteRtLmConversation* conversation, LiteRtLmJsonResponse** out_history) {
++  LITERT_LM_C_RETURN_IF_NULL(out_history);
++  *out_history = nullptr;
++  if (!conversation || !conversation->conversation) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "Invalid conversation.");
++  }
++  auto response = std::make_unique<LiteRtLmJsonResponse>();
++  response->json_string =
++      nlohmann::ordered_json(conversation->conversation->GetHistory()).dump();
++  *out_history = response.release();
++  return kLiteRtLmStatusOk;
++}
++
++LiteRtLmStatusCode litert_lm_conversation_save_cache(
++    LiteRtLmConversation* conversation, const char* path,
++    const char* compatibility_key) {
++  LITERT_LM_C_RETURN_IF_NULL(path);
++  LITERT_LM_C_RETURN_IF_NULL(compatibility_key);
++  if (!conversation || !conversation->conversation) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "Invalid conversation.");
++  }
++  return litert::lm::c::ToCStatus(
++      conversation->conversation->SaveCache(path, compatibility_key));
++}
++
++LiteRtLmStatusCode litert_lm_conversation_load_cache(
++    LiteRtLmConversation* conversation, const char* path,
++    const char* compatibility_key, const char* history_json) {
++  LITERT_LM_C_RETURN_IF_NULL(path);
++  LITERT_LM_C_RETURN_IF_NULL(compatibility_key);
++  LITERT_LM_C_RETURN_IF_NULL(history_json);
++  if (!conversation || !conversation->conversation) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                      "Invalid conversation.");
++  }
++  auto history = nlohmann::ordered_json::parse(history_json, nullptr, false);
++  if (!history.is_array()) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "History must be a JSON array.");
++  }
++  return litert::lm::c::ToCStatus(conversation->conversation->LoadCache(
++      path, compatibility_key, history.get<std::vector<litert::lm::Message>>()));
++}
++
+ LiteRtLmStatusCode litert_lm_conversation_send_message(
+     LiteRtLmConversation* conversation, const char* message_json,
+     const char* extra_context,
+@@ -779,4 +827,27 @@ LiteRtLmStatusCode litert_lm_conversation_get_token_count(
+   return kLiteRtLmStatusOk;
+ }
+ 
++LiteRtLmStatusCode litert_lm_conversation_count_tokens(
++    LiteRtLmConversation* conversation, const char* message_json,
++    const char* extra_context,
++    const LiteRtLmConversationOptionalArgs* optional_args, int* out_count) {
++  LITERT_LM_C_RETURN_IF_NULL(out_count);
++  LITERT_LM_C_RETURN_IF_NULL(message_json);
++  if (!conversation || !conversation->conversation) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "Invalid conversation.");
++  }
++  auto message = nlohmann::json::parse(message_json, nullptr, false);
++  if (message.is_discarded()) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "Failed to parse message JSON.");
++  }
++  auto count = conversation->conversation->CountTokens(
++      message, CreateOptionalArgs(conversation->conversation.get(),
++                                  extra_context, optional_args));
++  if (!count.ok()) return litert::lm::c::ToCStatus(count.status());
++  *out_count = *count;
++  return kLiteRtLmStatusOk;
++}
++
+ }  // extern "C"
+diff --git a/c/conversation.h b/c/conversation.h
+index f951ad7137e165d882ff4113c0f8aa686d333d69..a3ccccafd63be1bed231895b71b4ed942b032372 100644
+--- a/c/conversation.h
++++ b/c/conversation.h
+@@ -496,6 +496,31 @@ LiteRtLmStatusCode litert_lm_conversation_clone(
+     LiteRtLmConversation* conversation,
+     LiteRtLmConversation** out_conversation);
+ 
++// Returns an owned JSON array of the completed conversation's history. Call
++// wait_until_done first; release with litert_lm_json_response_delete.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_get_history(
++    LiteRtLmConversation* conversation, LiteRtLmJsonResponse** out_history);
++
++// Gemma4 complete-turn persistence. Wait until done before saving. Bind the
++// exact history JSON and all conversation/session/model/runtime settings into
++// compatibility_key; atomically commit the history with the cache. Supports
++// alternating user/assistant text or user audio turns without prefilled
++// prefaces, channel filtering, constraints, tools, or pending messages.
++// The session save/load restrictions in engine.h also apply.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_save_cache(
++    LiteRtLmConversation* conversation, const char* path,
++    const char* compatibility_key);
++
++// Restores a fresh identically configured conversation without replaying its
++// prompt. history_json is the exact JSON array bound into compatibility_key.
++// On device transfer failure discard the engine and all its conversations.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_load_cache(
++    LiteRtLmConversation* conversation, const char* path,
++    const char* compatibility_key, const char* history_json);
++
+ // Sends a message to the conversation and returns the response.
+ // This is a blocking call.
+ //
+@@ -700,6 +725,16 @@ LITERT_LM_C_API_EXPORT
+ LiteRtLmStatusCode litert_lm_conversation_get_token_count(
+     LiteRtLmConversation* conversation, int* out_count);
+ 
++// Counts the templated input for the next message without changing history or
++// running inference. Media is preprocessed to determine its token geometry.
++// Wait until done first. Uses the same extra_context and optional_args as send.
++// out_count is written only on success.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_count_tokens(
++    LiteRtLmConversation* conversation, const char* message_json,
++    const char* extra_context,
++    const LiteRtLmConversationOptionalArgs* optional_args, int* out_count);
++
+ #ifdef __cplusplus
+ }  // extern "C"
+ #endif
+diff --git a/runtime/conversation/conversation.cc b/runtime/conversation/conversation.cc
+index dadc75e517fbbb32412958b9abcaaeb036260d92..8eb1ef4924144b6b87ebf3c70f723c273f1c193b 100644
+--- a/runtime/conversation/conversation.cc
++++ b/runtime/conversation/conversation.cc
+@@ -70,6 +70,60 @@ constexpr absl::string_view kChannelsKey = "channels";
+ constexpr absl::string_view kChannelContentCheckpoint =
+     "channel_content_checkpoint";
+ 
++absl::Status CheckCacheConfig(const ConversationConfig& config) {
++  // Gemma4's processor has no mutable state between complete turns. Other
++  // processors need their own state contract before enabling persistence.
++  const auto& tools = std::get<JsonPreface>(config.GetPreface()).tools;
++  if (!config.GetSessionConfig().GetLlmModelType().has_gemma4() ||
++      !std::holds_alternative<Gemma4DataProcessorConfig>(
++          config.GetProcessorConfig()) ||
++      !tools.empty() ||
++      config.prefill_preface_on_init() ||
++      config.filter_channel_content_from_kv_cache() ||
++      config.constrained_decoding_enabled() ||
++      config.constraint_provider_config().has_value()) {
++    return absl::FailedPreconditionError(
++        "Conversation cache requires Gemma4 without prefilled preface, "
++        "channel filtering, constraints, or tools.");
++  }
++  return absl::OkStatus();
++}
++
++absl::Status CheckCacheHistory(absl::Span<const Message> history) {
++  if (history.empty() || history.size() % 2 != 0) {
++    return absl::InvalidArgumentError("History must contain complete turns.");
++  }
++  for (size_t i = 0; i < history.size(); ++i) {
++    const auto& message = history[i];
++    if (!message.is_object() || !message.contains("role") ||
++        message["role"] != (i % 2 == 0 ? "user" : "assistant") ||
++        !message.contains("content") || message.contains("tool_calls")) {
++      return absl::InvalidArgumentError("Invalid text/audio conversation history.");
++    }
++    const auto& content = message["content"];
++    if (content.is_string()) continue;
++    if (!content.is_array()) {
++      return absl::InvalidArgumentError("History content must be text or an array.");
++    }
++    for (const auto& part : content) {
++      if (!part.is_object() || !part.contains("type")) {
++        return absl::InvalidArgumentError("Invalid history content part.");
++      }
++      if (part["type"] == "text" && part.contains("text") &&
++          part["text"].is_string()) continue;
++      if (i % 2 == 0 && part["type"] == "audio" &&
++          part.contains("path") != part.contains("blob")) {
++        const auto& source = part[part.contains("path") ? "path" : "blob"];
++        if (source.is_string() && !source.get_ref<const std::string&>().empty()) {
++          continue;
++        }
++      }
++      return absl::InvalidArgumentError("Unsupported history content part.");
++    }
++  }
++  return absl::OkStatus();
++}
++
+ bool IsEmptyInputError(const absl::Status& status) {
+   return absl::IsInvalidArgument(status) &&
+          absl::StrContains(status.message(), "Input is empty");
+@@ -957,6 +1011,37 @@ void Conversation::CancelGroup(absl::string_view task_group_id) {
+   }
+ }
+ 
++absl::Status Conversation::SaveCache(absl::string_view path,
++                                    absl::string_view compatibility_key) {
++  ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
++  absl::MutexLock lock(history_mutex_);
++  if (is_appending_message_ || checkpoint_message_index_.has_value() ||
++      history_.empty() || !history_.back().is_object() ||
++      !history_.back().contains("role") ||
++      history_.back()["role"] != "assistant") {
++    return absl::FailedPreconditionError(
++        "Conversation cache requires a completed assistant turn.");
++  }
++  ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_));
++  return session_->SaveCache(path, compatibility_key);
++}
++
++absl::Status Conversation::LoadCache(absl::string_view path,
++                                    absl::string_view compatibility_key,
++                                    std::vector<Message> history) {
++  ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
++  absl::MutexLock lock(history_mutex_);
++  if (!history_.empty() || is_appending_message_ ||
++      checkpoint_message_index_.has_value()) {
++    return absl::FailedPreconditionError(
++        "Conversation cache requires a fresh conversation.");
++  }
++  ABSL_RETURN_IF_ERROR(CheckCacheHistory(history));
++  ABSL_RETURN_IF_ERROR(session_->LoadCache(path, compatibility_key));
++  history_ = std::move(history);
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<Conversation>> Conversation::Clone() {
+   ABSL_ASSIGN_OR_RETURN(auto session, session_->Clone());
+   ABSL_ASSIGN_OR_RETURN(
+diff --git a/runtime/conversation/conversation.h b/runtime/conversation/conversation.h
+index 4f04a57c0d178b63cf9376a45f249f3c7d07c260..b3e1c3dca615f4f3eebb535adee804af4b08c68b 100644
+--- a/runtime/conversation/conversation.h
++++ b/runtime/conversation/conversation.h
+@@ -666,6 +666,22 @@ class Conversation {
+   // ongoing tasks.
+   absl::StatusOr<std::unique_ptr<Conversation>> Clone();
+ 
++  // Persists a completed Gemma4 turn. The caller must first WaitUntilDone(),
++  // obtain GetHistory(), and bind its exact serialized bytes and GetConfig()
++  // into compatibility_key. Commit history and cache as one generation.
++  // Supports alternating user/assistant text or user audio turns. Prefilled
++  // prefaces, channel filtering, constraints, tools, and pending messages are
++  // not supported. Session::SaveCache restrictions also apply.
++  absl::Status SaveCache(absl::string_view path,
++                        absl::string_view compatibility_key);
++
++  // Restores into a fresh conversation with the original configuration and
++  // exact history bound into compatibility_key. No prompt is replayed. A
++  // failure after device transfer begins requires recreating the engine.
++  absl::Status LoadCache(absl::string_view path,
++                        absl::string_view compatibility_key,
++                        std::vector<Message> history);
++
+   // Cancels all ongoing asynchronous tasks with the given task_group_id.
+   // Args:
+   // - `task_group_id`: The id of the task group to cancel.

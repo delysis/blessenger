@@ -1,0 +1,10 @@
+{
+  "model_repository": "litert-community/gemma-4-E4B-it-litert-lm",
+  "model_revision": "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+  "model_file": "gemma-4-E4B-it.litertlm",
+  "artifact_sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+  "actual_export": "48 INT8 KV tensors: K [1,2,32003,256] (20 layers), [1,2,32003,512] (4 layers), V transposes; verifier length4. Configured capacity must be aligned before allocation.",
+  "admission": "Only MetalBuffer+Int8 joins MetalBufferFp16+Float16. Rank2..4, positive dimensions, last dimension multiple4, optional physical marker16 with zero remaining strides, allocation exactly packed bytes, signed index bounds and offset0.",
+  "offset_test_scope": "Actual managed/imported Metal C APIs cannot construct a nonzero offset; constructors use the default0. Existing rejection remains; tests assert the actual managed offset invariant.",
+  "hardware_status": "Native Metal provider tests are in companion LiteRT0005 and were not executed here. Codec registered-provider tests validate canonical host mapping only and were syntax-checked, not linked or executed."
+}

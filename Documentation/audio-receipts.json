@@ -1,0 +1,632 @@
+{
+  "schema_version": 1,
+  "source_note": "Retrieved through the GitHub connector at exact revisions; source-file Git blob hashes are independently recomputed below.",
+  "files": [
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Package.swift",
+      "git_blob_sha1": "bfb886069c40ef5d2859fdbbc64d12e971091e17",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Package.swift",
+      "size_bytes": 3334,
+      "sha256": "99d909e681532868ac8263302299edec530c3361c7f2b978101fa697253423cb"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Documentation/TTS/PocketTTS.md",
+      "git_blob_sha1": "76b11ade2de40319bb928dc5f4d7d5f732e6b040",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Documentation/TTS/PocketTTS.md",
+      "size_bytes": 19727,
+      "sha256": "5361c3f63a1e28f63c10c74a8b443fc4bd5b23a2a7a7fad554ea37be7e1fb80b"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/PocketTtsManager.swift",
+      "git_blob_sha1": "5823bde29638dc615c79d5086975d9d1805c54f6",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/PocketTtsManager.swift",
+      "size_bytes": 17002,
+      "sha256": "9abf168582d4fbb002c7e292f128c1f0f31efff3f3dabccfec93a8ee7345d894"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/PocketTtsComputeUnits.swift",
+      "git_blob_sha1": "13a0bc2ca111f9f304b0c43e292690955680257a",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/PocketTtsComputeUnits.swift",
+      "size_bytes": 4145,
+      "sha256": "f1d451658930fcbb26996183dc2e2461fc144d26802424f4bb685547dd25b196"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/PocketTTSError.swift",
+      "git_blob_sha1": "7bd03bce0e4ee9e8aa1d71273828322fe8e4e8d2",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/PocketTTSError.swift",
+      "size_bytes": 706,
+      "sha256": "731eb8021725e82a9a4307be37e962a67311dbd2018b017445cb5c57c8b83a4b"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/VAD/VadManager.swift",
+      "git_blob_sha1": "e347a53491a25a5213d4b78f9ca428543c7b015b",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/VAD/VadManager.swift",
+      "size_bytes": 15126,
+      "sha256": "1cd09b15f40e83bc0889c6c1d784a51fe2c9a0e121308feb2203ad521608be3f"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/VAD/VadTypes.swift",
+      "git_blob_sha1": "7249b0a49f7dc0e195ce39f45abd0f319ecae0b5",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/VAD/VadTypes.swift",
+      "size_bytes": 8132,
+      "sha256": "bcb3fc84f9a85e4e70cfef4f1f131de9cd9b08d81e5f0add02b208f3009a13d8"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/VAD/VadManager+Streaming.swift",
+      "git_blob_sha1": "90f6b9b0f88a6c292ccbd04927f501fbf0b119f7",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/VAD/VadManager+Streaming.swift",
+      "size_bytes": 4330,
+      "sha256": "ce1107d710778c7a9419429f02e5ff9ae24ca38b9b3240475aef9ecd8c59726e"
+    },
+    {
+      "repository": "fikrikarim/volocal",
+      "revision": "b731963bac43ab29ca430d7f0e55f7b843cc46e5",
+      "path": "Volocal/Audio/SharedAudioEngine.swift",
+      "git_blob_sha1": "972565e4510e2e69c52aa6a02b4a977f772b1d2d",
+      "url": "https://github.com/fikrikarim/volocal/blob/b731963bac43ab29ca430d7f0e55f7b843cc46e5/Volocal/Audio/SharedAudioEngine.swift",
+      "size_bytes": 7268,
+      "sha256": "1845e8c29a3002403e97b287ff43af081603d359cca119e4ea05476932cfad77"
+    },
+    {
+      "repository": "fikrikarim/volocal",
+      "revision": "b731963bac43ab29ca430d7f0e55f7b843cc46e5",
+      "path": "Volocal/TTS/TTSManager.swift",
+      "git_blob_sha1": "ef59508652459d10d7747b203acb8ac8321ad8ed",
+      "url": "https://github.com/fikrikarim/volocal/blob/b731963bac43ab29ca430d7f0e55f7b843cc46e5/Volocal/TTS/TTSManager.swift",
+      "size_bytes": 4751,
+      "sha256": "8797ba917bab1088a97801fbf77b292da5c261c2ec7475bf7f08ae135b038e66"
+    },
+    {
+      "repository": "fikrikarim/volocal",
+      "revision": "b731963bac43ab29ca430d7f0e55f7b843cc46e5",
+      "path": "Volocal/Pipeline/VoicePipeline.swift",
+      "git_blob_sha1": "1bdae65651793954517ba01d4019a1a39b668dde",
+      "url": "https://github.com/fikrikarim/volocal/blob/b731963bac43ab29ca430d7f0e55f7b843cc46e5/Volocal/Pipeline/VoicePipeline.swift",
+      "size_bytes": 9083,
+      "sha256": "00a48d7d3267a33c16e839ab8a34a36564492b820cd18dc9070e5c7e49c7e2b1"
+    },
+    {
+      "repository": "fikrikarim/volocal",
+      "revision": "b731963bac43ab29ca430d7f0e55f7b843cc46e5",
+      "path": "Volocal/Pipeline/SentenceBuffer.swift",
+      "git_blob_sha1": "079040966cd2f5d8a24019d7500c7d688fcc360d",
+      "url": "https://github.com/fikrikarim/volocal/blob/b731963bac43ab29ca430d7f0e55f7b843cc46e5/Volocal/Pipeline/SentenceBuffer.swift",
+      "size_bytes": 4408,
+      "sha256": "b1d952b1f1f70210840cedb45eb6d2a058c9914ce381879229eed23fac99c0b7"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift",
+      "git_blob_sha1": "a4b1688bd947891fbf341747c42e4b89b9ed313d",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift",
+      "size_bytes": 23126,
+      "sha256": "29cf2f5f5b633a9dbb341de2f2d4ec3f7599d7856bd3ad379f29373e22dd063f"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsModelStore.swift",
+      "git_blob_sha1": "ed3dbfdd2422130a874daa582f2fa44d99c59ed3",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsModelStore.swift",
+      "size_bytes": 26504,
+      "sha256": "05ba2c1240f3430f4c25d13344d43e785a8cac30d31ab1a831c5f2d9f5b4af70"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsVoiceCloner.swift",
+      "git_blob_sha1": "b9a69f268fcb7a96977b247d3302e91971df9dad",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsVoiceCloner.swift",
+      "size_bytes": 18561,
+      "sha256": "44cd1d2a83d6acdf93bd63b37f285a9137237b4d0a6db385afea1c06813ceb3c"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift",
+      "git_blob_sha1": "7e8c9be7f7648119d6bb7579b788446471e2c320",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift",
+      "size_bytes": 62952,
+      "sha256": "ee6fe702598479c382671228ee19a58303614c6390cc120325371c67e27b16c8"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+Types.swift",
+      "git_blob_sha1": "1c5f7ded36db70427bbf4bb042b3cd2b01be318f",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+Types.swift",
+      "size_bytes": 1116,
+      "sha256": "a33511485e689bd2df2d52101e9592215f7ff4cf72764a48131c353b62cee92b"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/PocketTtsConstants.swift",
+      "git_blob_sha1": "a67436f5d1c5ade7f5da77f16d6b0cc17c1f5162",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/PocketTtsConstants.swift",
+      "size_bytes": 9536,
+      "sha256": "acb56784d714137590d8911c56dd17e4604e0a2179663e60aaa178fb8c79c42f"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Package@swift-6.2.swift",
+      "git_blob_sha1": "d5552c840c9696be6c872e0836fc89c8f5e9e0d9",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Package@swift-6.2.swift",
+      "size_bytes": 4812,
+      "sha256": "e339ae4cbcfb599d77a3f45b2c9a1bce92da5678aa0b1496066b1304b1f4af2b"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Assets/PocketTtsResourceDownloader.swift",
+      "git_blob_sha1": "524b1b6444e911ab380f4ced6b375b393af95993",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Assets/PocketTtsResourceDownloader.swift",
+      "size_bytes": 24457,
+      "sha256": "925771f18a87984ac0498ad625df5a652d95f9ec4cc4fee79ee63e0dd91e89df"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Tests/FluidAudioTests/TTS/PocketTTS/PocketTtsComputeUnitsTests.swift",
+      "git_blob_sha1": "6c837cdf7bc35dea559829c11e0722ed553f6d1b",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Tests/FluidAudioTests/TTS/PocketTTS/PocketTtsComputeUnitsTests.swift",
+      "size_bytes": 3362,
+      "sha256": "cf90fdd27bfa41d0be0daa5941df8ac39d8f09bae45c80056fcf2a72c94f86fd"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Tests/FluidAudioTests/TTS/PocketTTS/PocketTtsStreamingTests.swift",
+      "git_blob_sha1": "8332a3e5ba8abe5bd80a8a842fc6dc0a90832dc2",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Tests/FluidAudioTests/TTS/PocketTTS/PocketTtsStreamingTests.swift",
+      "size_bytes": 22853,
+      "sha256": "d6f1e20cca64df206aa946c881a4ac14959689f95140ad428aa7cd692148dd7c"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/Shared/AudioConverter.swift",
+      "git_blob_sha1": "db9c0be39204a8a532e4b07c759ceca353cdfd33",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/Shared/AudioConverter.swift",
+      "size_bytes": 23138,
+      "sha256": "68334f0e8e633f5685dd7e126a9efdb8185e96cc3cfceaff94941e9d89e8fb0a"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/ModelRegistry.swift",
+      "git_blob_sha1": "1c0340d78fb0915480725e6c444fe970bf42ad38",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/ModelRegistry.swift",
+      "size_bytes": 8942,
+      "sha256": "8d8d217cd42b79c943f2df5831cf11323533dbbe4032550e50c3ee328e696edd"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/ModelNames.swift",
+      "git_blob_sha1": "bd9fe1006eb2c0a692ae819d9d6c9ec852d8256a",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/ModelNames.swift",
+      "size_bytes": 89701,
+      "sha256": "c0aca8b9640a66b21178e3d6c8b397b441438f5e4543a9343a33cebcfb35bbcf"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/Shared/Download/DownloadTypes.swift",
+      "git_blob_sha1": "cdf2c0e961d5eb91455f82da01708c3cae121041",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/Shared/Download/DownloadTypes.swift",
+      "size_bytes": 6246,
+      "sha256": "fdbf48c584242351a6382212f90055950d548fb8e7ca36be992b13133fc04c1f"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/Shared/Download/ModelHub.swift",
+      "git_blob_sha1": "58de35533d9226e357d8b158aec1e215424759d8",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/Shared/Download/ModelHub.swift",
+      "size_bytes": 41755,
+      "sha256": "d35b8d89f824082bc7bb686894e0f485500dd8e5e3f20d25b42071e30ec34be5"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/Shared/Download/ModelCache.swift",
+      "git_blob_sha1": "7b8f7e6e1b20bd37401dd9874cc7e4334c7fbc58",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/Shared/Download/ModelCache.swift",
+      "size_bytes": 19534,
+      "sha256": "bd95260b5fdbae173b83aff3814948e218a7c09e1cb316f023ada8b68e90ebb0"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/Shared/MLModel+Prediction.swift",
+      "git_blob_sha1": "b94ca8f20101d8b786b2eeebc032849a02c26dcd",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/Shared/MLModel+Prediction.swift",
+      "size_bytes": 349,
+      "sha256": "879f1d8afbae2b10d4a871063e0f4fb6b2fd57509a6abdf74879e6cc54737b49"
+    },
+    {
+      "repository": "FluidInference/FluidAudio",
+      "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+      "path": "Sources/FluidAudio/TTS/PocketTTS/Assets/PocketTtsConstantsLoader.swift",
+      "git_blob_sha1": "5e61f948e9b8897902aee813556124040cda09d6",
+      "url": "https://github.com/FluidInference/FluidAudio/blob/bd95867286539ca72c1f8f4253532143597483cf/Sources/FluidAudio/TTS/PocketTTS/Assets/PocketTtsConstantsLoader.swift",
+      "size_bytes": 19553,
+      "sha256": "33bc1542441fc4491a30d9fb17d52f2d5c028bcd4f7d9af27c76cbe454991b15"
+    }
+  ],
+  "retrieved_utc_date": "2026-10-19",
+  "dependency": {
+    "repository": "FluidInference/FluidAudio",
+    "revision": "bd95867286539ca72c1f8f4253532143597483cf",
+    "minimum_macos": "14",
+    "package_swift_tools_version": "6.0",
+    "swift_6_2_manifest_traits": "TTS enabled by default in the Swift 6.2 manifest; explicitly defined in the base manifest."
+  },
+  "architecture_reference": {
+    "repository": "fikrikarim/volocal",
+    "revision": "b731963bac43ab29ca430d7f0e55f7b843cc46e5",
+    "copied_production_code": false
+  },
+  "model_assets": [
+    {
+      "repository": "FluidInference/pocket-tts-coreml",
+      "revision": "91748676fe3c8b2eb3007b3125253bcd898202c3",
+      "metadata_url": "https://huggingface.co/api/models/FluidInference/pocket-tts-coreml",
+      "immutable_url": "https://huggingface.co/FluidInference/pocket-tts-coreml/tree/91748676fe3c8b2eb3007b3125253bcd898202c3",
+      "metadata_last_modified": "2026-09-09T01:55:19.000Z",
+      "metadata_sha256": "a68c6394eeda7383606b6672432f1fdce598f5e71f6dee842df64ddac75cf792",
+      "weights_downloaded_in_this_workspace": false,
+      "selected_files": [
+        {
+          "name": "english_rank4",
+          "tree_url": "https://huggingface.co/api/models/FluidInference/pocket-tts-coreml/tree/91748676fe3c8b2eb3007b3125253bcd898202c3/v2.1/english?recursive=true",
+          "file_count": 22,
+          "total_bytes": 367507879,
+          "files": [
+            {
+              "path": "v2.1/english/cond_prefill_ane.mlmodelc/analytics/coremldata.bin",
+              "size": 243,
+              "oid": "30e860e7d86d01a5ec635c1aa5ad8378ee02e076",
+              "lfs": {
+                "oid": "1c9d0f384e454921a66cdd1a9fb8fa59fa0c5cd3703ca32a9792a97e67e8a1c2",
+                "size": 243,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/cond_prefill_ane.mlmodelc/coremldata.bin",
+              "size": 1388,
+              "oid": "5280e79e2b4378774a61b5cd71110f8886ece00a",
+              "lfs": {
+                "oid": "39d79bbbf366dca5fb7339c461952d79484e12da2b3642e45881afd4ddf82e7b",
+                "size": 1388,
+                "pointerSize": 129
+              }
+            },
+            {
+              "path": "v2.1/english/cond_prefill_ane.mlmodelc/model.mil",
+              "size": 136093,
+              "oid": "2aef44ccd7c895876ef314e46a742909df52fe28",
+              "lfs": null
+            },
+            {
+              "path": "v2.1/english/cond_prefill_ane.mlmodelc/weights/weight.bin",
+              "size": 132187392,
+              "oid": "e6c603e617d9f9b1277982ed8367dded09cc4e92",
+              "lfs": {
+                "oid": "b8bbefa5799ee581561d7a28a21a42f9ea9b7e73ca7bc1339330ea4cff24806d",
+                "size": 132187392,
+                "pointerSize": 134
+              }
+            },
+            {
+              "path": "v2.1/english/constants_bin/alba.safetensors",
+              "size": 6194424,
+              "oid": "817ef268df79f674a4e3c12027e79b70de46f7fa",
+              "lfs": {
+                "oid": "69c32db63ca56843d994f81f343f62e0bf2d73f7e4c9bc73e44bb1110b1d8845",
+                "size": 6194424,
+                "pointerSize": 132
+              }
+            },
+            {
+              "path": "v2.1/english/constants_bin/bos_before_voice.bin",
+              "size": 4096,
+              "oid": "510dc02b5324d05f4d8c6dcf676ca9241a6a30c8",
+              "lfs": {
+                "oid": "6ac530a104e3f3d2b2ff15f3fad63540f2619b31db78b159c0595a108f142caf",
+                "size": 4096,
+                "pointerSize": 129
+              }
+            },
+            {
+              "path": "v2.1/english/constants_bin/bos_emb.bin",
+              "size": 128,
+              "oid": "89a20dad35b263becd3d5d7b7dd97372ad5ea290",
+              "lfs": {
+                "oid": "52f1a157fa35fc100213e6e0fafa74703be99db8faa42de3e99feda607ac7b63",
+                "size": 128,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/constants_bin/text_embed_table.bin",
+              "size": 16388096,
+              "oid": "8a4c039a01c18b2009e5e3580cabde28be7fda38",
+              "lfs": {
+                "oid": "2512f9edd82ab0c68bb42a5fcd329a371eaf63ee6fb5275dfb1bc9536592bb0e",
+                "size": 16388096,
+                "pointerSize": 133
+              }
+            },
+            {
+              "path": "v2.1/english/constants_bin/tokenizer.model",
+              "size": 59339,
+              "oid": "1820a7cbb15efc6a33dd365113c07e3df9d28d80",
+              "lfs": {
+                "oid": "d461765ae179566678c93091c5fa6f2984c31bbe990bf1aa62d92c64d91bc3f6",
+                "size": 59339,
+                "pointerSize": 130
+              }
+            },
+            {
+              "path": "v2.1/english/flow_decoder_fused.mlmodelc/analytics/coremldata.bin",
+              "size": 243,
+              "oid": "de5da7392913995a2b334958380c1492877742af",
+              "lfs": {
+                "oid": "17cf344fd2be66e934982944a7a252da17087efbc9daac0d3dfb4e8e95797264",
+                "size": 243,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/flow_decoder_fused.mlmodelc/coremldata.bin",
+              "size": 413,
+              "oid": "d9abf6be77d7d70d9fee2309055a8e92868c5d79",
+              "lfs": {
+                "oid": "69ff9affa07e38b1a511ac8d71c594eeeb236389ddbe74f4fabdfa45db4edf7a",
+                "size": 413,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/flow_decoder_fused.mlmodelc/model.mil",
+              "size": 333331,
+              "oid": "c64a1f34555e7bbf9c8d4502d29f9ef52dd6b0ec",
+              "lfs": null
+            },
+            {
+              "path": "v2.1/english/flow_decoder_fused.mlmodelc/weights/weight.bin",
+              "size": 19012608,
+              "oid": "6e75e3fb7a9763bb94b0c399b2ec940a3129eb4c",
+              "lfs": {
+                "oid": "f28a1bd0af940a195802e9d702c9e050f3e69d265e582f3d0fdf4001709eb30c",
+                "size": 19012608,
+                "pointerSize": 133
+              }
+            },
+            {
+              "path": "v2.1/english/flowlm_step_ane.mlmodelc/analytics/coremldata.bin",
+              "size": 243,
+              "oid": "bf9327124ca6f7c7b6d4b4489f60e8dab3175f8a",
+              "lfs": {
+                "oid": "5718b06291735fe6e648b6980fb07209b5bbda339ecc8fb2c8a0dfa87fbaf54f",
+                "size": 243,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/flowlm_step_ane.mlmodelc/coremldata.bin",
+              "size": 1414,
+              "oid": "5d55c55aeca2d5f08c5153ef23f944540b04c4df",
+              "lfs": {
+                "oid": "18e49a8e73db70da25caddcaac36bc77245d6bea30754a23df3b10c27fa4de73",
+                "size": 1414,
+                "pointerSize": 129
+              }
+            },
+            {
+              "path": "v2.1/english/flowlm_step_ane.mlmodelc/model.mil",
+              "size": 156945,
+              "oid": "f0c8bfc3b853321eae98de68477c497385c9b4b9",
+              "lfs": null
+            },
+            {
+              "path": "v2.1/english/flowlm_step_ane.mlmodelc/weights/weight.bin",
+              "size": 151136960,
+              "oid": "8de347d87f58b2fb027895c679e6a0015122a985",
+              "lfs": {
+                "oid": "fdd40be8edecea51035dfa91beada8e74de2634eab266b85f329bf85b344d271",
+                "size": 151136960,
+                "pointerSize": 134
+              }
+            },
+            {
+              "path": "v2.1/english/mimi_decoder.mlmodelc/analytics/coremldata.bin",
+              "size": 243,
+              "oid": "54f1906017f5d5124751a6c5d39e72cf0ccc2e64",
+              "lfs": {
+                "oid": "be4199b44838e2fb199bb44b7649531d28fe847a1a6633fd9f8ca89576c5a7f8",
+                "size": 243,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "v2.1/english/mimi_decoder.mlmodelc/coremldata.bin",
+              "size": 1777,
+              "oid": "de964cb7c980cf8d8ede358a615d7047fcc1ee73",
+              "lfs": {
+                "oid": "9d8644e2caad1513153ac28f1ba8090fcd2facdbd5d2621bf8016186fa932bf8",
+                "size": 1777,
+                "pointerSize": 129
+              }
+            },
+            {
+              "path": "v2.1/english/mimi_decoder.mlmodelc/metadata.json",
+              "size": 16844,
+              "oid": "f66f9e7ff5be2ffbc44c8300f3501f67a77afaf6",
+              "lfs": null
+            },
+            {
+              "path": "v2.1/english/mimi_decoder.mlmodelc/model.mil",
+              "size": 107403,
+              "oid": "69ef039645ac6b4e76218d04f8327a3576d285bc",
+              "lfs": null
+            },
+            {
+              "path": "v2.1/english/mimi_decoder.mlmodelc/weights/weight.bin",
+              "size": 41768256,
+              "oid": "190839671bb0332bcd8e7cc276be5dfe49c59320",
+              "lfs": {
+                "oid": "c93d182f9ad8c1042ec8302093aabb4e310d76616932dd12720e03b5d07f7c64",
+                "size": 41768256,
+                "pointerSize": 133
+              }
+            }
+          ]
+        },
+        {
+          "name": "optional_voice_encoder",
+          "tree_url": "https://huggingface.co/api/models/FluidInference/pocket-tts-coreml/tree/91748676fe3c8b2eb3007b3125253bcd898202c3/mimi_encoderv2.mlmodelc?recursive=true",
+          "file_count": 5,
+          "total_bytes": 44388051,
+          "files": [
+            {
+              "path": "mimi_encoderv2.mlmodelc/analytics/coremldata.bin",
+              "size": 243,
+              "oid": "fe2ea14b43155d0afce9de546ad51e2c1408d16c",
+              "lfs": {
+                "oid": "eb3fd1e037531560c647fe8fd3731855c1612aebfe93040c92722353fb5277a5",
+                "size": 243,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "mimi_encoderv2.mlmodelc/coremldata.bin",
+              "size": 380,
+              "oid": "c253268cd9887e6ff0cec80d8b6ed3b668a4d8d3",
+              "lfs": {
+                "oid": "dead2f8a09e4a952fc3c97153068e736b92cd9301bf6bbdb7c19bda211b2725e",
+                "size": 380,
+                "pointerSize": 128
+              }
+            },
+            {
+              "path": "mimi_encoderv2.mlmodelc/metadata.json",
+              "size": 2091,
+              "oid": "f8211bc408facb3cd795cb559d680dedcf60bde5",
+              "lfs": null
+            },
+            {
+              "path": "mimi_encoderv2.mlmodelc/model.mil",
+              "size": 24543097,
+              "oid": "2b5bb5f87290988d559e3d63ed74572f7e055ef2",
+              "lfs": {
+                "oid": "d69f444c0196e0f6089efebd50893bcfc895db2d2c6297dafdff44a156f8a7e7",
+                "size": 24543097,
+                "pointerSize": 133
+              }
+            },
+            {
+              "path": "mimi_encoderv2.mlmodelc/weights/weight.bin",
+              "size": 19842240,
+              "oid": "92fbedf37e553bd6940b2da41399734773dd5fa8",
+              "lfs": {
+                "oid": "2f4de846831ebf7a85f92623cc7fb18b2a3abebeb71d4c759181a5d2421fb029",
+                "size": 19842240,
+                "pointerSize": 133
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "repository": "FluidInference/silero-vad-coreml",
+      "revision": "b419383c55c110e2c9271fa6ee0ea83d03c70d96",
+      "metadata_url": "https://huggingface.co/api/models/FluidInference/silero-vad-coreml",
+      "immutable_url": "https://huggingface.co/FluidInference/silero-vad-coreml/tree/b419383c55c110e2c9271fa6ee0ea83d03c70d96",
+      "metadata_last_modified": "2026-06-23T18:07:49.000Z",
+      "metadata_sha256": "265b8d7a346d7b8ae7e1bd23c2c368c75bd5729daf61332bf0b71176f70fa727",
+      "weights_downloaded_in_this_workspace": false
+    }
+  ],
+  "api_contract": {
+    "capture": "AVAudioEngine input/output voice processing in one engine; mono Float32 at 16000 Hz for Gemma, resampled with a persistent AVAudioConverter.",
+    "vad": "VadManager.processStreamingChunk, explicit VadStreamState, 4096-sample chunks; CPU-only compute, threshold 0.65, 0.5-second silence, app-enforced 30-second utterance limit.",
+    "speech": "PocketTtsManager placement .ane (rank4), conditioner/FlowLM/flowDecoder/mimiEncoder cpuAndNeuralEngine, mimiDecoder cpuOnly. No TTS stage is configured to permit GPU compute.",
+    "fallback": "Only explicit thrown Neural Engine evidence enables sticky uniform cpuOnly fallback on the same rank4 assets. Generic CoreML, network and cancellation errors do not. Fatal process aborts cannot be recovered by Swift error handling.",
+    "retry": "A sentence can be retried only before any of its audio is queued. After that, an ANE error stops the response and enables CPU for subsequent responses.",
+    "streaming": "One sentence (at most 240 Unicode scalars) per PocketTtsSession; upstream streams are unbounded but no second sentence is queued into them. App queue: eight sentences with backpressure; playback: eight 1920-sample 24kHz frames, at most 640ms scheduled.",
+    "cancellation": "PocketTtsSession.cancel is awaited to join generation, including the current CoreML operation; playback stops immediately and generation IDs discard stale completion callbacks.",
+    "voice": "One to ten seconds of mono24k conditioning. VoiceSample reads at most 4096 source frames per call within an independent 10s budget, downmixes at source rate, then resamples once. Late failed packetized reads keep an already-decoded prefix, matching pinned FluidAudio. First-read failures, less than 1s and nonfinite samples are rejected. Controller retains 20MiB file bound and transactional conditioning commit.",
+    "echo": "If voice processing is unavailable, capture is suppressed during playback and for a 300ms tail; no separate interrupt control is required.",
+    "pins": "ModelRegistry.revisionOverrides is configured once on MainActor before FluidAudio work. Revision-specific cache folders avoid adopting mutable old assets.",
+    "legacy_backfills": "Before Pocket initialize, all selected English rank4 files, BOS and Alba constants are present. English skips 24-layer speaker projection and pack-local encoder backfills. The optional shared encoder is preflighted before cloneVoice.",
+    "cache_validation": "Fast startup validates exact selected file sizes and rejects symbolic links/incomplete files. This detects partial caches; it is not a cryptographic check of later local edits. ModelHub downloads from the exact pinned revision.",
+    "voice_commit": "setVoice(referenceAudio:commit:) validates and clones into a local value, checks task cancellation, invokes a synchronous throwing @Sendable commit closure, then replaces in-memory conditioning with no intervening await. Nil reset follows the same order; clone/cancellation/commit failure retains the prior live voice.",
+    "capture_callback": "A local OSAllocatedUnfairLock gates one-time delivery to AVAudioConverterInputBlock, following the pinned AudioConverter Swift 6 pattern; persistent streaming converter retains its state."
+  },
+  "failure_reference": {
+    "url": "https://github.com/FluidInference/FluidAudio/issues/881",
+    "use": "Concrete reported ANEProgramProcessRequestDirect failure signature; not a native qualification result."
+  },
+  "validation": {
+    "source_files_verified_against_git_blob": 30,
+    "swift_compiler_available": true,
+    "native_macos_tests_run": false,
+    "native_coreml_ane_tests_run": false,
+    "audio_hardware_tests_run": false,
+    "tests_added": [
+      "Tests/CallGemmaTests/AudioPolicyTests.swift",
+      "Tests/CallGemmaTests/VoiceSampleTests.swift"
+    ],
+    "scope": "Eight actual pure audio-policy/buffer tests passed on Linux Swift 6.2.3 with complete concurrency checking and warning errors. Apple sources syntax-parse only; no CoreML, ANE or physical audio claim.",
+    "portable_audio_tests_passed": 8,
+    "evidence": "../Qualification/Validation/swift-portable/tests.xml",
+    "native_voice_decoder_tests_not_run": 4,
+    "compressed_eof_test_limit": "Generated AAC exercises actual Apple encoding/decoding but a particular OS decoder may finish without throwing at the padding tail; the failure branch is not forcibly injected."
+  },
+  "instrumentation": {
+    "enable": "Set CALL_GEMMA_TRACE=1 in the launched app environment before startup. Signposting is otherwise disabled.",
+    "apple_api": "https://developer.apple.com/documentation/os/ossignposter",
+    "subsystem": "CallGemma",
+    "category": "Audio",
+    "interval": "Sentence synthesis stream: from session creation through consumption and producer join, including downstream backpressure. It is not an isolated CoreML compute measurement.",
+    "events": [
+      "First PCM frame received",
+      "First playback buffer scheduled"
+    ],
+    "logging_scope": "Phase boundaries only; no speech contents, per-sample events, or per-token logs.",
+    "native_manual_gate": [
+      "On the target Apple Silicon Mac, run swift test using the actual pinned dependency and built patched runtime; retain the complete test log, macOS/Swift/Xcode versions and model asset revisions.",
+      "Build and sign the app, move the app to a new location, make the original .build resource bundles unavailable, and verify both app and dependency resources load. Restore any moved build files after this relocation test.",
+      "Record Instruments Points of Interest together with Time Profiler, CoreML/Neural Engine activity and the audio output timeline. Use a three-sentence response long enough to exceed eight Pocket frames. Confirm first playback scheduling occurs before the sentence stream ends; then verify from compute/audio tracks that synthesis really continues while output plays. The sentence interval alone cannot prove private producer overlap.",
+      "Capture output with a loopback device or external recorder and retain the waveform. Check within-sentence continuity and measure sentence-transition silence across at least 20 warm responses; report maximum and distribution with hardware/load, rather than equating schedule time with audible time.",
+      "Measure utterance-complete to first-text, first-PCM and first-buffer-scheduled latency using the app/runtime phase markers. Repeat with warm caches, a restored conversation, and fresh process startup.",
+      "Exercise built-in Alba and a one-to-ten-second imported sample across process restart. Confirm missing/truncated pinned model files are repaired or fail explicitly, and an offline complete cache starts without legacy default-main backfills.",
+      "Interrupt via speaking while playback is active; verify playback stops, the previous session producer joins, and no old frame or completion is heard during the next response. Test hang-up during capture, generation and playback.",
+      "On a device/configuration that emits an actual catchable ANE failure, verify CPU fallback before the first frame retries once and does not use GPU. If the failure occurs after a frame was queued, verify current response stops without repeating the sentence and the next response uses CPU. Do not report this as passed from a fabricated generic NSError; a native fault-injected test build must be identified separately.",
+      "Verify generic CoreML shape/download errors and cancellation do not switch to CPU. If voice processing is unavailable, verify listening pauses during playback and its 300ms echo tail. Hardware loopback and barge-in results are required; source inspection is not device qualification."
+    ]
+  }
+}

@@ -1,0 +1,548 @@
+diff --git a/c/conversation.cc b/c/conversation.cc
+index 0702785..0f93bb7 100644
+--- a/c/conversation.cc
++++ b/c/conversation.cc
+@@ -590,6 +590,49 @@ LiteRtLmStatusCode litert_lm_conversation_clone(
+   return kLiteRtLmStatusOk;
+ }
+ 
++LiteRtLmStatusCode litert_lm_conversation_begin_audio_input(
++    LiteRtLmConversation* conversation, const char* prototype_json) {
++  if (!conversation || !conversation->conversation || !prototype_json) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid audio input.");
++  }
++  auto message = nlohmann::ordered_json::parse(prototype_json, nullptr, false);
++  if (message.is_discarded()) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid audio JSON.");
++  }
++  return litert::lm::c::ToCStatus(conversation->conversation->BeginAudioInput(message));
++}
++LiteRtLmStatusCode litert_lm_conversation_append_audio_input(
++    LiteRtLmConversation* conversation, const float* samples, size_t count) {
++  if (!conversation || !conversation->conversation || !samples || count == 0 || count > 16000) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid audio samples.");
++  }
++  return litert::lm::c::ToCStatus(conversation->conversation->AppendAudioInput({samples, count}));
++}
++LiteRtLmStatusCode litert_lm_conversation_finish_audio_input(
++    LiteRtLmConversation* conversation) {
++  if (!conversation || !conversation->conversation) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument, "Invalid conversation.");
++  }
++  return litert::lm::c::ToCStatus(conversation->conversation->FinishAudioInput());
++}
++
++LiteRtLmStatusCode litert_lm_conversation_prefill_history_suffix(
++    LiteRtLmConversation* conversation, const char* messages_json) {
++  if (!conversation || !conversation->conversation || !messages_json) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "Invalid history suffix arguments.");
++  }
++  auto parsed = nlohmann::ordered_json::parse(messages_json, nullptr, false);
++  if (parsed.is_discarded() || !parsed.is_array()) {
++    return litert::lm::c::ReturnError(absl::StatusCode::kInvalidArgument,
++                                    "History suffix must be an array.");
++  }
++  std::vector<litert::lm::Message> messages;
++  for (auto& message : parsed) messages.push_back(std::move(message));
++  return litert::lm::c::ToCStatus(
++      conversation->conversation->PrefillHistorySuffix(std::move(messages)));
++}
++
+ LiteRtLmStatusCode litert_lm_conversation_get_history(
+     LiteRtLmConversation* conversation, LiteRtLmJsonResponse** out_history) {
+   LITERT_LM_C_RETURN_IF_NULL(out_history);
+diff --git a/c/conversation.h b/c/conversation.h
+index 19fb928..7d2109c 100644
+--- a/c/conversation.h
++++ b/c/conversation.h
+@@ -502,6 +502,28 @@ LITERT_LM_C_API_EXPORT
+ LiteRtLmStatusCode litert_lm_conversation_get_history(
+     LiteRtLmConversation* conversation, LiteRtLmJsonResponse** out_history);
+ 
++// Incremental Gemma audio prefill. Calls are serialized and synchronous. Begin
++// uses the prototype audio message only to establish the prompt template;
++// append supplies 16 kHz mono floats. Finish flushes preprocessing; then use
++// send_message_stream with the final audio message to close the turn and decode.
++// On any failure discard the conversation. Never save/clone an open input.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_begin_audio_input(
++    LiteRtLmConversation* conversation, const char* prototype_json);
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_append_audio_input(
++    LiteRtLmConversation* conversation, const float* samples, size_t count);
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_finish_audio_input(
++    LiteRtLmConversation* conversation);
++
++// Replays complete canonical user/assistant turns after an already verified
++// cache prefix. Does not decode. Call only on a quiescent, uncancelled handle;
++// discard the handle on failure. The cache cannot be saved until a later decode.
++LITERT_LM_C_API_EXPORT
++LiteRtLmStatusCode litert_lm_conversation_prefill_history_suffix(
++    LiteRtLmConversation* conversation, const char* messages_json);
++
+ // Gemma4 complete-turn persistence. Wait until done before saving. Bind the
+ // exact history JSON and all conversation/session/model/runtime settings into
+ // compatibility_key; atomically commit the history with the cache. Supports
+diff --git a/runtime/conversation/BUILD b/runtime/conversation/BUILD
+index 93631d2..66ee64c 100644
+--- a/runtime/conversation/BUILD
++++ b/runtime/conversation/BUILD
+@@ -129,6 +129,7 @@ cc_library(
+     srcs = ["conversation.cc"],
+     hdrs = ["conversation.h"],
+     deps = [
++        "//support/preprocessor:audio_preprocessor_miniaudio",
+         ":channel_util",
+         ":internal_callback_util",
+         ":io_types",
+diff --git a/runtime/conversation/conversation.cc b/runtime/conversation/conversation.cc
+index 26ded51..c9efa64 100644
+--- a/runtime/conversation/conversation.cc
++++ b/runtime/conversation/conversation.cc
+@@ -13,8 +13,11 @@
+ // limitations under the License.
+ 
+ #include "runtime/conversation/conversation.h"
++#include "litert/cc/litert_tensor_buffer.h"
++#include "litert/cc/litert_macros.h"
+ 
+ #include <cstddef>
++#include <cmath>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -702,10 +705,19 @@ absl::Status Conversation::SendMessageAsync(
+     }
+   }
+ 
+-  ABSL_ASSIGN_OR_RETURN(auto session_inputs,
+-                        model_data_processor_->ToInputDataVector(
+-                            single_turn_text, messages_for_conversion,
+-                            optional_args.args.value_or(std::monostate())));
++  std::vector<InputData> session_inputs;
++  if (streamed_audio_) {
++    if (!streamed_audio_->finished || single_turn_text != streamed_audio_->rendered ||
++        optional_args.has_pending_message) {
++      return absl::FailedPreconditionError("Streaming audio template changed or input is unfinished.");
++    }
++    session_inputs = std::move(streamed_audio_->suffix);
++    streamed_audio_.reset();
++  } else {
++    ABSL_ASSIGN_OR_RETURN(session_inputs, model_data_processor_->ToInputDataVector(
++        single_turn_text, messages_for_conversion,
++        optional_args.args.value_or(std::monostate())));
++  }
+ 
+   if (is_appending_message) {
+     if (session_inputs.empty()) {
+@@ -1011,11 +1023,159 @@ void Conversation::CancelGroup(absl::string_view task_group_id) {
+   }
+ }
+ 
++absl::Status Conversation::BeginAudioInput(const Message& prototype) {
++  ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
++  if (streamed_audio_ || !prototype.is_object() ||
++      prototype.value("role", "") != "user") {
++    return absl::FailedPreconditionError("Audio input requires an idle user turn.");
++  }
++  ABSL_RETURN_IF_ERROR(session_->WaitUntilDone());
++  ABSL_ASSIGN_OR_RETURN(auto properties, engine_.GetAudioExecutorProperties());
++  if (properties.input_frame_count <= 0 || properties.streaming_chunk_overlap_size != 0) {
++    return absl::UnimplementedError("Incremental input requires an independent encoder window.");
++  }
++  ABSL_LOG(INFO) << "Audio input window=" << properties.input_frame_count
++                 << " shrink=" << properties.audio_shrink_factor
++                 << " streaming=" << properties.is_streaming_model;
++  auto stream = std::make_unique<StreamedAudio>();
++  stream->window_frames = properties.input_frame_count;
++  ABSL_ASSIGN_OR_RETURN(stream->rendered, GetSingleTurnText(prototype, OptionalArgs()));
++  ABSL_ASSIGN_OR_RETURN(auto inputs, model_data_processor_->ToInputDataVector(
++      stream->rendered, nlohmann::ordered_json::array({prototype}), std::monostate()));
++  std::vector<InputData> prefix;
++  bool audio_seen = false, end_seen = false;
++  for (auto& input : inputs) {
++    if (std::holds_alternative<InputAudio>(input)) {
++      if (audio_seen) return absl::InvalidArgumentError("Expected exactly one audio input.");
++      audio_seen = true;
++    } else if (std::holds_alternative<InputAudioEnd>(input)) {
++      if (!audio_seen || end_seen) return absl::InvalidArgumentError("Invalid audio end marker.");
++      end_seen = true;
++      stream->suffix.push_back(std::move(input));
++    } else if (!std::holds_alternative<InputText>(input)) {
++      return absl::InvalidArgumentError("Streaming input supports audio and text only.");
++    } else if (!audio_seen) {
++      prefix.push_back(std::move(input));
++    } else {
++      if (!end_seen) return absl::InvalidArgumentError("Text inside audio input.");
++      stream->suffix.push_back(std::move(input));
++    }
++  }
++  if (!audio_seen || !end_seen || prefix.empty()) {
++    return absl::InvalidArgumentError("Missing audio template boundary.");
++  }
++  const auto& processor_config = std::get<Gemma4DataProcessorConfig>(config_.GetProcessorConfig());
++  auto audio_config = litert::support::AudioPreprocessorConfig::CreateDefaultGemma4Config(
++      processor_config.skip_mel_spectrogram_extraction);
++  audio_config.SetBufferLastFrame(true);
++  ABSL_ASSIGN_OR_RETURN(stream->processor,
++      litert::support::AudioPreprocessorMiniAudio::Create(audio_config));
++  ABSL_RETURN_IF_ERROR(session_->RunPrefill(prefix));
++  streamed_audio_ = std::move(stream);
++  return absl::OkStatus();
++}
++
++absl::Status Conversation::AppendAudioInput(absl::Span<const float> samples) {
++  if (!streamed_audio_ || streamed_audio_->finished || samples.empty() ||
++      samples.size() > 16000 || streamed_audio_->samples + samples.size() > 30 * 16000) {
++    return absl::InvalidArgumentError("Invalid streaming audio append.");
++  }
++  for (float sample : samples) {
++    if (!std::isfinite(sample)) return absl::InvalidArgumentError("Nonfinite PCM.");
++  }
++  auto audio = streamed_audio_->processor->Preprocess(
++      InputAudio(std::vector<float>(samples.begin(), samples.end())));
++  streamed_audio_->samples += samples.size();
++  if (!audio.ok()) {
++    if (audio.status().message() == "Not enough samples to form any frame.") return absl::OkStatus();
++    return audio.status();
++  }
++  return PrefillAudioFeatures(std::move(*audio), false);
++}
++
++absl::Status Conversation::PrefillAudioFeatures(InputAudio audio, bool flush) {
++  ABSL_ASSIGN_OR_RETURN(auto tensor, audio.GetPreprocessedAudioTensor());
++  LITERT_ASSIGN_OR_RETURN(auto type, tensor->TensorType());
++  const auto& dims = type.Layout().Dimensions();
++  if (dims.size() != 3 || dims[0] != 1 || dims[1] < 0 || dims[2] <= 0) {
++    return absl::InvalidArgumentError("Unexpected audio feature shape.");
++  }
++  auto& stream = *streamed_audio_;
++  if (stream.feature_width && stream.feature_width != dims[2]) {
++    return absl::InvalidArgumentError("Audio feature width changed.");
++  }
++  stream.feature_width = dims[2];
++  const size_t old = stream.features.size();
++  stream.features.resize(old + dims[1] * dims[2]);
++  LITERT_RETURN_IF_ERROR(const_cast<TensorBuffer*>(tensor)->Read<float>(absl::MakeSpan(stream.features).subspan(old)));
++  return PrefillBufferedAudio(flush);
++}
++
++absl::Status Conversation::PrefillBufferedAudio(bool flush) {
++  auto& stream = *streamed_audio_;
++  if (stream.features.empty()) return absl::OkStatus();
++  const size_t window = stream.window_frames * stream.feature_width;
++  size_t consumed = 0;
++  while (stream.features.size() - consumed >= window ||
++         (flush && consumed < stream.features.size())) {
++    const size_t count = std::min(window, stream.features.size() - consumed);
++    RankedTensorType block_type(GetElementType<float>(),
++        Layout(Dimensions({1, static_cast<int>(count / stream.feature_width), stream.feature_width})));
++    LITERT_ASSIGN_OR_RETURN(auto block, TensorBuffer::CreateManagedHostMemory(block_type, count * sizeof(float)));
++    LITERT_RETURN_IF_ERROR(block.Write<float>(absl::MakeConstSpan(stream.features).subspan(consumed, count)));
++    std::vector<InputData> inputs;
++    inputs.emplace_back(InputAudio(std::move(block)));
++    ABSL_RETURN_IF_ERROR(session_->RunPrefill(inputs));
++    consumed += count;
++  }
++  stream.features.erase(stream.features.begin(), stream.features.begin() + consumed);
++  return absl::OkStatus();
++}
++
++absl::Status Conversation::FinishAudioInput() {
++  if (!streamed_audio_ || streamed_audio_->finished || streamed_audio_->samples == 0) {
++    return absl::FailedPreconditionError("No open audio input.");
++  }
++  auto audio = streamed_audio_->processor->Flush();
++  if (audio.ok()) {
++    ABSL_RETURN_IF_ERROR(PrefillAudioFeatures(std::move(*audio), true));
++  } else if (audio.status().message() != "Not enough samples to form any frame.") {
++    return audio.status();
++  }
++  ABSL_RETURN_IF_ERROR(PrefillBufferedAudio(true));
++  streamed_audio_->finished = true;
++  return absl::OkStatus();
++}
++
++absl::Status Conversation::PrefillHistorySuffix(std::vector<Message> messages) {
++  ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
++  ABSL_RETURN_IF_ERROR(CheckCacheHistory(messages));
++  if (streamed_audio_) return absl::FailedPreconditionError("Audio input is open.");
++  ABSL_RETURN_IF_ERROR(session_->WaitUntilDone());
++  std::vector<Message> old;
++  {
++    absl::MutexLock lock(history_mutex_);
++    if (is_appending_message_ || checkpoint_message_index_.has_value()) {
++      return absl::FailedPreconditionError("Cannot replay into a pending turn.");
++    }
++    if (!history_.empty()) ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_));
++    old = history_;
++  }
++  ABSL_ASSIGN_OR_RETURN(auto inputs, GetInputDataVectorForMessages(
++      old, messages, OptionalArgs(), /*include_preface=*/old.empty()));
++  ABSL_RETURN_IF_ERROR(session_->RunPrefill(inputs));
++  {
++    absl::MutexLock lock(history_mutex_);
++    history_.insert(history_.end(), messages.begin(), messages.end());
++  }
++  return absl::OkStatus();
++}
++
+ absl::Status Conversation::SaveCache(absl::string_view path,
+                                     absl::string_view compatibility_key) {
+   ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
+   absl::MutexLock lock(history_mutex_);
+-  if (is_appending_message_ || checkpoint_message_index_.has_value() ||
++  if (streamed_audio_ || is_appending_message_ || checkpoint_message_index_.has_value() ||
+       history_.empty() || !history_.back().is_object() ||
+       !history_.back().contains("role") ||
+       history_.back()["role"] != "assistant") {
+@@ -1029,7 +1189,7 @@ absl::Status Conversation::SaveCache(absl::string_view path,
+ absl::StatusOr<SessionCacheSnapshot> Conversation::CaptureCache(std::ostream* output) {
+   ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
+   absl::MutexLock lock(history_mutex_);
+-  if (is_appending_message_ || checkpoint_message_index_.has_value() ||
++  if (streamed_audio_ || is_appending_message_ || checkpoint_message_index_.has_value() ||
+       history_.empty() || !history_.back().is_object() ||
+       !history_.back().contains("role") ||
+       history_.back()["role"] != "assistant") {
+@@ -1057,6 +1217,7 @@ absl::Status Conversation::LoadCache(absl::string_view path,
+ }
+ 
+ absl::StatusOr<std::unique_ptr<Conversation>> Conversation::Clone() {
++  if (streamed_audio_) return absl::FailedPreconditionError("Cannot clone an open audio input.");
+   ABSL_ASSIGN_OR_RETURN(auto session, session_->Clone());
+   ABSL_ASSIGN_OR_RETURN(
+       std::unique_ptr<ModelDataProcessor> model_data_processor,
+diff --git a/runtime/conversation/conversation.h b/runtime/conversation/conversation.h
+index 1d65c23..fdab7db 100644
+--- a/runtime/conversation/conversation.h
++++ b/runtime/conversation/conversation.h
+@@ -47,6 +47,7 @@
+ #include "runtime/engine/engine_settings.h"
+ #include "runtime/engine/io_types.h"
+ #include "runtime/util/status_macros.h"
++#include "support/preprocessor/audio_preprocessor_miniaudio.h"
+ 
+ namespace litert::lm {
+ 
+@@ -684,6 +685,19 @@ class Conversation {
+                         absl::string_view compatibility_key,
+                         std::vector<Message> history);
+ 
++  // One audio user turn, supplied incrementally as 16 kHz mono PCM. The
++  // prototype is used only to render its template; its audio is not prefetched.
++  // Finish through SendMessageAsync with the final durable audio message after
++  // FinishAudioInput. No other operation is valid while input is open.
++  absl::Status BeginAudioInput(const Message& prototype);
++  absl::Status AppendAudioInput(absl::Span<const float> samples);
++  absl::Status FinishAudioInput();
++
++  // Teacher-forces complete canonical turns after a valid cached prefix, without
++  // generating a response. Caller must be quiescent. Failed handles are discarded.
++  // The previous cache remains authoritative until a later completed decode.
++  absl::Status PrefillHistorySuffix(std::vector<Message> messages);
++
+   // Cancels all ongoing asynchronous tasks with the given task_group_id.
+   // Args:
+   // - `task_group_id`: The id of the task group to cancel.
+@@ -852,6 +866,19 @@ class Conversation {
+   // Declare the session after model_data_processor_ and other members it
+   // depends on so that the session is destroyed before them. This is to avoid
+   // memory corruption and null-pointer deference issues.
++  struct StreamedAudio {
++    std::unique_ptr<litert::support::AudioPreprocessorMiniAudio> processor;
++    std::string rendered;
++    std::vector<InputData> suffix;
++    int samples = 0;
++    int window_frames = 0;
++    int feature_width = 0;
++    std::vector<float> features;
++    bool finished = false;
++  };
++  absl::Status PrefillAudioFeatures(InputAudio audio, bool flush);
++  absl::Status PrefillBufferedAudio(bool flush);
++  std::unique_ptr<StreamedAudio> streamed_audio_;
+   std::unique_ptr<Engine::Session> session_;
+ 
+   // The index of the message you have to rewind to in order to remove channel
+diff --git a/runtime/executor/audio/audio_executor_utils.cc b/runtime/executor/audio/audio_executor_utils.cc
+index e54401c..b61337e 100644
+--- a/runtime/executor/audio/audio_executor_utils.cc
++++ b/runtime/executor/audio/audio_executor_utils.cc
+@@ -94,6 +94,8 @@ GetAudioExecutorPropertiesFromModelResources(ModelResources& model_resources) {
+     input_sequence_length = dims[dims.size() - 2];
+   }
+ 
++  properties.input_frame_count = input_sequence_length;
++
+   int output_sequence_length;
+   if (has_adapter) {
+     LITERT_ASSIGN_OR_RETURN(
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index 2a59afd..f406732 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -18,6 +18,7 @@
+ #include <atomic>
+ #include <cstdint>
+ #include <cstring>
++#include <cstdlib>
+ #include <functional>
+ #include <limits>
+ #include <memory>
+@@ -2328,6 +2329,12 @@ absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
+                                               prefill_signature_map_,
+                                               ids.size(), remaining_capacity,
+                                               /*use_greedy_chunking=*/is_cpu));
++  // Qualification-only switch: exercise the one-token graph without sampling.
++  // The regular prefill path still owns pending-token bookkeeping and KV writes.
++  if (std::getenv("CALL_GEMMA_QUALIFY_SINGLE_TOKEN_PREFILL") != nullptr &&
++      ids.size() == 1 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
++    work_groups = {{std::string(kDecodeSignatureRunner), 1}};
++  }
+   for (int i = 0; i < work_groups.size(); ++i) {
+     const auto& prefill_signature = work_groups[i].first;
+     int prefill_length = work_groups[i].second;
+diff --git a/support/preprocessor/audio_preprocessor_miniaudio.cc b/support/preprocessor/audio_preprocessor_miniaudio.cc
+index c73b965..697919a 100644
+--- a/support/preprocessor/audio_preprocessor_miniaudio.cc
++++ b/support/preprocessor/audio_preprocessor_miniaudio.cc
+@@ -143,6 +143,9 @@ AudioPreprocessorMiniAudio::Create(const AudioPreprocessorConfig& config) {
+ // 4. Create a tensor buffer for the log mel spectrograms.
+ absl::StatusOr<InputAudio> AudioPreprocessorMiniAudio::Preprocess(
+     const InputAudio& input_audio) {
++  if (stream_flushed_) {
++    return absl::FailedPreconditionError("Reset is required after audio flush.");
++  }
+   if (input_audio.IsTensorBuffer()) {
+     LITERT_ASSIGN_OR_RETURN(auto processed_audio_tensor,
+                      input_audio.GetPreprocessedAudioTensor());
+@@ -215,4 +218,15 @@ absl::StatusOr<InputAudio> AudioPreprocessorMiniAudio::Preprocess(
+   }
+ }
+ 
++absl::StatusOr<InputAudio> AudioPreprocessorMiniAudio::Flush() {
++  if (stream_flushed_ || !config_.BufferLastFrame()) {
++    return absl::FailedPreconditionError("Flush requires buffered preprocessing.");
++  }
++  config_.SetBufferLastFrame(false);
++  auto result = Preprocess(InputAudio(std::vector<float>()));
++  config_.SetBufferLastFrame(true);
++  stream_flushed_ = true;
++  return result;
++}
++
+ }  // namespace litert::support
+diff --git a/support/preprocessor/audio_preprocessor_miniaudio.h b/support/preprocessor/audio_preprocessor_miniaudio.h
+index f6c77c5..d1274fb 100644
+--- a/support/preprocessor/audio_preprocessor_miniaudio.h
++++ b/support/preprocessor/audio_preprocessor_miniaudio.h
+@@ -66,8 +66,14 @@ class AudioPreprocessorMiniAudio : public AudioPreprocessor {
+   //   with shape (1, num_frames, num_mel_bins).
+   absl::StatusOr<InputAudio> Preprocess(const InputAudio& input_audio) override;
+ 
++  // Completes the buffered final frame exactly once at end of input. Streaming
++  // callers must create the preprocessor with BufferLastFrame enabled and must
++  // not append another utterance without Reset().
++  absl::StatusOr<InputAudio> Flush();
++
+   // Resets the preprocessor to its initial state.
+   void Reset() override {
++    stream_flushed_ = false;
+     input_queue_.clear();
+     if (config_.GetSemicausalPadding()) {
+       samples_to_next_step_ = config_.GetFrameLength() - config_.GetHopLength();
+@@ -82,7 +88,8 @@ class AudioPreprocessorMiniAudio : public AudioPreprocessor {
+       : config_(other.config_),
+         mel_filterbank_(nullptr),
+         input_queue_(other.input_queue_),
+-        samples_to_next_step_(other.samples_to_next_step_) {
++        samples_to_next_step_(other.samples_to_next_step_),
++        stream_flushed_(other.stream_flushed_) {
+     mel_filterbank_ = std::make_unique<MelFilterbank>();
+     auto status = mel_filterbank_->Initialize(
+         other.config_.GetFftBins(), other.config_.GetSampleRateHz(),
+@@ -107,6 +114,7 @@ class AudioPreprocessorMiniAudio : public AudioPreprocessor {
+     }
+     input_queue_ = other.input_queue_;
+     samples_to_next_step_ = other.samples_to_next_step_;
++    stream_flushed_ = other.stream_flushed_;
+     return *this;
+   }
+ 
+@@ -132,6 +140,7 @@ class AudioPreprocessorMiniAudio : public AudioPreprocessor {
+   std::unique_ptr<MelFilterbank> mel_filterbank_;
+   std::vector<float> input_queue_;
+   int samples_to_next_step_;
++  bool stream_flushed_ = false;
+ };
+ 
+ }  // namespace litert::support
+diff --git a/support/preprocessor/audio_preprocessor_miniaudio_test.cc b/support/preprocessor/audio_preprocessor_miniaudio_test.cc
+index 9258a02..5935d56 100644
+--- a/support/preprocessor/audio_preprocessor_miniaudio_test.cc
++++ b/support/preprocessor/audio_preprocessor_miniaudio_test.cc
+@@ -757,5 +757,48 @@ TEST(AudioPreprocessorMiniAudioTest, InvalidFrameLength) {
+ #endif  // !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) &&
+         // !defined(__NT__) && !defined(_WIN64)
+ 
++// Stream chunk boundaries must not inject the offline preprocessor's zero
++// padding. Compare every feature value, including the flushed final frame.
++TEST(AudioPreprocessorMiniAudioTest, Gemma4StreamingMatchesWholeAudio) {
++  for (bool skip_mel : {false, true}) {
++    for (int length : {16000, 16327, 32000}) {
++      for (int chunk : {512, 640, 7680}) {
++        auto config = AudioPreprocessorConfig::CreateDefaultGemma4Config(skip_mel);
++        ASSERT_OK_AND_ASSIGN(auto whole, AudioPreprocessorMiniAudio::Create(config));
++        config.SetBufferLastFrame(true);
++        ASSERT_OK_AND_ASSIGN(auto stream, AudioPreprocessorMiniAudio::Create(config));
++        std::vector<float> pcm(length);
++        for (int i = 0; i < length; ++i) pcm[i] = ((i * 37) % 997 - 498) / 997.0f;
++        ASSERT_OK_AND_ASSIGN(auto expected_audio, whole->Preprocess(InputAudio(pcm)));
++        ASSERT_OK_AND_ASSIGN(auto expected_tensor, expected_audio.GetPreprocessedAudioTensor());
++        ASSERT_OK_AND_ASSIGN(auto expected, GetDataAsVector<float>(*expected_tensor));
++        std::vector<float> actual;
++        auto append = [&](absl::StatusOr<InputAudio> audio) {
++          // A 640-sample PCM graph can legitimately have no complete frame yet.
++          if (!audio.ok()) {
++            EXPECT_TRUE(skip_mel && audio.status().message() == "Not enough samples to form any frame.")
++                << audio.status();
++            return;
++          }
++          ASSERT_OK_AND_ASSIGN(auto tensor, audio->GetPreprocessedAudioTensor());
++          ASSERT_OK_AND_ASSIGN(auto values, GetDataAsVector<float>(*tensor));
++          actual.insert(actual.end(), values.begin(), values.end());
++        };
++        for (int begin = 0; begin < length; begin += chunk) {
++          std::vector<float> part(pcm.begin() + begin,
++                                  pcm.begin() + std::min(length, begin + chunk));
++          append(stream->Preprocess(InputAudio(part)));
++        }
++        append(stream->Flush());
++        EXPECT_FALSE(stream->Flush().ok());
++        EXPECT_FALSE(stream->Preprocess(InputAudio(pcm)).ok());
++        stream->Reset();
++        EXPECT_TRUE(stream->Preprocess(InputAudio(pcm)).ok());
++        EXPECT_EQ(actual, expected) << "skip_mel=" << skip_mel << " length=" << length << " chunk=" << chunk;
++      }
++    }
++  }
++}
++
+ }  // namespace
+ }  // namespace litert::support
+diff --git a/support/util/io_types.h b/support/util/io_types.h
+index cd524fa..6129c6f 100644
+--- a/support/util/io_types.h
++++ b/support/util/io_types.h
+@@ -312,6 +312,8 @@ inline std::ostream& operator<<(std::ostream& os,
+ // type (static or streaming) and the model parameters (chunk size, overlap
+ // size).
+ struct AudioExecutorProperties {
++  // Natural encoder input window in frontend frames, including static encoders.
++  int input_frame_count = 0;
+   // Whether the audio model is a streaming model.
+   bool is_streaming_model = false;
+ 

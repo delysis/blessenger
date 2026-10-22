@@ -1,0 +1,49 @@
+{
+  "patch": "0005-int8-metal-kv-checkpoint.patch",
+  "sha256": "89a22433c7a3131f1abb8c77853065ae18495b49bb4e452c21a00bc434c0e38b",
+  "prerequisites": [
+    {
+      "file": "0001-litert-lock-failure.patch",
+      "sha256": "c48c720229c84faa00ff41f69c9687020d0706985acae7f944b49d98238f7f3f"
+    },
+    {
+      "file": "0002-litert-host-staging-api.patch",
+      "sha256": "d06914e54351dbf8cd66fd590c4199b4c2c2806f1ace392b9c114604fa2f37cf"
+    },
+    {
+      "file": "0003-litert-host-staging-providers.patch",
+      "sha256": "021e0ce703c4559e5a2308bdb0eba40c181733211a165c91532756ef0d219754"
+    },
+    {
+      "file": "0004-gemma-metal-kv-checkpoint.patch",
+      "sha256": "3b8e369cbaa0b6687720898ae3c79c9db607c2d140bd79793d7aefa393acbdd3"
+    }
+  ],
+  "files": [
+    {
+      "path": "ml_drift_delegate/delegate/buffer_handler_metal.mm",
+      "before_sha256": "b68d5a5ae9796de7904d8b5dcd1115795e364314cb6f308b926e51fc96d24b0b",
+      "after_sha256": "5a56dfb789cf6828c17ca00cc3d0899dda6534ef450d0e1129aee2eb0db5c8d9",
+      "before_blob_sha1": "80922d6f201a6718f3f5405583fc3f046641abce",
+      "after_blob_sha1": "b5de2867a015ed13e285da84219bc3f3d3272a02"
+    },
+    {
+      "path": "ml_drift_delegate/delegate/buffer_handler_metal_test.mm",
+      "before_sha256": "ffd556dc67765f3d5e9186ae8ffc8350f7529f389b552ab071d7b07c877f2033",
+      "after_sha256": "59ef473c25154c8a198ac51ba3a6251048d0742d4662a1ff3fc5c0f5c1fc0baf",
+      "before_blob_sha1": "910204a0f612036fe838962a75dbba77c6f6b1b5",
+      "after_blob_sha1": "da3ce6c7eb9c8f69e3f1d44c52b0d1f6a2a55a5b"
+    }
+  ],
+  "validation": {
+    "sequential_apply_and_whitespace": "PASS",
+    "exact_assembled_source_files": 91,
+    "independent_source_review": "PASS: litert_buffers reviewed production predicates, both INT8 XCTest methods, and full-bit-pattern FP16 change",
+    "native_metal_xctest": "NOT_RUN: no Apple SDK, Metal device, or XCTest runner in this environment"
+  },
+  "xctest_methods": [
+    "testCheckpointAllocatedInt8KvBuffers",
+    "testCheckpointRejectsInvalidInt8Buffers"
+  ],
+  "fp16_test_change": "testCheckpointAllocatedGemmaKvBuffers now covers all65536 uint16 bit patterns, including NaNs/Inf/subnormals/signedzero"
+}

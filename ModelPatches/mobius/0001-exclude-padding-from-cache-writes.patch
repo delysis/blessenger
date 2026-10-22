@@ -1,0 +1,76 @@
+--- a/models/tts/pocket_tts/coreml/convert_models/traceable/traceable_cond_prefill_ane.py
++++ b/models/tts/pocket_tts/coreml/convert_models/traceable/traceable_cond_prefill_ane.py
+@@ -7,20 +7,10 @@
+ 
+ 1. **Rank-4 cache I/O.** `cache{i} [2,1,L,16,64]` split into
+    `k_cache{i}` / `v_cache{i}` `[1,L,16,64]`; same slot layout.
+-2. **Scatter-free block write.** The T_max-token scatter (with the
+-   Trial 17 dump-slot redirect for padded tokens) becomes a `[T,L]`
+-   one-hot assignment matrix applied as a matmul:
+-       M[t,l]   = (write_idx[t] == l)            # exactly one 1 per row
+-       written  = M^T @ k_flat                   # [L, H*D]
+-       covered  = (sum_t M[t,l]) > 0             # [L]
+-       new_k    = k_cache*(1-covered) + written
+-   For every real slot exactly one M entry is 1, so `written` is a
+-   single-term sum — bit-identical to scatter. Padded tokens all map to
+-   the dump slot (L-1), where `written` ACCUMULATES instead of taking
+-   the last write; that slot is excluded by the attention mask here and
+-   only ever read by flowlm after being legitimately overwritten (its
+-   write at pos==L-1 happens in the same step that first unmasks it),
+-   so the difference is unobservable.
++2. **Scatter-free block write.** Only real tokens have a one-hot assignment
++   row. Padded rows are all zero, so they cannot modify any cache position.
++   The assignment matrix is applied to K/V with a matmul; existing cache
++   positions are replaced only where a valid token writes.
+ 3. **Rank-4 RoPE.** B=1 folds away: pairs viewed as `[T, H, D/2, 2]`.
+ 4. **Additive attention mask** instead of `masked_fill(-inf)`.
+ 5. **No cache NaN scrub** — the Swift host zero-fills caches
+@@ -117,7 +107,7 @@
+ 
+         Returns (rotr, roti, assign, covered, mask_bias):
+             rotr/roti  [T, 1, 32]  RoPE rotation at positions pos..pos+T-1
+-            assign     [T, L]      one-hot write rows (dump-slot redirect)
++            assign     [T, L]      one-hot real-token writes; zero padded rows
+             covered    [L]         1.0 where any token writes
+             mask_bias  [T, L]      0 attendable / -1e4 masked (additive)
+         """
+@@ -131,13 +121,12 @@
+         rotr = torch.cos(angles)
+         roti = torch.sin(angles)
+ 
+-        # Write indices with the Trial 17 dump-slot redirect for padding.
+-        write_idx = ts - torch.floor(ts / L_float) * L_float  # mod L
+-        token_valid = (self.token_indices < valid_f.view(1)).to(dtype)  # [T]
+-        dump = float(L - 1)
+-        write_idx = write_idx * token_valid + dump * (1.0 - token_valid)
+-
+-        assign = (write_idx.view(T, 1) == self.slot_indices.view(1, L)).to(dtype)  # [T, L]
++        # Padded rows have no write destination. Never accumulate them in a
++        # masked cache slot: finite attention masks do not isolate large values.
++        write_idx = ts - torch.floor(ts / L_float) * L_float
++        token_valid = (self.token_indices < valid_f.view(1)).to(dtype)
++        assign = (write_idx.view(T, 1) == self.slot_indices.view(1, L)).to(dtype)
++        assign = assign * token_valid.view(T, 1)
+         covered = torch.clamp(assign.sum(dim=0), max=1.0)  # [L]
+ 
+         # valid: slot < pos + valid_len (true end, excludes padding + dump);
+@@ -287,8 +276,8 @@
+ 
+     Caches start ZERO-FILLED (the Swift host contract), N=141 real tokens
+     padded to T_max=256 with garbage. Compares each layer's K/V cache on
+-    [0, N) plus the returned positions. The dump slot (L-1) is excluded by
+-    design (accumulate vs last-write; unobservable through the mask).
++    [0, N) plus the returned positions. Every unused slot in the corrected
++    output must remain zero, including the former dump slot.
+     """
+     print("Loading PocketTTS model...")
+     from pocket_tts import TTSModel
+@@ -325,6 +314,8 @@
+     for li in range(nl):
+         ref_cache, ref_pos = ref[2 * li], ref[2 * li + 1]
+         nk, nv, npos = got[3 * li], got[3 * li + 1], got[3 * li + 2]
++        assert torch.count_nonzero(nk[:, N:]) == 0, "Padding changed unused K cache"
++        assert torch.count_nonzero(nv[:, N:]) == 0, "Padding changed unused V cache"
+         d_k = (ref_cache[0][:, :N] - nk[:, :N]).abs().max().item()
+         d_v = (ref_cache[1][:, :N] - nv[:, :N]).abs().max().item()
+         d_p = (ref_pos - npos).abs().max().item()

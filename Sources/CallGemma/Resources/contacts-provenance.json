@@ -1,0 +1,6 @@
+{
+  "source": "mom/crates/mom-llama-runtime/assets/therapy_consult_personas.yaml",
+  "source_sha256": "09557b34bc9c85108ab7f901ca419fa50eb60283fb79519b6eeecccf8213ea64",
+  "prompts": "Verbatim decoded system_prompt fields; no rewriting",
+  "count": 14
+}

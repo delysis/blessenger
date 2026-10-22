@@ -1,0 +1,149 @@
+{
+  "scope": "Validation only; held-out test not scored; not acoustic or streaming acceptance",
+  "seconds": 1.3806299170246348,
+  "trials": [
+    {
+      "features": "flatten",
+      "classifier": "linear",
+      "regularization": 0.001,
+      "wrong_activations": 0,
+      "correct_detections": 30,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0,
+      "margin": 0.2
+    },
+    {
+      "features": "flatten",
+      "classifier": "linear",
+      "regularization": 0.01,
+      "wrong_activations": 0,
+      "correct_detections": 29,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.7,
+      "margin": 0
+    },
+    {
+      "features": "flatten",
+      "classifier": "linear",
+      "regularization": 0.1,
+      "wrong_activations": 0,
+      "correct_detections": 30,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.9,
+      "margin": 0
+    },
+    {
+      "features": "flatten",
+      "classifier": "linear",
+      "regularization": 1,
+      "wrong_activations": 0,
+      "correct_detections": 33,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.95,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "linear",
+      "regularization": 0.001,
+      "wrong_activations": 0,
+      "correct_detections": 71,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.2,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "linear",
+      "regularization": 0.01,
+      "wrong_activations": 0,
+      "correct_detections": 69,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.5,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "linear",
+      "regularization": 0.1,
+      "wrong_activations": 0,
+      "correct_detections": 66,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.7,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "linear",
+      "regularization": 1,
+      "wrong_activations": 0,
+      "correct_detections": 47,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.95,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "mlp32",
+      "regularization": 0.01,
+      "wrong_activations": 0,
+      "correct_detections": 0,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 1.01,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "mlp32",
+      "regularization": 0.1,
+      "wrong_activations": 0,
+      "correct_detections": 0,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 1.01,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "mlp32",
+      "regularization": 1,
+      "wrong_activations": 0,
+      "correct_detections": 53,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.95,
+      "margin": 0
+    },
+    {
+      "features": "pool",
+      "classifier": "mlp32",
+      "regularization": 10,
+      "wrong_activations": 0,
+      "correct_detections": 62,
+      "positive_clips": 112,
+      "negative_clips": 21,
+      "threshold": 0.8,
+      "margin": 0
+    }
+  ],
+  "chosen": {
+    "features": "pool",
+    "classifier": "linear",
+    "regularization": 0.001,
+    "wrong_activations": 0,
+    "correct_detections": 71,
+    "positive_clips": 112,
+    "negative_clips": 21,
+    "threshold": 0.2,
+    "margin": 0
+  }
+}

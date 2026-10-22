@@ -1,0 +1,735 @@
+diff --git a/runtime/executor/BUILD b/runtime/executor/BUILD
+index 35f24760e554c08c380e65b3c1ac7793294794b3..d1561e7bba967c74b44bc70f68af81b294c02da9 100644
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -692,8 +692,42 @@ cc_library(
+     deps = [
+         "@com_google_absl//absl/log:absl_check",
+         "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:statusor",
++        "@com_google_absl//absl/strings",
++        "@com_google_absl//absl/types:span",
++    ],
++)
++
++cc_library(
++    name = "context_serialization",
++    srcs = ["context_serialization.cc"],
++    hdrs = ["context_serialization.h"],
++    deps = [
++        ":executor_settings_base",
++        ":llm_executor_processed_tokens",
++        ":llm_executor_settings",
++        "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:status_macros",
++        "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/strings",
++        "@com_google_absl//absl/strings:string_view",
+         "@com_google_absl//absl/types:span",
++        "@nlohmann_json//:json",
++    ],
++)
++
++cc_test(
++    name = "context_serialization_test",
++    srcs = ["context_serialization_test.cc"],
++    deps = [
++        ":context_serialization",
++        ":executor_settings_base",
++        ":llm_executor_processed_tokens",
++        ":llm_executor_settings",
++        "@com_google_googletest//:gtest_main",
++        "@com_google_absl//absl/status",
++        "@nlohmann_json//:json",
++        "//runtime/util:test_utils",
+     ],
+ )
+ 
+diff --git a/runtime/executor/CMakeLists.txt b/runtime/executor/CMakeLists.txt
+index 37964cfaf3f0adb14c456d140ace080b39f760e6..f0634a7cf4e4ebe0cf4b3b47a553804df81086a3 100644
+--- a/runtime/executor/CMakeLists.txt
++++ b/runtime/executor/CMakeLists.txt
+@@ -286,6 +286,29 @@ target_link_libraries(runtime_executor_llm_executor_processed_tokens
+     LITERTLM_DEPS
+ )
+ 
++# ==============================================================================
++# Context Serialization
++# ==============================================================================
++add_litertlm_library(runtime_executor_context_serialization STATIC
++  context_serialization.cc
++)
++add_library(LiteRTLM::Runtime::Executor::ContextSerialization
++  ALIAS runtime_executor_context_serialization)
++
++target_include_directories(runtime_executor_context_serialization
++  PUBLIC
++    ${LITERTLM_GENERATED_SRC_DIR}
++    ${LITERT_INCLUDE_DIR}
++    ${LITERTLM_INCLUDE_PATHS}
++)
++
++target_link_libraries(runtime_executor_context_serialization
++  PUBLIC
++    LiteRTLM::Runtime::Executor::LlmExecutorProcessedTokens
++    LiteRTLM::Runtime::Executor::LlmExecutorSettings
++    LITERTLM_DEPS
++)
++
+ # ==============================================================================
+ # LLM Executor Settings
+ # ==============================================================================
+diff --git a/runtime/executor/context_serialization.cc b/runtime/executor/context_serialization.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f21abfb1f8a158fb182f0f4cb8b166c132dcc35
+--- /dev/null
++++ b/runtime/executor/context_serialization.cc
+@@ -0,0 +1,278 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/context_serialization.h"
++
++#include <algorithm>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <memory>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/status_macros.h"  // from @com_google_absl
++#include "absl/strings/escaping.h"  // from @com_google_absl
++#include "absl/types/span.h"  // from @com_google_absl
++#include "runtime/executor/executor_settings_base.h"
++
++namespace litert::lm {
++namespace {
++
++using Json = nlohmann::json;
++
++absl::Status InvalidMetadata() {
++  return absl::InvalidArgumentError("Invalid serialized execution metadata.");
++}
++
++bool IsLittleEndian() {
++  const uint32_t one = 1;
++  return *reinterpret_cast<const uint8_t*>(&one) == 1;
++}
++
++Json ExecutionSettings(const LlmExecutorSettings& settings) {
++  const auto& advanced = settings.GetAdvancedSettings();
++  return {
++      {"backend", GetBackendString(settings.GetBackend())},
++      {"activation",
++       settings.GetActivationDataType().has_value()
++           ? Json(static_cast<int>(*settings.GetActivationDataType()))
++           : Json(nullptr)},
++      {"mixed_precision", settings.IsMixedPrecisionEnabled()},
++      {"max_tokens", settings.GetMaxNumTokens()},
++      {"lora_rank", settings.GetLoraRank()},
++      {"signatures", settings.GetSelectedSignatures()},
++      {"output_candidates", advanced ? advanced->num_output_candidates : 1},
++      {"speculative_decoding",
++       advanced && advanced->enable_speculative_decoding},
++  };
++}
++
++// Reject excessive nesting before constructing a JSON tree. Syntax and escapes
++// are subsequently checked by the JSON parser.
++bool HasBoundedDepth(absl::string_view text) {
++  bool quoted = false;
++  bool escaped = false;
++  int depth = 0;
++  for (char c : text) {
++    if (quoted) {
++      if (escaped) {
++        escaped = false;
++      } else if (c == '\\') {
++        escaped = true;
++      } else if (c == '"') {
++        quoted = false;
++      }
++    } else if (c == '"') {
++      quoted = true;
++    } else if (c == '{' || c == '[') {
++      if (++depth > 32) return false;
++    } else if (c == '}' || c == ']') {
++      if (--depth < 0) return false;
++    }
++  }
++  return depth == 0 && !quoted;
++}
++
++std::string EncodeEmbedding(absl::Span<const float> values) {
++  static_assert(sizeof(float) == 4 && std::numeric_limits<float>::is_iec559);
++  return absl::Base64Escape(absl::string_view(
++      reinterpret_cast<const char*>(values.data()), values.size() * sizeof(float)));
++}
++
++absl::StatusOr<std::string> ReadContextBytes(const Json& value) {
++  if (!value.is_string()) return InvalidMetadata();
++  const auto& encoded = value.get_ref<const std::string&>();
++  std::string result;
++  if (encoded.size() > kMaxContextMetadataBytes ||
++      !absl::Base64Unescape(encoded, &result)) {
++    return InvalidMetadata();
++  }
++  return result;
++}
++
++absl::StatusOr<std::vector<float>> DecodeEmbedding(const Json& value) {
++  ABSL_ASSIGN_OR_RETURN(std::string bytes, ReadContextBytes(value));
++  if (bytes.size() % sizeof(float) != 0) return InvalidMetadata();
++  std::vector<float> result(bytes.size() / sizeof(float));
++  if (!bytes.empty()) std::memcpy(result.data(), bytes.data(), bytes.size());
++  return result;
++}
++
++}  // namespace
++
++absl::StatusOr<int> ReadContextInteger(const Json& value) {
++  if (!value.is_number_integer()) return InvalidMetadata();
++  if (value.is_number_unsigned()) {
++    const uint64_t number = value.get<uint64_t>();
++    if (number > std::numeric_limits<int>::max()) return InvalidMetadata();
++    return static_cast<int>(number);
++  }
++  const int64_t number = value.get<int64_t>();
++  if (number < std::numeric_limits<int>::min() ||
++      number > std::numeric_limits<int>::max()) {
++    return InvalidMetadata();
++  }
++  return static_cast<int>(number);
++}
++
++absl::StatusOr<std::string> SerializeContextMetadata(
++    const LlmExecutorSettings& settings, const ProcessedTokens& tokens,
++    int current_step, bool ran_decode, Json backend) {
++  if (!backend.is_object()) return InvalidMetadata();
++  auto rows = tokens.GetCopyOfTokens();
++  auto pending = tokens.GetNextUnprocessedToken();
++  Json pending_json = Json::array();
++  for (size_t i = 0; i < pending.token.size(); ++i) {
++    if (i >= rows.size() || rows[i].empty() || pending.token[i] == nullptr ||
++        rows[i].back() != pending.token[i]->id()) {
++      return absl::InternalError("Inconsistent pending input tokens.");
++    }
++    rows[i].pop_back();
++    pending_json.push_back(
++        {{"id", pending.token[i]->id()},
++         {"embedding", EncodeEmbedding(pending.token[i]->embedding())},
++         {"per_layer_embedding",
++          EncodeEmbedding(pending.token[i]->per_layer_embedding())}});
++  }
++  Json metadata = {
++      {"version", 1},
++      {"little_endian", IsLittleEndian()},
++      {"settings", ExecutionSettings(settings)},
++      {"current_step", current_step},
++      {"ran_decode", ran_decode},
++      {"tokens", std::move(rows)},
++      {"pending", std::move(pending_json)},
++      {"backend", std::move(backend)},
++  };
++  std::string result = metadata.dump();
++  if (result.size() > kMaxContextMetadataBytes) {
++    return absl::ResourceExhaustedError("Execution metadata exceeds 16 MiB.");
++  }
++  return result;
++}
++
++absl::StatusOr<ContextMetadata> ParseContextMetadata(
++    absl::string_view serialized, const LlmExecutorSettings& settings) {
++  if (serialized.empty() || serialized.size() > kMaxContextMetadataBytes ||
++      !HasBoundedDepth(serialized)) {
++    return InvalidMetadata();
++  }
++  Json metadata = Json::parse(serialized.begin(), serialized.end(), nullptr, false);
++  if (!metadata.is_object() || metadata.size() != 8 ||
++      !metadata.contains("version") || !metadata.contains("little_endian") ||
++      !metadata.contains("settings") || !metadata.contains("current_step") ||
++      !metadata.contains("ran_decode") || !metadata.contains("tokens") ||
++      !metadata.contains("pending") || !metadata.contains("backend") ||
++      metadata.dump() != serialized) {
++    return InvalidMetadata();
++  }
++  ABSL_ASSIGN_OR_RETURN(int version, ReadContextInteger(metadata["version"]));
++  if (version != 1 ||
++      metadata["little_endian"] != IsLittleEndian() ||
++      metadata["settings"].dump() != ExecutionSettings(settings).dump()) {
++    return absl::FailedPreconditionError("Incompatible execution metadata.");
++  }
++  ABSL_ASSIGN_OR_RETURN(int step, ReadContextInteger(metadata["current_step"]));
++  if (step < 0 || static_cast<uint32_t>(step) > settings.GetMaxNumTokens() ||
++      !metadata["ran_decode"].is_boolean() ||
++      !metadata["backend"].is_object()) {
++    return InvalidMetadata();
++  }
++  const Json& rows_json = metadata["tokens"];
++  const Json& pending_json = metadata["pending"];
++  const int max_candidates = std::max(
++      settings.GetAdvancedSettings()
++          ? settings.GetAdvancedSettings()->num_output_candidates
++          : 1,
++      1);
++  if (!rows_json.is_array() || rows_json.empty() ||
++      rows_json.size() > static_cast<size_t>(max_candidates) ||
++      !pending_json.is_array() ||
++      (!pending_json.empty() && pending_json.size() != rows_json.size())) {
++    return InvalidMetadata();
++  }
++  std::vector<std::vector<int>> rows;
++  rows.reserve(rows_json.size());
++  for (const Json& row_json : rows_json) {
++    if (!row_json.is_array() ||
++        row_json.size() > static_cast<uint64_t>(settings.GetMaxNumTokens()) + 1 ||
++        (!rows.empty() && row_json.size() != rows.front().size())) {
++      return InvalidMetadata();
++    }
++    std::vector<int> row;
++    row.reserve(row_json.size());
++    for (const Json& value : row_json) {
++      ABSL_ASSIGN_OR_RETURN(int id, ReadContextInteger(value));
++      row.push_back(id);
++    }
++    rows.push_back(std::move(row));
++  }
++  std::vector<std::shared_ptr<TokenData>> pending;
++  pending.reserve(pending_json.size());
++  for (const Json& value : pending_json) {
++    if (!value.is_object() || value.size() != 3 || !value.contains("id") ||
++        !value.contains("embedding") || !value.contains("per_layer_embedding")) {
++      return InvalidMetadata();
++    }
++    ABSL_ASSIGN_OR_RETURN(int id, ReadContextInteger(value["id"]));
++    ABSL_ASSIGN_OR_RETURN(auto embedding, DecodeEmbedding(value["embedding"]));
++    ABSL_ASSIGN_OR_RETURN(auto per_layer_embedding,
++                          DecodeEmbedding(value["per_layer_embedding"]));
++    pending.push_back(std::make_shared<TokenData>(
++        id, std::move(embedding), std::move(per_layer_embedding)));
++  }
++  ABSL_ASSIGN_OR_RETURN(
++      auto tokens,
++      ProcessedTokens::CreateFromTokens(std::move(rows), std::move(pending)));
++  // DecodeLogits advances the logical step before an externally sampled token
++  // is available. Normal Decode includes that token as pending input.
++  if (static_cast<int64_t>(step) >
++      static_cast<int64_t>(tokens.TokenCount()) +
++          (pending_json.empty() ? 1 : 0)) {
++    return InvalidMetadata();
++  }
++  return ContextMetadata{std::move(tokens), step,
++                         metadata["ran_decode"].get<bool>(), rows_json.size(),
++                         std::move(metadata["backend"])};
++}
++
++absl::Status ValidateContextTokens(const ProcessedTokens& tokens, int vocab_size,
++                                  size_t embedding_size,
++                                  size_t per_layer_embedding_size) {
++  if (vocab_size <= 0) return InvalidMetadata();
++  for (const auto& row : tokens.GetCopyOfTokens()) {
++    for (int id : row) {
++      // Negative IDs in processed history represent modality placeholders.
++      if (id >= vocab_size) return InvalidMetadata();
++    }
++  }
++  for (const auto& token : tokens.GetNextUnprocessedToken().token) {
++    if (token->id() < 0 &&
++        (token->id() != -1 || token->embedding().empty())) {
++      return InvalidMetadata();
++    }
++    if ((!token->embedding().empty() &&
++         token->embedding().size() != embedding_size) ||
++        (!token->per_layer_embedding().empty() &&
++         token->per_layer_embedding().size() != per_layer_embedding_size)) {
++      return InvalidMetadata();
++    }
++  }
++  return absl::OkStatus();
++}
++
++}  // namespace litert::lm
+diff --git a/runtime/executor/context_serialization.h b/runtime/executor/context_serialization.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..5dbe6f0c835257e50bc9ea3cf4c1237559c135b5
+--- /dev/null
++++ b/runtime/executor/context_serialization.h
+@@ -0,0 +1,59 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_CONTEXT_SERIALIZATION_H_
++#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_CONTEXT_SERIALIZATION_H_
++
++#include <cstddef>
++#include <string>
++
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "runtime/executor/llm_executor_processed_tokens.h"
++#include "runtime/executor/llm_executor_settings.h"
++
++namespace litert::lm {
++
++inline constexpr size_t kMaxContextMetadataBytes = 16 * 1024 * 1024;
++
++struct ContextMetadata {
++  ProcessedTokens tokens;
++  int current_step = 0;
++  bool ran_decode = false;
++  size_t candidate_count = 1;
++  nlohmann::json backend;
++};
++
++absl::StatusOr<std::string> SerializeContextMetadata(
++    const LlmExecutorSettings& settings, const ProcessedTokens& tokens,
++    int current_step, bool ran_decode, nlohmann::json backend);
++
++// Parses and validates all token bookkeeping before any live state is changed.
++// Model/build identity is checked by the caller; this checks execution settings.
++absl::StatusOr<ContextMetadata> ParseContextMetadata(
++    absl::string_view serialized, const LlmExecutorSettings& settings);
++
++// Checks token IDs before lookup/sampling and optional pending embeddings
++// against the target model's per-token input sizes (in floats).
++absl::Status ValidateContextTokens(const ProcessedTokens& tokens, int vocab_size,
++                                  size_t embedding_size,
++                                  size_t per_layer_embedding_size);
++
++absl::StatusOr<int> ReadContextInteger(const nlohmann::json& value);
++
++}  // namespace litert::lm
++
++#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_CONTEXT_SERIALIZATION_H_
+diff --git a/runtime/executor/context_serialization_test.cc b/runtime/executor/context_serialization_test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..25f251cdd4d238f0804025f5b421afc8369a4bb8
+--- /dev/null
++++ b/runtime/executor/context_serialization_test.cc
+@@ -0,0 +1,183 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/context_serialization.h"
++
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <memory>
++#include <optional>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include <gmock/gmock.h>
++#include <gtest/gtest.h>
++#include "absl/status/status.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "runtime/executor/executor_settings_base.h"
++#include "runtime/executor/llm_executor_processed_tokens.h"
++#include "runtime/executor/llm_executor_settings.h"
++#include "runtime/util/test_utils.h"  // IWYU pragma: keep
++
++namespace litert::lm {
++namespace {
++
++using ::testing::status::StatusIs;
++
++class ContextSerializationTest : public ::testing::Test {
++ protected:
++  void SetUp() override {
++    ASSERT_OK_AND_ASSIGN(auto assets, ModelAssets::Create("model.litertlm"));
++    ASSERT_OK_AND_ASSIGN(auto settings,
++                         LlmExecutorSettings::CreateDefault(std::move(assets)));
++    settings.SetMaxNumTokens(64);
++    AdvancedSettings advanced;
++    advanced.num_output_candidates = 2;
++    settings.SetAdvancedSettings(advanced);
++    settings_ = std::move(settings);
++  }
++
++  const LlmExecutorSettings& settings() const { return *settings_; }
++
++ private:
++  std::optional<LlmExecutorSettings> settings_;
++};
++
++TEST_F(ContextSerializationTest, PreservesCandidatesAndPendingEmbeddingBits) {
++  // Include negative modality IDs and float representations JSON numbers
++  // cannot preserve (negative zero and a NaN payload).
++  const std::vector<uint32_t> bits = {0x80000000, 0x7fc12345, 0x3f800000};
++  std::vector<float> embedding(bits.size());
++  std::memcpy(embedding.data(), bits.data(), bits.size() * sizeof(uint32_t));
++  ASSERT_OK_AND_ASSIGN(
++      auto tokens,
++      ProcessedTokens::CreateFromTokens(
++          {{-1, 11}, {-1, 21}},
++          {std::make_shared<TokenData>(42, embedding, std::vector<float>{2}),
++           std::make_shared<TokenData>(43, std::vector<float>{}, embedding)}));
++  const nlohmann::json backend = {{"kind", "test"}, {"phase", 3}};
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeContextMetadata(
++                                            settings(), tokens, 3, true, backend));
++  ASSERT_OK_AND_ASSIGN(auto restored,
++                       ParseContextMetadata(serialized, settings()));
++  EXPECT_EQ(restored.current_step, 3);
++  EXPECT_TRUE(restored.ran_decode);
++  EXPECT_EQ(restored.candidate_count, 2);
++  EXPECT_EQ(restored.backend, backend);
++  EXPECT_EQ(restored.tokens.GetCopyOfTokens(), tokens.GetCopyOfTokens());
++  const auto pending = restored.tokens.GetNextUnprocessedToken();
++  ASSERT_EQ(pending.token.size(), 2);
++  EXPECT_EQ(pending.step, 2);
++  ASSERT_EQ(pending.token[0]->embedding().size(), bits.size());
++  EXPECT_EQ(std::memcmp(pending.token[0]->embedding().data(), bits.data(),
++                        bits.size() * sizeof(uint32_t)), 0);
++  ASSERT_EQ(pending.token[1]->per_layer_embedding().size(), bits.size());
++  EXPECT_EQ(std::memcmp(pending.token[1]->per_layer_embedding().data(), bits.data(),
++                        bits.size() * sizeof(uint32_t)), 0);
++}
++
++TEST_F(ContextSerializationTest, PreservesAbsenceOfPendingInput) {
++  ProcessedTokens tokens;
++  tokens.AddProcessedTokens({1, 2});
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeContextMetadata(
++                                            settings(), tokens, 3, true,
++                                            nlohmann::json::object()));
++  ASSERT_OK_AND_ASSIGN(auto restored,
++                       ParseContextMetadata(serialized, settings()));
++  EXPECT_EQ(restored.tokens.GetCopyOfTokens(), tokens.GetCopyOfTokens());
++  EXPECT_TRUE(restored.tokens.GetNextUnprocessedToken().token.empty());
++}
++
++TEST_F(ContextSerializationTest, RejectsMalformedTokenBookkeeping) {
++  ProcessedTokens tokens;
++  tokens.AddProcessedTokens({1, 2});
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeContextMetadata(
++                                            settings(), tokens, 2, true,
++                                            nlohmann::json::object()));
++  const auto valid = nlohmann::json::parse(serialized);
++  const std::vector<nlohmann::json> invalid_steps = {
++      -1, 65, 4, 2.0, std::numeric_limits<uint64_t>::max(), nullptr};
++  for (const auto& value : invalid_steps) {
++    auto invalid = valid;
++    invalid["current_step"] = value;
++    EXPECT_THAT(ParseContextMetadata(invalid.dump(), settings()),
++                StatusIs(absl::StatusCode::kInvalidArgument));
++  }
++  for (const auto& rows : std::vector<nlohmann::json>{
++           nlohmann::json::array(), {{1, 2}, {3}}, {{1.5, 2}},
++           {{1, 2}, {1, 2}, {1, 2}}}) {
++    auto invalid = valid;
++    invalid["tokens"] = rows;
++    EXPECT_THAT(ParseContextMetadata(invalid.dump(), settings()),
++                StatusIs(absl::StatusCode::kInvalidArgument));
++  }
++  auto invalid = valid;
++  invalid["pending"] = {{{"id", 3}, {"embedding", "!"},
++                         {"per_layer_embedding", ""}}};
++  EXPECT_THAT(ParseContextMetadata(invalid.dump(), settings()),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++}
++
++TEST_F(ContextSerializationTest, RejectsChangedSettingsAndInvalidFraming) {
++  ProcessedTokens tokens;
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeContextMetadata(
++                                            settings(), tokens, 0, false,
++                                            nlohmann::json::object()));
++  auto changed = nlohmann::json::parse(serialized);
++  changed["settings"]["max_tokens"] = 32;
++  EXPECT_THAT(ParseContextMetadata(changed.dump(), settings()),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  changed = nlohmann::json::parse(serialized);
++  changed["version"] = 2;
++  EXPECT_THAT(ParseContextMetadata(changed.dump(), settings()),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  EXPECT_THAT(ParseContextMetadata(serialized.substr(1), settings()),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  EXPECT_THAT(ParseContextMetadata(std::string(33, '[') + std::string(33, ']'),
++                                  settings()),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  EXPECT_THAT(ParseContextMetadata(
++                  std::string(kMaxContextMetadataBytes + 1, ' '), settings()),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  // Duplicate keys must not acquire a meaning that differs between readers.
++  serialized.insert(1, "\"version\":1,");
++  EXPECT_THAT(ParseContextMetadata(serialized, settings()),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++}
++
++TEST_F(ContextSerializationTest, RejectsInvalidLookupAndEmbeddingInputs) {
++  ProcessedTokens tokens;
++  tokens.AddProcessedTokens({-1, 2});
++  ASSERT_OK(tokens.AddPendingInputToken({std::make_shared<TokenData>(3)}));
++  EXPECT_OK(ValidateContextTokens(tokens, 8, 4, 2));
++  EXPECT_THAT(ValidateContextTokens(tokens, 3, 4, 2),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  tokens.InvalidatePendingInputToken();
++  ASSERT_OK(tokens.AddPendingInputToken({std::make_shared<TokenData>(-1)}));
++  EXPECT_THAT(ValidateContextTokens(tokens, 8, 4, 2),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  tokens.InvalidatePendingInputToken();
++  ASSERT_OK(tokens.AddPendingInputToken({std::make_shared<TokenData>(
++      -1, std::vector<float>(4), std::vector<float>(2))}));
++  EXPECT_OK(ValidateContextTokens(tokens, 8, 4, 2));
++  EXPECT_THAT(ValidateContextTokens(tokens, 8, 3, 2),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  EXPECT_THAT(ValidateContextTokens(tokens, 8, 4, 1),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++}
++
++}  // namespace
++}  // namespace litert::lm
+diff --git a/runtime/executor/llm_executor_base.h b/runtime/executor/llm_executor_base.h
+index 7380a0047c1d85e17a3863e92f09a8b07fdcfcae..99c6fbc9476cea17d759a78c67bbccb86596c7be 100644
+--- a/runtime/executor/llm_executor_base.h
++++ b/runtime/executor/llm_executor_base.h
+@@ -34,6 +34,13 @@
+ 
+ namespace litert::lm {
+ 
++// The small execution metadata is kept separate from the potentially large
++// tensor payload so callers can persist both without another full tensor copy.
++struct SerializedLlmContext {
++  std::string metadata;
++  std::string state;
++};
++
+ // The LLM Executor serves as a lightweight and portable wrapper around various
+ // converted LLM model formats, i.e. LiteRT. It aims to provide a general,
+ // minimal-dependency interface for the users, abstracting the complexities of
+@@ -192,6 +199,25 @@ class LlmExecutorBase {
+   };
+ 
+   // ------------State/context management APIs------------:
++  // Snapshots an idle executor. This does not preserve the sampler's random
++  // sequence; loading uses the target session's sampling configuration.
++  // Built-in backends require speculative decoding to be disabled: a verifier
++  // may write recurrent/ring state past the visible turn's boundary.
++  virtual absl::StatusOr<SerializedLlmContext> SerializeContext() const {
++    return absl::UnimplementedError(absl::StrCat(
++        "SerializeContext not implemented for backend: ", ExecutorBackendName()));
++  }
++
++  // Loads into a fresh, idle context with the same model and execution
++  // configuration. The caller must check its immutable compatibility key first.
++  // A failure after resizing or transferring device buffers can leave the
++  // target partially updated; callers must discard a failed restore target.
++  virtual absl::Status LoadContext(absl::string_view metadata,
++                                  absl::string_view state) {
++    return absl::UnimplementedError(absl::StrCat(
++        "LoadContext not implemented for backend: ", ExecutorBackendName()));
++  }
++
+   // Creates a new context with the given configs.
+   virtual absl::StatusOr<std::unique_ptr<LlmContext>> CreateNewContext(
+       std::optional<uint32_t> lora_id, RuntimeConfig runtime_config) const {
+diff --git a/runtime/executor/llm_executor_processed_tokens.cc b/runtime/executor/llm_executor_processed_tokens.cc
+index 8958ab2524bdf88efbb6a72a875e1d1676a37332..ec361c53560b64b6ddac91fcebba93c3887fc289 100644
+--- a/runtime/executor/llm_executor_processed_tokens.cc
++++ b/runtime/executor/llm_executor_processed_tokens.cc
+@@ -15,6 +15,7 @@
+ #include "runtime/executor/llm_executor_processed_tokens.h"
+ 
+ #include <cstddef>
++#include <limits>
+ #include <memory>
+ #include <utility>
+ #include <vector>
+@@ -28,6 +29,34 @@ namespace litert::lm {
+ // tokens_ must have at least one element.
+ ProcessedTokens::ProcessedTokens() : tokens_(1) {}
+ 
++absl::StatusOr<ProcessedTokens> ProcessedTokens::CreateFromTokens(
++    std::vector<std::vector<int>> token_ids,
++    std::vector<std::shared_ptr<TokenData>> pending_tokens) {
++  if (token_ids.empty() ||
++      (!pending_tokens.empty() && pending_tokens.size() != token_ids.size())) {
++    return absl::InvalidArgumentError("Invalid processed token candidate count.");
++  }
++  const size_t count = token_ids.front().size();
++  if (count >= std::numeric_limits<int>::max()) {
++    return absl::InvalidArgumentError("Too many processed tokens.");
++  }
++  for (size_t i = 0; i < token_ids.size(); ++i) {
++    if (token_ids[i].size() != count ||
++        (!pending_tokens.empty() && pending_tokens[i] == nullptr)) {
++      return absl::InvalidArgumentError("Invalid processed token rows.");
++    }
++  }
++  ProcessedTokens result;
++  result.tokens_.clear();
++  result.tokens_.reserve(token_ids.size());
++  for (size_t i = 0; i < token_ids.size(); ++i) {
++    result.tokens_.push_back(
++        {std::move(token_ids[i]),
++         pending_tokens.empty() ? nullptr : std::move(pending_tokens[i])});
++  }
++  return result;
++}
++
+ int ProcessedTokens::TokenCount() const {
+   return GetStep() + (HasPendingInputToken() ? 1 : 0);
+ }
+diff --git a/runtime/executor/llm_executor_processed_tokens.h b/runtime/executor/llm_executor_processed_tokens.h
+index 0be420c26d2b4bce3c69775265d50dc1e57bbfb9..48d0c02bf86fb0faafaed3506f3151738c5307ac 100644
+--- a/runtime/executor/llm_executor_processed_tokens.h
++++ b/runtime/executor/llm_executor_processed_tokens.h
+@@ -21,6 +21,7 @@
+ #include <vector>
+ 
+ #include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
+ #include "absl/types/span.h"  // from @com_google_absl
+ 
+ namespace litert::lm {
+@@ -83,6 +84,12 @@ class ProcessedTokens {
+ 
+   ProcessedTokens();
+ 
++  // Reconstructs processed token rows and optional pending tokens without
++  // replaying history or allocating a TokenData for each historical token.
++  static absl::StatusOr<ProcessedTokens> CreateFromTokens(
++      std::vector<std::vector<int>> token_ids,
++      std::vector<std::shared_ptr<TokenData>> pending_tokens);
++
+   ProcessedTokens(const ProcessedTokens&) = default;
+   ProcessedTokens(ProcessedTokens&&) noexcept = default;
+   ProcessedTokens& operator=(const ProcessedTokens&) = default;

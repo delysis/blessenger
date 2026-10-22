@@ -1,0 +1,8 @@
+{
+  "CLiteRTLM.xcframework/ios-arm64-simulator/CLiteRTLM.framework/CLiteRTLM": "d25b044529b16f6ac7a60f0f88f065ef0bf8bdf20893a592dfa8d1def9cd89e3",
+  "CLiteRTLM.xcframework/ios-arm64/CLiteRTLM.framework/CLiteRTLM": "46912920133f87fdfda9db8a834b9df76ab69661dffd0bac25631a7f61e9422a",
+  "GemmaModelConstraintProvider.xcframework/ios-arm64-simulator/GemmaModelConstraintProvider.framework/GemmaModelConstraintProvider": "1901dc81a032697239445f3e58c05cb1c4378f0cda91f380f19b5514bf04ca14",
+  "GemmaModelConstraintProvider.xcframework/ios-arm64-simulator/GemmaModelConstraintProvider.framework/Info.plist": "38d734b6206cffb3c177003aa093f350327c078c9213c08fdefd80329e5e8b7e",
+  "GemmaModelConstraintProvider.xcframework/ios-arm64/GemmaModelConstraintProvider.framework/GemmaModelConstraintProvider": "e68c15ead82cce7073394036fc0d15dad5a1bc93645224fcabfd3629ac42e8b4",
+  "GemmaModelConstraintProvider.xcframework/ios-arm64/GemmaModelConstraintProvider.framework/Info.plist": "8769f1da6550ac4079a3236ae5c8602b4f42824e43eadcec462fbc31c69735ef"
+}

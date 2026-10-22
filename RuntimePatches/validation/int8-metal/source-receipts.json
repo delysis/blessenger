@@ -1,0 +1,116 @@
+{
+  "source": "Exact pinned GitHub connector sources retained in the previous Gemma Metal trace; Git blob IDs independently recomputed for this review.",
+  "files": [
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/buffer_handler_utils.cc",
+      "git_blob_sha1": "4b6e448efe3d1e2651315715114a885df3f1b957",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/buffer_handler_utils.cc",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/buffer_handler_utils.cc",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/buffer_handler_utils.cc",
+      "sha256": "a4c249eae3a0b2f9679c53fa64c758b407bbbda4845115afb7c6cc4cc1e9ba59",
+      "bytes": 7457
+    },
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/gpu_backend_metal_litert.mm",
+      "git_blob_sha1": "f9e1da385811890f5db014a9ccba70ca0138fcba",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/gpu_backend_metal_litert.mm",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/gpu_backend_metal_litert.mm",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/gpu_backend_metal_litert.mm",
+      "sha256": "b96858a13b2ecff27a75fd5a49d4749edfacdd0286ab88ff691d90d858c7a91b",
+      "bytes": 11986
+    },
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/gpu_backend_metal.mm",
+      "git_blob_sha1": "44c334fac24df3aa2d4462ab095c04d75c95f0b0",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/gpu_backend_metal.mm",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/gpu_backend_metal.mm",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/gpu_backend_metal.mm",
+      "sha256": "891f4da921da358a83626d9dbf16e16a279d7eee76f0b82a4981fe000a137ffa",
+      "bytes": 28898
+    },
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/delegate_kernel_litert.cc",
+      "git_blob_sha1": "02c7476394ef5b7deef07d277d4954ad09ad2c7f",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/delegate_kernel_litert.cc",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/delegate_kernel_litert.cc",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/delegate_kernel_litert.cc",
+      "sha256": "fefb34f3e691ab36610c0df216f4a10c70bc8faaa3e86e8d222697fe76aa9290",
+      "bytes": 32244
+    },
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/composite/add_values_to_cache_kernel.cc",
+      "git_blob_sha1": "eb2f38df505d66a01dc27795665685928d279773",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/composite/add_values_to_cache_kernel.cc",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/composite/add_values_to_cache_kernel.cc",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/composite/add_values_to_cache_kernel.cc",
+      "sha256": "7093b70b1ef46336b4bb2ffb9de2d4293b94af6d96b18fe675cf3ce378fd09e4",
+      "bytes": 9336
+    },
+    {
+      "repository": "google-ai-edge/LiteRT",
+      "revision": "9b8c7f77e7a29e6073e614a05e1e38be7b761229",
+      "upstream_path": "ml_drift_delegate/delegate/composite/add_values_to_cache_parser.cc",
+      "git_blob_sha1": "1c322f4f6345795085fe9eba89c689ef3f4ed187",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/LiteRT/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/composite/add_values_to_cache_parser.cc",
+      "github_url": "https://github.com/google-ai-edge/LiteRT/blob/9b8c7f77e7a29e6073e614a05e1e38be7b761229/ml_drift_delegate/delegate/composite/add_values_to_cache_parser.cc",
+      "prior_evidence_path": "../gemma4-metal/sources/LiteRT/ml_drift_delegate/delegate/composite/add_values_to_cache_parser.cc",
+      "sha256": "84f66ee46214017f52e49684840989546cc60ebd3d0c8a19d5ae56f37dc16e12",
+      "bytes": 6509
+    },
+    {
+      "repository": "google-ai-edge/ml-drift",
+      "revision": "1b18771f44c0be3d972847b31a80f6dc3d6964b5",
+      "upstream_path": "ml_drift/metal/metal_spatial_tensor.mm",
+      "git_blob_sha1": "670c75702ea1df1bd5feec0040e41759bd0997ec",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/ml-drift/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/metal/metal_spatial_tensor.mm",
+      "github_url": "https://github.com/google-ai-edge/ml-drift/blob/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/metal/metal_spatial_tensor.mm",
+      "prior_evidence_path": "../gemma4-metal/sources/ml-drift/ml_drift/metal/metal_spatial_tensor.mm",
+      "sha256": "2164ae7744cac32b70f671dcaff19b822502da0676b3baa7c3fc45cba36092d8",
+      "bytes": 19939
+    },
+    {
+      "repository": "google-ai-edge/ml-drift",
+      "revision": "1b18771f44c0be3d972847b31a80f6dc3d6964b5",
+      "upstream_path": "ml_drift/common/task/tensor_desc.cc",
+      "git_blob_sha1": "ccce83ba08642fdb09af642504ec0ab950c7e011",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/ml-drift/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/common/task/tensor_desc.cc",
+      "github_url": "https://github.com/google-ai-edge/ml-drift/blob/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/common/task/tensor_desc.cc",
+      "prior_evidence_path": "../gemma4-metal/sources/ml-drift/ml_drift/common/task/tensor_desc.cc",
+      "sha256": "41d899a41893d332dd8f72c4e144e2eae97e7dcf79ccd3dff2b8d1f37607e14e",
+      "bytes": 90169
+    },
+    {
+      "repository": "google-ai-edge/ml-drift",
+      "revision": "1b18771f44c0be3d972847b31a80f6dc3d6964b5",
+      "upstream_path": "ml_drift/common/task/tensor_desc.h",
+      "git_blob_sha1": "6fc14fe9b1a720fcb0e5052e8ea73a5ed4024613",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/ml-drift/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/common/task/tensor_desc.h",
+      "github_url": "https://github.com/google-ai-edge/ml-drift/blob/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/common/task/tensor_desc.h",
+      "prior_evidence_path": "../gemma4-metal/sources/ml-drift/ml_drift/common/task/tensor_desc.h",
+      "sha256": "7718feb741022be86115fea76e2280afb17a335412189fa6031791e7971cb3bf",
+      "bytes": 26275
+    },
+    {
+      "repository": "google-ai-edge/ml-drift",
+      "revision": "1b18771f44c0be3d972847b31a80f6dc3d6964b5",
+      "upstream_path": "ml_drift/metal/common.mm",
+      "git_blob_sha1": "1c10d86983f8c8bd9d0355e1c5d179868f30f8fe",
+      "sha256": "edb8056e3a86e753ca0b4d6d3943010db84e05ad20abb67c8c53c4f837850e13",
+      "raw_url": "https://raw.githubusercontent.com/google-ai-edge/ml-drift/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/metal/common.mm",
+      "github_url": "https://github.com/google-ai-edge/ml-drift/blob/1b18771f44c0be3d972847b31a80f6dc3d6964b5/ml_drift/metal/common.mm",
+      "prior_evidence_path": "../gemma4-metal/sources/ml-drift/ml_drift/metal/common.mm",
+      "bytes": 27983
+    }
+  ],
+  "native_metal_execution": "NOT_RUN"
+}

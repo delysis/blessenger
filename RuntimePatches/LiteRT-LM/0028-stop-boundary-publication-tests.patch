@@ -1,0 +1,98 @@
+--- a/runtime/core/tasks_test.cc
++++ b/runtime/core/tasks_test.cc
+@@ -2587,42 +2587,70 @@
+ class BatchedStopExecutor : public FakeLlmExecutor {
+  public:
+   explicit BatchedStopExecutor(std::vector<std::vector<int>> tokens)
+-      : FakeLlmExecutor(2560, {{2}}, tokens, /*batch_size=*/1) {}
++      : FakeLlmExecutor(2560, {{2}}, tokens, /*batch_size=*/1),
++        batch_length_(tokens.size()) {}
+   absl::StatusOr<std::vector<std::vector<int>>> Decode(
+       const ExecutorDecodeParams& params) override {
+     std::vector<int> batch;
+-    for (int i = 0; i < 4; ++i) {
++    for (int i = 0; i < batch_length_; ++i) {
+       ABSL_ASSIGN_OR_RETURN(auto token, FakeLlmExecutor::Decode(params));
+       batch.push_back(token.at(0).at(0));
+     }
+     return std::vector<std::vector<int>>{std::move(batch)};
+   }
++ private:
++  int batch_length_;
+ };
+ 
+ TEST_F(TasksTest, BatchedDecodePreservesTheCorrectStopBoundary) {
+-  for (bool rollback : {false, true}) {
+-    for (int stop_position = 0; stop_position < 4; ++stop_position) {
+-      SCOPED_TRACE(::testing::Message() << rollback << ":" << stop_position);
+-      std::vector<std::vector<int>> tokens = {{90}, {547}, {58}, {735}};
+-      tokens[stop_position] = {0};
+-      BatchedStopExecutor executor(std::move(tokens));
+-      std::optional<BenchmarkInfo> benchmark_info;
+-      ASSERT_OK_AND_ASSIGN(auto buffer, tokenizer_->TokenIdsToTensorBuffer({2}));
+-      ExecutorInputs inputs(ExecutorTextData(std::move(buffer)), std::nullopt,
+-                            std::nullopt);
+-      ASSERT_OK(Tasks::Prefill(executor, inputs, true, benchmark_info));
+-      StopTokenDetector detector(1);
+-      ASSERT_OK(detector.AddStopTokenSequence({0}));
+-      if (rollback) ASSERT_TRUE(detector.MarkForRollback(0));
+-      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback = nullptr;
+-      ASSERT_OK_AND_ASSIGN(auto response,
+-          Tasks::Decode(executor, *tokenizer_, detector, 1, benchmark_info,
+-              std::nullopt, RepetitionPenaltyConfig::Default(),
+-              NoRepeatNgramConfig::Default(), SuppressTokensConfig::Default(),
+-              nullptr, std::nullopt, callback, nullptr));
+-      EXPECT_EQ(response.GetTaskState(), TaskState::kDone);
+-      ASSERT_OK_AND_ASSIGN(int current_step, executor.GetCurrentStep());
+-      EXPECT_EQ(current_step, 1 + stop_position + (rollback ? 0 : 1));
++  for (int batch_length = 1; batch_length <= 5; ++batch_length) {
++    for (bool streaming : {false, true}) {
++      for (int stop_length : {1, 2}) {
++        for (bool rollback : {false, true}) {
++          if (rollback && stop_length != 1) continue;
++          for (int stop_position = stop_length - 1;
++               stop_position < batch_length; ++stop_position) {
++            SCOPED_TRACE(::testing::Message() << batch_length << ":"
++                << streaming << ":" << stop_length << ":" << rollback
++                << ":" << stop_position);
++            std::vector<std::vector<int>> tokens(batch_length, {90});
++            tokens[stop_position] = {0};
++            if (stop_length == 2) tokens[stop_position - 1] = {547};
++            BatchedStopExecutor executor(std::move(tokens));
++            std::optional<BenchmarkInfo> benchmark_info;
++            ASSERT_OK_AND_ASSIGN(auto buffer,
++                tokenizer_->TokenIdsToTensorBuffer({2}));
++            ExecutorInputs inputs(ExecutorTextData(std::move(buffer)),
++                                  std::nullopt, std::nullopt);
++            ASSERT_OK(Tasks::Prefill(executor, inputs, true, benchmark_info));
++            StopTokenDetector detector(1);
++            ASSERT_OK(detector.AddStopTokenSequence(stop_length == 1
++                ? std::vector<int>{0} : std::vector<int>{547, 0}));
++            if (rollback) ASSERT_TRUE(detector.MarkForRollback(0));
++            std::vector<int> published_tokens;
++            absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback = nullptr;
++            if (streaming) callback = [&](absl::StatusOr<Responses> response) {
++              ASSERT_OK(response);
++              for (const auto& ids : response->GetTokenIds())
++                published_tokens.insert(published_tokens.end(), ids.begin(), ids.end());
++            };
++            ASSERT_OK_AND_ASSIGN(auto response,
++                Tasks::Decode(executor, *tokenizer_, detector, 1, benchmark_info,
++                    std::nullopt, RepetitionPenaltyConfig::Default(),
++                    NoRepeatNgramConfig::Default(), SuppressTokensConfig::Default(),
++                    nullptr, std::nullopt, callback, nullptr));
++            EXPECT_EQ(response.GetTaskState(), TaskState::kDone);
++            if (!streaming) for (const auto& ids : response.GetTokenIds())
++              published_tokens.insert(published_tokens.end(), ids.begin(), ids.end());
++            // Neither stop-sequence tokens nor the accepted trailing batch
++            // may be published, even though ordinary stops remain in context.
++            EXPECT_EQ(published_tokens,
++                std::vector<int>(stop_position + 1 - stop_length, 90));
++            ASSERT_OK_AND_ASSIGN(int current_step, executor.GetCurrentStep());
++            EXPECT_EQ(current_step, 1 + stop_position + (rollback ? 0 : 1));
++          }
++        }
++      }
+     }
+   }
+ }

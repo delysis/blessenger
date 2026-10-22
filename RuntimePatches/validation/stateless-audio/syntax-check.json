@@ -1,0 +1,48 @@
+{
+  "results": [
+    {
+      "file": "runtime/executor/audio_litert_compiled_model_executor_test.cc",
+      "command": [
+        "/usr/bin/c++",
+        "-DLITERT_CC_RUNTIME_BUILTIN_NONE",
+        "-I/workspace/scratch/09e99beaae67/LiteRT-LM",
+        "-I/workspace/scratch/09e99beaae67/LiteRT-pinned",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/litert-source",
+        "-I/workspace/scratch/09e99beaae67/litert-abi-generated",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/json-3.12.0/include",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/abseil-cpp-20260526.0",
+        "-DNDEBUG",
+        "-std=c++20",
+        "-Inative-state-test-deps/googletest-1.17.0/googletest/include",
+        "-Inative-state-test-deps/googletest-1.17.0/googlemock/include",
+        "-fsyntax-only",
+        "LiteRT-LM/runtime/executor/audio_litert_compiled_model_executor_test.cc"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "In file included from LiteRT-LM/runtime/executor/audio_litert_compiled_model_executor_test.cc:15:\n/workspace/scratch/09e99beaae67/LiteRT-LM/runtime/executor/audio_litert_compiled_model_executor.h:31:10: fatal error: litert/cc/litert_compiled_model.h: No such file or directory\n   31 | #include \"litert/cc/litert_compiled_model.h\"  // from @litert\n      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncompilation terminated.\n"
+    },
+    {
+      "file": "runtime/framework/resource_management/resource_manager_test.cc",
+      "command": [
+        "/usr/bin/c++",
+        "-DLITERT_CC_RUNTIME_BUILTIN_NONE",
+        "-I/workspace/scratch/09e99beaae67/LiteRT-LM",
+        "-I/workspace/scratch/09e99beaae67/LiteRT-pinned",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/litert-source",
+        "-I/workspace/scratch/09e99beaae67/litert-abi-generated",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/json-3.12.0/include",
+        "-I/workspace/scratch/09e99beaae67/native-state-test-deps/abseil-cpp-20260526.0",
+        "-DNDEBUG",
+        "-std=c++20",
+        "-Inative-state-test-deps/googletest-1.17.0/googletest/include",
+        "-Inative-state-test-deps/googletest-1.17.0/googlemock/include",
+        "-fsyntax-only",
+        "LiteRT-LM/runtime/framework/resource_management/resource_manager_test.cc"
+      ],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "In file included from LiteRT-LM/runtime/framework/resource_management/resource_manager_test.cc:15:\n/workspace/scratch/09e99beaae67/LiteRT-LM/runtime/framework/resource_management/resource_manager.h:31:10: fatal error: runtime/components/model_resources.h: No such file or directory\n   31 | #include \"runtime/components/model_resources.h\"\n      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\ncompilation terminated.\n"
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+diff --git a/ml_drift_delegate/delegate/buffer_handler_metal.mm b/ml_drift_delegate/delegate/buffer_handler_metal.mm
+index 80922d6f201a6718f3f5405583fc3f046641abce..b5de2867a015ed13e285da84219bc3f3d3272a02 100644
+--- a/ml_drift_delegate/delegate/buffer_handler_metal.mm
++++ b/ml_drift_delegate/delegate/buffer_handler_metal.mm
+@@ -324,7 +324,9 @@
+     ::litert::ml_drift::ConvertDataToDescriptor(memory_info->host_memory, desc_with_data,
+                                                 memory_info->tensor_type.element_type);
+     id<MTLBuffer> buffer = gpu_tensor.GetBufferHandle();
+-    if (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBufferFp16 &&
++    if ((memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBufferFp16 ||
++         (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBuffer &&
++          memory_info->tensor_type.element_type == kLiteRtElementTypeInt8)) &&
+         buffer != nil && buffer.storageMode == MTLStorageModeShared) {
+       const auto& data = desc_with_data.GetData();
+       void* contents = [buffer contents];
+@@ -423,7 +425,9 @@
+     if ([buffer contents] == nullptr || memory_info->packed_bytes > buffer.length) {
+       return kLiteRtStatusErrorInvalidArgument;
+     }
+-  } else if (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBufferFp16) {
++  } else if (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBufferFp16 ||
++             (memory_info->buffer_type == kLiteRtTensorBufferTypeMetalBuffer &&
++              memory_info->tensor_type.element_type == kLiteRtElementTypeInt8)) {
+     auto& gpu_tensor = memory_info->metal_tensor;
+     id<MTLBuffer> buffer = gpu_tensor.GetBufferHandle();
+     if (buffer == nil) {
+diff --git a/ml_drift_delegate/delegate/buffer_handler_metal_test.mm b/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
+index 910204a0f612036fe838962a75dbba77c6f6b1b5..da3ce6c7eb9c8f69e3f1d44c52b0d1f6a2a55a5b 100644
+--- a/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
++++ b/ml_drift_delegate/delegate/buffer_handler_metal_test.mm
+@@ -437,10 +437,10 @@
+     XCTAssertEqual(sourceBuffer.length, bytes);
+     if (sourceBuffer == nil || sourceBuffer.length != bytes) return;
+ 
+-    // Vary finite FP16 bit patterns across positions, including channel slices.
++    // Cover every FP16 bit pattern, including signed zeros, subnormals and NaNs.
+     std::vector<uint16_t> pattern(bytes / sizeof(uint16_t));
+     for (size_t i = 0; i < pattern.size(); ++i) {
+-      pattern[i] = static_cast<uint16_t>(0x3000 | ((i ^ (i >> 10)) & 0x3ff));
++      pattern[i] = static_cast<uint16_t>(i * 40503U);
+     }
+     id<MTLBuffer> upload = [_device newBufferWithBytes:pattern.data()
+                                               length:bytes options:MTLResourceStorageModeShared];
+@@ -489,6 +489,174 @@
+     XCTAssertTrue(downloaded);
+     if (!downloaded) return;
+     XCTAssertEqual(std::memcmp(readback.contents, pattern.data(), bytes), 0);
++  }
++}
++
++- (void)testCheckpointAllocatedInt8KvBuffers {
++  if (!_device) return;
++
++  // E4B has two KV heads, 256/512 head widths, and INT8 external tensors.
++  // Test the app's minimum aligned context rather than the export's magic size.
++  const int32_t shapes[][4] = {
++      {1, 2, 2048, 256}, {1, 2, 256, 2048},
++      {1, 2, 2048, 512}, {1, 2, 512, 2048}};
++  using MetalMemory = std::unique_ptr<HwMemoryInfo, decltype(&LiteRtDestroyMetalMemory)>;
++  const auto gpuCopy = [&](id<MTLBuffer> source, id<MTLBuffer> destination) {
++    if (source == nil || destination == nil || source.length != destination.length) return false;
++    id<MTLCommandBuffer> command = [_commandQueue commandBuffer];
++    if (command == nil) return false;
++    id<MTLBlitCommandEncoder> encoder = [command blitCommandEncoder];
++    if (encoder == nil) return false;
++    [encoder copyFromBuffer:source sourceOffset:0 toBuffer:destination
++         destinationOffset:0 size:source.length];
++    [encoder endEncoding];
++    [command commit];
++    [command waitUntilCompleted];
++    return command.status == MTLCommandBufferStatusCompleted;
++  };
++  for (const auto& shape : shapes) {
++    LiteRtRankedTensorType tensorType = {};
++    tensorType.element_type = kLiteRtElementTypeInt8;
++    tensorType.layout.rank = 4;
++    tensorType.layout.has_strides = true;
++    tensorType.layout.strides[0] = 16;
++    size_t bytes = 1;
++    for (int i = 0; i < 4; ++i) {
++      tensorType.layout.dimensions[i] = shape[i];
++      bytes *= shape[i];
++    }
++    const auto allocate = [&] {
++      HwMemoryInfoPtr info = nullptr;
++      XCTAssertEqual(LiteRtCreateMetalMemory(
++                         (__bridge void*)_device, (__bridge void*)_commandQueue, &tensorType,
++                         kLiteRtTensorBufferTypeMetalBuffer, bytes, bytes, &info),
++                     kLiteRtStatusOk);
++      return MetalMemory(info, &LiteRtDestroyMetalMemory);
++    };
++    auto source = allocate();
++    XCTAssertTrue(source != nullptr);
++    if (!source) return;
++    id<MTLBuffer> sourceBuffer = (__bridge id<MTLBuffer>)source->raw_handle;
++    XCTAssertNotNil(sourceBuffer);
++    XCTAssertEqual(sourceBuffer.storageMode, MTLStorageModeShared);
++    XCTAssertEqual(sourceBuffer.length, bytes);
++    if (sourceBuffer == nil || sourceBuffer.length != bytes) return;
++    // Cover all 256 bit patterns, including INT8_MIN/-1/0/INT8_MAX, with
++    // different values across channel slices and token rows.
++    std::vector<uint8_t> pattern(bytes);
++    for (size_t i = 0; i < bytes; ++i) {
++      pattern[i] = static_cast<uint8_t>(i ^ (i >> 8) ^ (i >> 16));
++    }
++    id<MTLBuffer> upload = [_device newBufferWithBytes:pattern.data()
++                                              length:bytes options:MTLResourceStorageModeShared];
++    const bool uploaded = gpuCopy(upload, sourceBuffer);
++    XCTAssertTrue(uploaded);
++    if (!uploaded) return;
++    XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(source.get()), kLiteRtStatusOk);
++    void* hostMemory = nullptr;
++    auto status = LiteRtLockMetalMemory(source.get(), kLiteRtTensorBufferLockModeRead, &hostMemory);
++    XCTAssertEqual(status, kLiteRtStatusOk);
++    XCTAssertTrue(hostMemory != nullptr);
++    if (status != kLiteRtStatusOk || hostMemory == nullptr) return;
++    std::vector<uint8_t> checkpoint(bytes);
++    std::memcpy(checkpoint.data(), hostMemory, bytes);
++    XCTAssertEqual(LiteRtUnlockMetalMemory(source.get()), kLiteRtStatusOk);
++    XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(source.get()), kLiteRtStatusOk);
++    source.reset();
++
++    auto restored = allocate();
++    XCTAssertTrue(restored != nullptr);
++    if (!restored) return;
++    id<MTLBuffer> restoredBuffer = (__bridge id<MTLBuffer>)restored->raw_handle;
++    XCTAssertNotNil(restoredBuffer);
++    XCTAssertEqual(restoredBuffer.storageMode, MTLStorageModeShared);
++    XCTAssertEqual(restoredBuffer.length, bytes);
++    if (restoredBuffer == nil || restoredBuffer.length != bytes) return;
++    // A fresh alias with no device must still update Shared storage. The old
++    // unchecked upload allocated its staging buffer via that absent device.
++    HwMemoryInfoPtr aliasInfo = nullptr;
++    XCTAssertEqual(LiteRtImportMetalMemory(
++                       nullptr, (__bridge void*)_commandQueue, &tensorType,
++                       kLiteRtTensorBufferTypeMetalBuffer, (__bridge void*)restoredBuffer,
++                       bytes, bytes, &aliasInfo),
++                   kLiteRtStatusOk);
++    MetalMemory alias(aliasInfo, &LiteRtDestroyMetalMemory);
++    XCTAssertTrue(alias != nullptr);
++    if (!alias) return;
++    XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(alias.get()), kLiteRtStatusOk);
++    hostMemory = nullptr;
++    status = LiteRtLockMetalMemory(alias.get(), kLiteRtTensorBufferLockModeWrite, &hostMemory);
++    XCTAssertEqual(status, kLiteRtStatusOk);
++    XCTAssertTrue(hostMemory != nullptr);
++    if (status != kLiteRtStatusOk || hostMemory == nullptr) return;
++    std::memcpy(hostMemory, checkpoint.data(), bytes);
++    XCTAssertEqual(LiteRtUnlockMetalMemory(alias.get()), kLiteRtStatusOk);
++    XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(alias.get()), kLiteRtStatusOk);
++    id<MTLBuffer> readback =
++        [_device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
++    const bool downloaded = gpuCopy(restoredBuffer, readback);
++    XCTAssertTrue(downloaded);
++    if (!downloaded) return;
++    XCTAssertEqual(std::memcmp(readback.contents, pattern.data(), bytes), 0);
++  }
++}
++
++- (void)testCheckpointRejectsInvalidInt8Buffers {
++  if (!_device) return;
++
++  LiteRtRankedTensorType tensorType = {};
++  tensorType.element_type = kLiteRtElementTypeInt8;
++  tensorType.layout.rank = 2;
++  tensorType.layout.dimensions[0] = 1;
++  tensorType.layout.dimensions[1] = 8;
++  tensorType.layout.has_strides = true;
++  tensorType.layout.strides[0] = 16;
++  const size_t bytes = 8;
++  const struct {
++    MTLResourceOptions options;
++    size_t capacity;
++    LiteRtStatus expected;
++  } cases[] = {
++      {MTLResourceStorageModeShared, bytes / 2, kLiteRtStatusErrorInvalidArgument},
++      {MTLResourceStorageModePrivate, bytes, kLiteRtStatusErrorUnsupported},
++#if TARGET_OS_OSX
++      {MTLResourceStorageModeManaged, bytes, kLiteRtStatusErrorUnsupported},
++#endif
++  };
++  for (const auto& testCase : cases) {
++#if TARGET_OS_OSX
++    if (testCase.options == MTLResourceStorageModeManaged &&
++        [_device supportsFamily:MTLGPUFamilyApple1]) continue;
++#endif
++    id<MTLBuffer> buffer =
++        [_device newBufferWithLength:testCase.capacity options:testCase.options];
++    XCTAssertNotNil(buffer);
++    if (buffer == nil) return;
++    HwMemoryInfoPtr info = nullptr;
++    XCTAssertEqual(LiteRtImportMetalMemory(
++                       (__bridge void*)_device, (__bridge void*)_commandQueue, &tensorType,
++                       kLiteRtTensorBufferTypeMetalBuffer, (__bridge void*)buffer,
++                       bytes, bytes, &info),
++                   kLiteRtStatusOk);
++    std::unique_ptr<HwMemoryInfo, decltype(&LiteRtDestroyMetalMemory)> memory(
++        info, &LiteRtDestroyMetalMemory);
++    XCTAssertTrue(memory != nullptr);
++    if (!memory) return;
++    XCTAssertEqual(LiteRtReleaseMetalHostStagingMemory(memory.get()), testCase.expected);
++    if (testCase.options != MTLResourceStorageModeShared) continue;
++    // Even without preflight, an undersized destination must fail before copy.
++    std::memset(buffer.contents, 0x5a, testCase.capacity);
++    void* hostMemory = nullptr;
++    const auto status =
++        LiteRtLockMetalMemory(memory.get(), kLiteRtTensorBufferLockModeWrite, &hostMemory);
++    XCTAssertEqual(status, kLiteRtStatusOk);
++    XCTAssertTrue(hostMemory != nullptr);
++    if (status != kLiteRtStatusOk || hostMemory == nullptr) return;
++    std::memset(hostMemory, 0xa5, bytes);
++    XCTAssertEqual(LiteRtUnlockMetalMemory(memory.get()), kLiteRtStatusErrorInvalidArgument);
++    for (size_t i = 0; i < testCase.capacity; ++i) {
++      XCTAssertEqual(static_cast<const uint8_t*>(buffer.contents)[i], 0x5a);
++    }
+   }
+ }
+ 

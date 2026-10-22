@@ -1,0 +1,75 @@
+<!doctype html><meta charset="utf-8"><title>Blessenger cloud call retry diagnostic</title><button id="run">Run</button><label><input id="relay" type="checkbox">Relay</label><label><input id="speech" type="checkbox">Speech</label><pre id="result">Ready</pre><script type="module">
+import {CompanionRTC} from '/rtc.js';
+const result=document.querySelector('#result');
+const api=async(path,body)=>{const r=await fetch(path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||'HTTP '+r.status);return v;};
+const NativePeer=window.RTCPeerConnection;
+window.RTCPeerConnection=class extends NativePeer {constructor(config){super({...config,...(document.querySelector('#relay').checked?{iceTransportPolicy:'relay'}:{})});}};
+const show=value=>result.textContent=JSON.stringify(value,null,2);
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true;
+ const speechTest=document.querySelector('#speech').checked;
+ const receipt={scope:speechTest?'Two actual-app calls; synthetic non-AEC spoken input after greeting through Opus, muted render, reply and retry':'Two Cloudflare-signaled actual-app calls; synthetic silent input, muted render, intentional cancellation after first audio',browser:navigator.userAgent,relayOnly:document.querySelector('#relay').checked,rounds:[],errors:[]};show(receipt);
+ const context=new AudioContext();await context.resume();
+ const silent=context.createGain();silent.gain.value=0;
+ const oscillator=context.createOscillator(),destination=context.createMediaStreamDestination();oscillator.connect(silent).connect(destination);oscillator.start();
+ try{
+  const target=await api('/target');await context.audioWorklet.addModule('/call-audio.js');
+  const speech=speechTest?await context.decodeAudioData(await (await fetch('/speech.wav')).arrayBuffer()):null;
+  for(let round=0;round<2;round++){
+   const r={packets:0,renderedFrames:0,epochFrames:0,errors:[],requests:[]};receipt.rounds.push(r);show(receipt);
+   let call,rtc,timer,epoch,last=-1,ack=[],speechSource,lastAudio=0;const sizes=new Map();
+   const node=new AudioWorkletNode(context,'call-audio'),mute=context.createGain();mute.gain.value=0;node.connect(mute).connect(context.destination);
+   node.port.onmessage=({data})=>{if(data.epoch===epoch&&data.played!==undefined){ack.push(data.played);const count=sizes.get(data.played)||0;r.renderedFrames+=count;r.epochFrames+=count;lastAudio=performance.now();show(receipt);}};
+   try{
+    const start=performance.now();
+    const timedAPI=async(path,body)=>{const t=performance.now();try{return await api(path,body);}finally{r.requests.push({path,milliseconds:Math.round(performance.now()-t)});}};
+    rtc=new CompanionRTC(timedAPI,s=>{
+     if(!call)return;
+     if(s.closed)throw Error('Server closed before intentional hang-up');
+     if(s.id!==call.id||typeof s.epoch!=='string'||!Array.isArray(s.packets)||s.packets.length>1)throw Error('Invalid response');
+     for(const p of s.packets)if(!Number.isInteger(p.sequence)||!Array.isArray(p.samples)||p.samples.length>1920||!p.samples.every(Number.isFinite))throw Error('Invalid PCM packet');
+     if(s.epoch!==epoch){epoch=s.epoch;ack=[];last=-1;sizes.clear();r.epochFrames=0;}
+     const packets=s.packets.filter(p=>p.sequence>last);
+     for(const p of packets){last=p.sequence;sizes.set(p.sequence,p.samples.length);r.packets++;}
+     node.port.postMessage({epoch,packets});
+    },e=>{r.errors.push(e.message);show(receipt);});
+    await rtc.open(destination.stream);r.peerOpenMs=Math.round(performance.now()-start);
+    call=await api('/api/call',{thread:target.thread,rtc:rtc.id});epoch=call.epoch;
+    timer=setInterval(()=>{try{rtc.send({epoch,acknowledged:ack.splice(0)});}catch(e){r.errors.push(e.message);clearInterval(timer);}},25);
+    const deadline=performance.now()+30000;
+    while(!r.renderedFrames&&!rtc.closed&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));
+    if(!r.renderedFrames)throw Error('No audio rendered before deadline');
+    r.firstRenderMs=Math.round(performance.now()-start);
+    if(speech){
+     // This synthetic track truthfully reports no AEC. Input is half-duplex:
+     // let greeting render acknowledgements and its acoustic tail settle first.
+     const greetingDeadline=performance.now()+30000;
+     while(performance.now()-lastAudio<1500&&!rtc.closed&&!r.errors.length&&performance.now()<greetingDeadline)await new Promise(resolve=>setTimeout(resolve,50));
+     if(rtc.closed||r.errors.length||performance.now()-lastAudio<1500)throw Error('Greeting did not settle');
+     const previousEpoch=epoch;
+     speechSource=context.createBufferSource();speechSource.buffer=speech;speechSource.connect(destination);
+     r.speechStartMs=Math.round(performance.now()-start);r.speechDurationSeconds=speech.duration;
+     let ended=false;speechSource.onended=()=>{ended=true;};speechSource.start();
+     const replyDeadline=performance.now()+45000;
+     while(!(ended&&epoch!==previousEpoch&&r.epochFrames>=4800)&&!rtc.closed&&!r.errors.length&&performance.now()<replyDeadline)await new Promise(resolve=>setTimeout(resolve,50));
+     if(!ended||epoch===previousEpoch||r.epochFrames<4800||rtc.closed||r.errors.length)throw Error('No rendered reply after spoken input');
+     r.replyRenderMs=Math.round(performance.now()-start);r.replyRenderedFrames=r.epochFrames;
+    }
+    const stats=await rtc.peer.getStats();
+    const transport=[...stats.values()].find(x=>x.type==='transport'&&x.selectedCandidatePairId);
+    const pair=transport&&stats.get(transport.selectedCandidatePairId);
+    const candidate=pair&&stats.get(pair.localCandidateId);
+    r.candidateType=candidate?.candidateType||'unknown';
+    if(receipt.relayOnly&&r.candidateType!=='relay')throw Error('TURN relay not confirmed');
+   }finally{
+    clearInterval(timer);speechSource?.stop();speechSource?.disconnect();node.disconnect();mute.disconnect();
+    await rtc?.close();if(call)await api('/api/call/end',{id:call.id});
+    r.closed=true;show(receipt);
+   }
+   if(r.errors.length)throw Error('Round failed');
+  }
+  receipt.passed=true;
+ }catch(e){receipt.errors.push(String(e));receipt.passed=false;}
+ finally{oscillator.stop();destination.stream.getTracks().forEach(t=>t.stop());await context.close();receipt.finished=true;show(receipt);document.querySelector('#run').disabled=false;}
+};
+</script>

@@ -1,0 +1,24 @@
+{
+  "command": [
+    "/usr/bin/c++",
+    "-fsyntax-only",
+    "-DLITERT_CC_RUNTIME_BUILTIN_NONE",
+    "-I/workspace/scratch/09e99beaae67/LiteRT-LM",
+    "-I/workspace/scratch/09e99beaae67/LiteRT-pinned",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-deps/litert-source",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-syntax-headers",
+    "-I/workspace/scratch/09e99beaae67/litert-abi-generated",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-deps/json-3.12.0/include",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-deps/abseil-cpp-20260526.0",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-deps/googletest-1.17.0/googletest/include",
+    "-I/workspace/scratch/09e99beaae67/native-state-test-deps/googletest-1.17.0/googlemock/include",
+    "-std=c++20",
+    "/workspace/scratch/09e99beaae67/LiteRT-LM/runtime/executor/litert/state_serialization_test.cc"
+  ],
+  "exit_code": 0,
+  "scope": "C++ syntax/type validation only; no linking or hardware execution",
+  "source_sha256": "a433576077209b70de5028005d1bd8b535e8d93e9f09b126f9d3304d76bb77d4",
+  "supplemental_headers": "Existing six exact Git-blob-verified upstream headers in original validation/gemma4-metal/codec-test-syntax/source-receipts.json",
+  "errors": 0,
+  "warnings": 11
+}

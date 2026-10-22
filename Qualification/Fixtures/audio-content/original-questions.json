@@ -1,0 +1,26 @@
+[
+  {
+    "path": "original-0.wav",
+    "answer": "\\b(?:four|4)\\b"
+  },
+  {
+    "path": "original-1.wav",
+    "answer": "\\b(?:eight|8)\\b"
+  },
+  {
+    "path": "original-2.wav",
+    "answer": "\\bParis\\b"
+  },
+  {
+    "path": "original-3.wav",
+    "answer": "\\b(?:seven|7)\\b"
+  },
+  {
+    "path": "original-4.wav",
+    "answer": "\\b(?:nine|9)\\b"
+  },
+  {
+    "path": "original-5.wav",
+    "answer": "\\bEarth\\b"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "revision": "7a0b1ce0ea821bcd01c5f72af84155e02191152f",
+  "url": "https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/resolve/7a0b1ce0ea821bcd01c5f72af84155e02191152f/gemma-4-12B-it.litertlm",
+  "ranges": [
+    {
+      "file": "12b-audio-prefix.bin",
+      "begin": 6873415680,
+      "end_exclusive": 6873432064,
+      "sha256": "f93d6b4679c607ab92aa658afb93c7e8c3fe9122c7ab6393ab6ea01c5b668ce2",
+      "content_range": "bytes 6873415680-6873432063/6883278368"
+    },
+    {
+      "file": "gemma4_metadata_chunks/12b-audio_9830400.bin",
+      "begin": 6883246080,
+      "end_exclusive": 6883262464,
+      "sha256": "6ae7480c59d25cf0709bfda32f368dad07ca72fc29df31f11a733c4af31a52cd"
+    }
+  ]
+}

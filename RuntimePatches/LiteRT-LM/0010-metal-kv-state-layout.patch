@@ -1,0 +1,236 @@
+diff --git a/runtime/executor/litert/BUILD b/runtime/executor/litert/BUILD
+index b0b7ef71f470a3f3d39c7586dff4f136eeff4889..faf4b1afbe54f8e9b7e003f041f44713153420bf 100644
+--- a/runtime/executor/litert/BUILD
++++ b/runtime/executor/litert/BUILD
+@@ -131,6 +131,10 @@ cc_test(
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/strings:string_view",
+         "@com_google_googletest//:gtest_main",
++        "@litert//litert/c/internal:litert_tensor_buffer_registry",
++        "@litert//litert/c:litert_custom_tensor_buffer",
++        "@litert//litert/c:litert_environment_options_header",
++        "@litert//litert/c:litert_tensor_buffer",
+         "@litert//litert/cc:litert_element_type",
+         "@litert//litert/cc:litert_environment",
+         "@litert//litert/cc:litert_layout",
+diff --git a/runtime/executor/litert/state_serialization.cc b/runtime/executor/litert/state_serialization.cc
+index 6f2115396025ab0bef334c5f44a0e504f9d5687e..890c776dc990269f51ca4389198e785b9e7c29f7 100644
+--- a/runtime/executor/litert/state_serialization.cc
++++ b/runtime/executor/litert/state_serialization.cc
+@@ -144,11 +144,40 @@ absl::StatusOr<size_t> DescriptorBytes(const nlohmann::json& descriptor) {
+ absl::StatusOr<size_t> TransferOffset(const TensorBuffer& buffer,
+                                     size_t packed_bytes) {
+   LITERT_ASSIGN_OR_RETURN(auto type, buffer.TensorType());
+-  if (type.Layout().HasStrides()) {
++  LITERT_ASSIGN_OR_RETURN(auto buffer_type, buffer.BufferType());
++  const auto& layout = type.Layout();
++  if (buffer_type == TensorBufferType::kMetalBufferFp16) {
++    // Metal reports PHWC4 storage as {16}, but Lock/Unlock convert to/from
++    // contiguous host data. Gemma's KV kernels use a different blocked layout;
++    // the conversion preserves every device word only when there is no padding.
++    const auto dimensions = layout.Dimensions();
++    if (type.ElementType() != ElementType::Float16 || dimensions.size() < 2 ||
++        dimensions.size() > 4 || dimensions.back() % 4 != 0 ||
++        std::any_of(dimensions.begin(), dimensions.end(),
++                    [](int32_t dim) { return dim <= 0; })) {
++      return absl::UnimplementedError(
++          "Metal FP16 state requires an unpadded rank-2 to rank-4 FP16 tensor.");
++    }
++    const auto strides = layout.Strides();
++    if (layout.HasStrides() &&
++        (strides[0] != 16 ||
++         std::any_of(strides.begin() + 1, strides.end(),
++                     [](uint32_t stride) { return stride != 0; }))) {
++      return absl::UnimplementedError("Unknown Metal state storage layout.");
++    }
++    LITERT_ASSIGN_OR_RETURN(size_t size, buffer.Size());
++    if (size != packed_bytes) {
++      return absl::UnimplementedError("Padded Metal state storage is unsupported.");
++    }
++    // The descriptor conversion uses signed int element indices.
++    if (packed_bytes / sizeof(uint16_t) >
++        static_cast<size_t>(std::numeric_limits<int>::max())) {
++      return absl::UnimplementedError("Metal state exceeds the conversion index range.");
++    }
++  } else if (layout.HasStrides()) {
+     return absl::UnimplementedError(
+         "Strided state tensor layouts are unsupported.");
+   }
+-  LITERT_ASSIGN_OR_RETURN(auto buffer_type, buffer.BufferType());
+   LITERT_ASSIGN_OR_RETURN(size_t offset, buffer.Offset());
+   switch (buffer_type) {
+     case TensorBufferType::kHostMemory:
+diff --git a/runtime/executor/litert/state_serialization_test.cc b/runtime/executor/litert/state_serialization_test.cc
+index c0556bf3df05fc662eea414b006bb4ea49ae6ddf..8473f0f351e0103e24dfa5eb3abee6f0879f1268 100644
+--- a/runtime/executor/litert/state_serialization_test.cc
++++ b/runtime/executor/litert/state_serialization_test.cc
+@@ -29,6 +29,10 @@
+ #include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/strings/string_view.h"  // from @com_google_absl
+ #include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "litert/c/internal/litert_tensor_buffer_registry.h"  // from @litert
++#include "litert/c/litert_custom_tensor_buffer.h"  // from @litert
++#include "litert/c/litert_environment_options.h"  // from @litert
++#include "litert/c/litert_tensor_buffer.h"  // from @litert
+ #include "litert/cc/litert_element_type.h"  // from @litert
+ #include "litert/cc/litert_environment.h"  // from @litert
+ #include "litert/cc/litert_layout.h"  // from @litert
+@@ -44,6 +48,42 @@ namespace {
+ 
+ using ::testing::status::StatusIs;
+ 
++// A registered provider for testing codec admission and transfer calls. This
++// deliberately supplies canonical host bytes; it does not emulate Metal's
++// physical layout, conversion, or synchronization.
++struct MappedTestMemory : HwMemoryInfo {
++  std::vector<char> bytes;
++  int locks = 0;
++};
++
++LiteRtStatus CreateMappedTestMemory(
++    LiteRtGpuDeviceId, LiteRtGpuQueueId, const LiteRtRankedTensorType*,
++    LiteRtTensorBufferType, size_t, size_t packed_bytes,
++    HwMemoryInfoPtr* memory) {
++  auto* info = new MappedTestMemory{};
++  info->bytes.resize(packed_bytes);
++  info->memory_handle = info;
++  *memory = info;
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus DestroyMappedTestMemory(HwMemoryInfoPtr memory) {
++  delete static_cast<MappedTestMemory*>(memory);
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus LockMappedTestMemory(HwMemoryInfoPtr memory,
++                                 LiteRtTensorBufferLockMode, void** data) {
++  auto* info = static_cast<MappedTestMemory*>(memory);
++  ++info->locks;
++  *data = info->bytes.data();
++  return kLiteRtStatusOk;
++}
++
++LiteRtStatus FinishMappedTestMemory(HwMemoryInfoPtr) {
++  return kLiteRtStatusOk;
++}
++
+ // Rewrite a valid header and update the checksum so malformed-metadata tests
+ // exercise parsing and validation instead of stopping at the corruption check.
+ std::string ReplaceHeader(absl::string_view state,
+@@ -109,6 +149,25 @@ class StateSerializationTest : public ::testing::Test {
+     buffers.emplace(name, std::move(buffer));
+   }
+ 
++  void AddMappedBuffer(StateTensorBuffers& buffers, const std::string& name,
++                       const RankedTensorType& type,
++                       TensorBufferType buffer_type =
++                           TensorBufferType::kMetalBufferFp16,
++                       size_t extra_bytes = 0) {
++    const auto c_type = static_cast<LiteRtTensorBufferType>(buffer_type);
++    LITERT_ASSERT_OK(LiteRtRegisterTensorBufferHandlers(
++        env_->Get(), c_type, CreateMappedTestMemory, DestroyMappedTestMemory,
++        LockMappedTestMemory, FinishMappedTestMemory, nullptr, nullptr,
++        kLiteRtEnvOptionTagNull, kLiteRtEnvOptionTagNull));
++    LITERT_ASSERT_OK(LiteRtRegisterTensorBufferHostStagingMemoryHandler(
++        env_->Get(), c_type, FinishMappedTestMemory));
++    LITERT_ASSERT_OK_AND_ASSIGN(size_t size, type.Bytes());
++    LITERT_ASSERT_OK_AND_ASSIGN(
++        auto buffer, TensorBuffer::CreateManaged(*env_, buffer_type, type,
++                                                 size + extra_bytes));
++    buffers.emplace(name, std::move(buffer));
++  }
++
+   std::optional<Environment> env_;
+ };
+ 
+@@ -253,6 +312,89 @@ TEST_F(StateSerializationTest, RejectsUnpackedStrides) {
+               StatusIs(absl::StatusCode::kUnimplemented));
+ }
+ 
++TEST_F(StateSerializationTest, AdmitsConvertedMetalWithoutPhysicalPadding) {
++  const std::vector<RankedTensorType> types = {
++      {ElementType::Float16, Layout({1, 4}, {16, 0})},
++      {ElementType::Float16, Layout({1, 8, 4}, {16, 0, 0})},
++      {ElementType::Float16, Layout({1, 8, 4, 12}, {16, 0, 0, 0})},
++      {ElementType::Float16, Layout(Dimensions{1, 8, 4, 12})},
++  };
++  for (const auto& type : types) {
++    StateTensorBuffers source, target;
++    const auto dims = type.Layout().Dimensions();
++    ASSERT_NO_FATAL_FAILURE(AddBuffer(
++        source, "kv", ElementType::Float16, Dimensions(dims.begin(), dims.end()),
++        7));
++    ASSERT_NO_FATAL_FAILURE(AddMappedBuffer(target, "kv", type));
++    ASSERT_OK_AND_ASSIGN(auto serialized,
++                         SerializeState(nlohmann::json::object(), source));
++    ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++    const auto handle = target.at("kv").Get();
++    ASSERT_OK(LoadSerializedState(parsed, target));
++    EXPECT_EQ(target.at("kv").Get(), handle);
++    ASSERT_OK_AND_ASSIGN(auto restored,
++                         SerializeState(nlohmann::json::object(), target));
++    EXPECT_EQ(restored, serialized);
++  }
++}
++
++TEST_F(StateSerializationTest, RejectsUnsafeMetalLayoutsBeforeMapping) {
++  struct Case {
++    RankedTensorType type;
++    TensorBufferType buffer_type = TensorBufferType::kMetalBufferFp16;
++    size_t extra_bytes = 0;
++  };
++  const std::vector<Case> cases = {
++      {{ElementType::Float16, Layout({1, 8, 4, 11}, {16, 0, 0, 0})}},
++      {{ElementType::Float16, Layout(Dimensions{1, 8, 4, 11})}},
++      {{ElementType::Float32, Layout({1, 8, 4, 12}, {16, 0, 0, 0})}},
++      {{ElementType::Float16, Layout({4}, {16})}},
++      {{ElementType::Float16, Layout({1, 1, 1, 1, 4}, {16, 0, 0, 0, 0})}},
++      {{ElementType::Float16, Layout({1, 0, 4, 12}, {16, 0, 0, 0})}},
++      {{ElementType::Float16, Layout({1, 8, 4, 12}, {8, 0, 0, 0})}},
++      {{ElementType::Float16, Layout({1, 8, 4, 12}, {16, 0, 0, 0})},
++       TensorBufferType::kMetalBufferFp16, 2},
++      {{ElementType::Float16, Layout({1, 8, 4, 12}, {16, 0, 0, 0})},
++       TensorBufferType::kMetalBufferPacked},
++  };
++  for (size_t i = 0; i < cases.size(); ++i) {
++    SCOPED_TRACE(i);
++    StateTensorBuffers buffers;
++    ASSERT_NO_FATAL_FAILURE(AddMappedBuffer(buffers, "kv", cases[i].type,
++                                            cases[i].buffer_type,
++                                            cases[i].extra_bytes));
++    EXPECT_THAT(DescribeStateTensor(buffers.at("kv")),
++                StatusIs(absl::StatusCode::kUnimplemented));
++    EXPECT_FALSE(SerializeState(nlohmann::json::object(), buffers).ok());
++    HwMemoryHandle memory;
++    LITERT_ASSERT_OK(LiteRtGetTensorBufferCustomTensorBufferHandle(
++        buffers.at("kv").Get(), &memory));
++    EXPECT_EQ(static_cast<MappedTestMemory*>(memory)->locks, 0);
++  }
++}
++
++TEST_F(StateSerializationTest, RejectsPaddedMetalBeforeAnyRestoreWrite) {
++  StateTensorBuffers source, target;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(source, "a", ElementType::UInt8, {4}, 1));
++  ASSERT_NO_FATAL_FAILURE(
++      AddBuffer(source, "z", ElementType::Float16, {1, 8, 4, 11}, 2));
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(target, "a", ElementType::UInt8, {4}, 9));
++  ASSERT_NO_FATAL_FAILURE(AddMappedBuffer(
++      target, "z",
++      RankedTensorType(ElementType::Float16,
++                        Layout({1, 8, 4, 11}, {16, 0, 0, 0}))));
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), source));
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  EXPECT_THAT(LoadSerializedState(parsed, target),
++              StatusIs(absl::StatusCode::kUnimplemented));
++  ASSERT_NO_FATAL_FAILURE(ExpectBytes(target.at("a"), 9));
++  HwMemoryHandle memory;
++  LITERT_ASSERT_OK(LiteRtGetTensorBufferCustomTensorBufferHandle(
++      target.at("z").Get(), &memory));
++  EXPECT_EQ(static_cast<MappedTestMemory*>(memory)->locks, 0);
++}
++
+ TEST_F(StateSerializationTest, LegacyMapUsesTheCheckedCodec) {
+   StateTensorBuffers buffers;
+   ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "kv", ElementType::UInt8, {4}, 7));

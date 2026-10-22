@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/FluidInference/mobius",
+  "revision": "210d6b6d21177115babfece0de5e1795cffec2a2",
+  "original_source_sha256": "e6e96de9387ead7e4484c9b187740782cd6e3b2dd2d2f55c3c41b304b976d8af",
+  "status": "Integrated in diagnostic app; broad speaker acceptance remains pending",
+  "validation": "21 cache-write cases across widths 4, 16, and 256; 256-wide PCM matches host-clear repair; 4/16-wide PCM identical and user confirmed clean. Integrated 16/256 SDK synthesis and two muted actual-app greetings passed.",
+  "english_config_sha256": "dda3cad45082189ea221332d26ac0efd7f1ae85fd5dcc52f86dc348f240f6f27",
+  "weights_revision": "19f95fe2df36e79fbd9f10008595cc4c977a0fcc"
+}

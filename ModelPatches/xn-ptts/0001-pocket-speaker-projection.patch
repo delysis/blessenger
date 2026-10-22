@@ -1,0 +1,20 @@
+diff --git a/ptts/src/loader.rs b/ptts/src/loader.rs
+index c614198..e566e69 100644
+--- a/ptts/src/loader.rs
++++ b/ptts/src/loader.rs
+@@ -169,7 +169,14 @@ pub fn load_speaker_proj<B: Backend>(
+     if !vb.contains(SPEAKER_PROJ_WEIGHT) {
+         return Ok(None);
+     }
+-    let shape = (cfg.flow_lm.d_model, cfg.speaker_mimi_cfg().dimension);
++    // PocketTTS projects the quantized Mimi latent, not the encoder's
++    // hidden width. Phonon speaker encoders expose their full dimension.
++    let input_dim = if cfg.model_id.is_none() && cfg.speaker_mimi.is_none() {
++        cfg.mimi.quantizer_dimension
++    } else {
++        cfg.speaker_mimi_cfg().dimension
++    };
++    let shape = (cfg.flow_lm.d_model, input_dim);
+     let weight = vb.tensor(SPEAKER_PROJ_WEIGHT, shape)?;
+     Ok(Some(Linear::new(weight)))
+ }

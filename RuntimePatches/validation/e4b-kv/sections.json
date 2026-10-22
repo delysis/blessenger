@@ -1,0 +1,99 @@
+[
+  {
+    "begin": 16384,
+    "end": 28576,
+    "section_type": 5,
+    "metadata": {}
+  },
+  {
+    "begin": 32768,
+    "end": 4721781,
+    "section_type": 4,
+    "metadata": {}
+  },
+  {
+    "begin": 4734976,
+    "end": 175655560,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_embedder"
+    }
+  },
+  {
+    "begin": 175669248,
+    "end": 1012447760,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_per_layer_embedder"
+    }
+  },
+  {
+    "begin": 1012449280,
+    "end": 1106501560,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_audio_encoder_hw",
+      "backend_constraint": "cpu"
+    }
+  },
+  {
+    "begin": 1106509824,
+    "end": 1122242524,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_audio_adapter",
+      "backend_constraint": "cpu"
+    }
+  },
+  {
+    "begin": 1122254848,
+    "end": 1122265716,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_end_of_audio"
+    }
+  },
+  {
+    "begin": 1122271232,
+    "end": 1346409168,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_vision_encoder",
+      "prefer_activation_type": "fp16"
+    }
+  },
+  {
+    "begin": 1346420736,
+    "end": 1354309392,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_vision_adapter",
+      "backend_constraint": "cpu"
+    }
+  },
+  {
+    "begin": 1354317824,
+    "end": 1354328692,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_end_of_vision"
+    }
+  },
+  {
+    "begin": 1354334208,
+    "end": 3614377584,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_prefill_decode",
+      "prefer_activation_type": "fp16"
+    }
+  },
+  {
+    "begin": 3614392320,
+    "end": 3659518480,
+    "section_type": 3,
+    "metadata": {
+      "model_type": "tf_lite_mtp_drafter"
+    }
+  }
+]

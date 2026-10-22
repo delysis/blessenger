@@ -1,0 +1,23 @@
+{
+  "identity": "a1d833a06fa8d52c3663e52d0e7d3c90ed9dbfcc1d343d41cd09d21cd1afc3de",
+  "files": {
+    "PocketConditioning16.mlmodelc/analytics/coremldata.bin": "75b0de7db348438ece92b4d400d2a7a9e9b4fb49a97086ce0f9193292e450ff4",
+    "PocketConditioning16.mlmodelc/coremldata.bin": "7ba3163b0b6b711d924146db56fa3211f9291c4d6da6ce53463f7067b3f8982a",
+    "PocketConditioning16.mlmodelc/model.mil": "aa8b2f393ec77922a09a4ce0936e06890eeb4c9523c1df0b176a9611d1b25da4",
+    "PocketConditioning16.mlmodelc/weights/weight.bin": "49ce3d7c4a00060a0ac37aad21f2bfbdfbcde44764b1df0eaec323298f794325",
+    "PocketConditioning256.mlmodelc/analytics/coremldata.bin": "66440080f3b835531acc101af1bfd2aa56ffc4c5f91bff5238fe4adb128b4e05",
+    "PocketConditioning256.mlmodelc/coremldata.bin": "84eb783a0c08a7b0e4ce2975532d34296d757d7d06863d6066e4b8c80717cdf1",
+    "PocketConditioning256.mlmodelc/model.mil": "adaa63ba8d573966e16a9ab3bb76e9e1ae3be200821ccecb114c7b38b88b7467",
+    "PocketConditioning256.mlmodelc/weights/weight.bin": "b8bbefa5799ee581561d7a28a21a42f9ea9b7e73ca7bc1339330ea4cff24806d"
+  },
+  "exporter_revision": "210d6b6d21177115babfece0de5e1795cffec2a2",
+  "patch": "0001-exclude-padding-from-cache-writes.patch",
+  "weights": "english_2026-04",
+  "widths": [
+    16,
+    256
+  ],
+  "io": "float32",
+  "compute_precision": "float16",
+  "status": "Integrated diagnostic assets; broader live speaker acceptance pending"
+}

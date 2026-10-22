@@ -1,0 +1,45 @@
+{
+  "serving_default": {
+    "subgraph_index": 0,
+    "inputs": {
+      "mask": {
+        "shape": [
+          1,
+          1,
+          816
+        ],
+        "shape_signature": [],
+        "tensor_type": 6
+      },
+      "src_inputs": {
+        "shape": [
+          1,
+          1,
+          816,
+          128
+        ],
+        "shape_signature": [],
+        "tensor_type": 0
+      }
+    },
+    "outputs": {
+      "features": {
+        "shape": [
+          1,
+          204,
+          1536
+        ],
+        "shape_signature": [],
+        "tensor_type": 0
+      },
+      "mask": {
+        "shape": [
+          1,
+          204
+        ],
+        "shape_signature": [],
+        "tensor_type": 6
+      }
+    }
+  }
+}

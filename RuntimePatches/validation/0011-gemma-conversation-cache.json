@@ -1,0 +1,31 @@
+{
+  "patch": "0011-gemma-conversation-cache.patch",
+  "sha256": "56a62ca6921574ac036b76ed2b8205428a2d6e2eb853ca810e5b5cbc100a88d4",
+  "base_commit": "5f25078c9439e176615af5ba42636ed904fca847",
+  "earlier_patches_touch_these_files": false,
+  "incremental_apply_and_whitespace": "PASS",
+  "exact_final_files": [
+    {
+      "path": "c/conversation.cc",
+      "base_blob_sha1": "34b2455b6912b8858970df9b2a967a859c7fc607",
+      "final_sha256": "52f1927444bbf9d4581ab0a4440adc3d9d25ad8359703ce0c383a6953b2274ff"
+    },
+    {
+      "path": "c/conversation.h",
+      "base_blob_sha1": "f951ad7137e165d882ff4113c0f8aa686d333d69",
+      "final_sha256": "ec266b66a0a26b15923b89e0d47ba2ec0592114f1c168788db7c628f14e52fba"
+    },
+    {
+      "path": "runtime/conversation/conversation.cc",
+      "base_blob_sha1": "dadc75e517fbbb32412958b9abcaaeb036260d92",
+      "final_sha256": "999c2cb7206c610d2d8afc41c9f0ca8847236f06fc1cda121aae2f85750248f8"
+    },
+    {
+      "path": "runtime/conversation/conversation.h",
+      "base_blob_sha1": "4f04a57c0d178b63cf9376a45f249f3c7d07c260",
+      "final_sha256": "27fa82c4eeedab8b12db82dd08953d32087a4c73c5ee8948ba2ab1385f74260a"
+    }
+  ],
+  "native_compile": "NOT_RUN: no Apple SDK or complete runtime build",
+  "native_functional_tests": "NOT_RUN: Qualification includes native text/audio history and token-count checks"
+}

@@ -1,0 +1,16 @@
+--- a/models/tts/pocket_tts/coreml/convert_models/traceable/traceable_flowlm_step_ane.py
++++ b/models/tts/pocket_tts/coreml/convert_models/traceable/traceable_flowlm_step_ane.py
+@@ -245,7 +245,12 @@
+ 
+             residual = x
+             x_norm = getattr(self, f"norm{i}_2")(x)
+-            ffn_out = getattr(self, f"linear{i}_2")(F.gelu(getattr(self, f"linear{i}_1")(x_norm)))
++            # Match the trained model's tanh approximation explicitly. The
++            # ANE fused GELU does not retain the CPU TANH_APPROX behavior.
++            preactivation = getattr(self, f"linear{i}_1")(x_norm)
++            activated = .5 * preactivation * (1 + torch.tanh(
++                math.sqrt(2 / math.pi) * (preactivation + .044715 * preactivation * preactivation * preactivation)))
++            ffn_out = getattr(self, f"linear{i}_2")(activated)
+             x = residual + ffn_out
+ 
+             tail.extend([new_k, new_v, new_pos])

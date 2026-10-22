@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "researched_at": "2026-10-19",
+  "artifact_downloads_performed": false,
+  "selection": {
+    "threshold_physical_bytes": 17179869184,
+    "at_or_above": "gemma-4-12B-it.litertlm",
+    "below": "gemma-4-E4B-it.litertlm",
+    "required_qat_verified": false,
+    "default_behavior": "Block preparation until an explicit choice to use the available LiteRT artifact. These files must not be represented as verified QAT or verified QAT Mobile."
+  },
+  "artifacts": [
+    {
+      "repository": "litert-community/gemma-4-12B-it-litert-lm",
+      "revision": "7a0b1ce0ea821bcd01c5f72af84155e02191152f",
+      "file": "gemma-4-12B-it.litertlm",
+      "bytes": 6883278368,
+      "sha256": "58fd31b778ca2c21c80d634fb34fc5a89d11d563a38dfd3cbf1b40dbf252a8b6",
+      "capabilities": {
+        "macos_gpu": true,
+        "audio_input": true,
+        "mtp": true
+      },
+      "minimum_runtime_version": "0.17.0",
+      "provenance": "LiteRT mixed-int4/int8; QAT provenance unverified",
+      "card_url": "https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm",
+      "pointer_url": "https://huggingface.co/litert-community/gemma-4-12B-it-litert-lm/raw/main/gemma-4-12B-it.litertlm",
+      "revision_source": "HF repository metadata saved as gemma4_12b_hf_repo.json and repository tree latest commit"
+    },
+    {
+      "repository": "litert-community/gemma-4-E4B-it-litert-lm",
+      "revision": "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+      "file": "gemma-4-E4B-it.litertlm",
+      "bytes": 3659530240,
+      "sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+      "capabilities": {
+        "macos_gpu": true,
+        "audio_input": true,
+        "mtp": true
+      },
+      "provenance": "LiteRT mixed-int4/int8; QAT provenance unverified",
+      "card_url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm",
+      "pointer_url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/raw/main/gemma-4-E4B-it.litertlm",
+      "revision_source": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/commit/e6a3892a8c22cf87ff99583996149cf3cb32452b"
+    }
+  ],
+  "retrieval_limits": "LFS pointer pages and current tree revisions were retrieved separately. Immutable-revision HF URLs were unavailable through the research tool. The app requests the pinned revision and validates its exact byte count and SHA-256 before loading, failing if these independently retrieved facts disagree.",
+  "qat_evidence": [
+    {
+      "url": "https://ai.google.dev/gemma/docs/core",
+      "finding": "QAT Mobile reference checkpoints use a distinct mobile quantization scheme. Overview links to the QAT collections and identifies LiteRT-LM for mobile use; it does not map the selected .litertlm hashes to those QAT checkpoints."
+    },
+    {
+      "url": "https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/",
+      "finding": "Official QAT announcement links broadly to the LiteRT Gemma family collection."
+    },
+    {
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/issues/2497",
+      "finding": "Open clarification request asks for the exact QAT-to-LiteRT package path; no maintainer confirmation of these artifacts was found."
+    },
+    {
+      "url": "https://github.com/google-ai-edge/litert-torch/issues/1044",
+      "finding": "Maintainer reports QAT checkpoint conversion unsupported and an early-error change; an unverified alternate exporter is not an app download path."
+    }
+  ],
+  "source_files": [
+    {
+      "repository": "huggingface/swift-transformers",
+      "revision": "e37cacea74498bba66002bb83ecafee3e4ab8884",
+      "path": "Sources/Hub/HubApi.swift",
+      "git_blob": "7887abce1b839ef6e4871eecec75300708502948",
+      "url": "https://github.com/huggingface/swift-transformers/blob/e37cacea74498bba66002bb83ecafee3e4ab8884/Sources/Hub/HubApi.swift"
+    },
+    {
+      "repository": "huggingface/swift-transformers",
+      "revision": "e37cacea74498bba66002bb83ecafee3e4ab8884",
+      "path": "Sources/Hub/Hub.swift",
+      "git_blob": "403e65337da08f0a44c2a25b66e4bd5648fd3261",
+      "url": "https://github.com/huggingface/swift-transformers/blob/e37cacea74498bba66002bb83ecafee3e4ab8884/Sources/Hub/Hub.swift"
+    },
+    {
+      "repository": "huggingface/swift-transformers",
+      "revision": "e37cacea74498bba66002bb83ecafee3e4ab8884",
+      "path": "Package.swift",
+      "git_blob": "1e09d29c49f4cab7b6533dc3a1dc1820aae5ad27",
+      "url": "https://github.com/huggingface/swift-transformers/blob/e37cacea74498bba66002bb83ecafee3e4ab8884/Package.swift"
+    },
+    {
+      "repository": "huggingface/swift-huggingface",
+      "revision": "de01c0ab8fd537bbd8216cea7f774275178501a2",
+      "path": "Sources/HuggingFace/Hub/HubClient+Files.swift",
+      "git_blob": "4d595fe9924152a4714e5a4618582c0f823dbfc7",
+      "url": "https://github.com/huggingface/swift-huggingface/blob/de01c0ab8fd537bbd8216cea7f774275178501a2/Sources/HuggingFace/Hub/HubClient+Files.swift"
+    },
+    {
+      "repository": "huggingface/swift-huggingface",
+      "revision": "de01c0ab8fd537bbd8216cea7f774275178501a2",
+      "path": "Sources/HuggingFace/Hub/HubCache.swift",
+      "git_blob": "629a693962ff1af25e99399f33ec9eb4a59f53b4",
+      "url": "https://github.com/huggingface/swift-huggingface/blob/de01c0ab8fd537bbd8216cea7f774275178501a2/Sources/HuggingFace/Hub/HubCache.swift"
+    }
+  ],
+  "download_behavior": {
+    "api": "HubApi(downloadBase:cache:hfToken:endpoint:useBackgroundSession:useOfflineMode:); snapshot(from:revision:matching:progressHandler:)",
+    "revision_directory": "Materialized downloadBase isolated by repository and immutable revision because HubApi.localRepoLocation omits revision.",
+    "authentication": "HubApi explicit token takes precedence; nil uses its environment token provider. No token is stored by this app. Catalog pages are public; upstream 401/403 errors are exposed.",
+    "integrity": "Streaming SHA-256 and exact size before first use; a bounded atomic receipt allows offline reuse for the unchanged local inode, size and mtime. Local app directory is trusted.",
+    "progress": "LFS reports intermediate byte progress. Automatic Xet path at this dependency pin reports completion only, so incomplete progress stays indeterminate.",
+    "resume": "Hub cache is preserved after cancellation/network failure. LFS cache path recognizes existing incomplete blobs and Range requests; automatic transport does not guarantee byte-for-byte resume after every cancellation. App does not implement a second downloader.",
+    "cancellation": "Task cancellation forwarded to the structured library call, explicitly checked after snapshot and during hashing. A late completion cannot publish a cancelled preparation as ready."
+  },
+  "memory_policy": {
+    "unit": "binary GiB",
+    "macos_query": "host_statistics64(HOST_VM_INFO64): free_count + inactive_count, multiplied by host page size. No speculative/purgeable double counting and no allocation probe.",
+    "physical_reserve": "max(3 GiB, physical / 4)",
+    "available_reserve": "1 GiB for speech and remaining headroom",
+    "fixed_estimates_bytes": {
+      "12B": 8589934592,
+      "E4B": 3758096384
+    },
+    "extra_bytes_per_context_token": 65536,
+    "minimum_context": 2048,
+    "maximums_by_physical_ram": {
+      "below12GiB": 4096,
+      "12to24GiB": 8192,
+      "24to32GiB": 16384,
+      "32GiBandAbove": 32768
+    },
+    "alignment": 4,
+    "note": "Conservative application policy estimates, not measured peak memory guarantees. Available memory is sampled again after a download."
+  },
+  "validation": {
+    "swift_compiler_available": true,
+    "macos_device_run": false,
+    "unit_tests_run": "Seven pure ModelPolicy tests passed; model-file verification and model-store native tests not run.",
+    "notes": "Actual production ModelCatalog/ModelPolicy compiled in Swift 6 with complete concurrency checking and warning errors. Native file/receipt integrity, download, memory query and engine allocation still require macOS.",
+    "evidence": "../Qualification/Validation/swift-portable/tests.xml"
+  }
+}

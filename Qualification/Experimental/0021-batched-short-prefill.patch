@@ -1,0 +1,53 @@
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index fb38156..985eed3 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -790,7 +790,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
+               start_step,
+               /*steps=*/prefill_length + input_idx, attn_params.local_type,
+               token_ids_span, attn_params.sliding_window_size,
+-              RingBufferAttentionMaskMode::kPrefill));
++              prefill_signature == "verify" ? RingBufferAttentionMaskMode::kVerify
++                                            : RingBufferAttentionMaskMode::kPrefill));
+         }
+       }
+       if (gpu_optimized_single_buffer_cache_) {
+@@ -2343,6 +2344,38 @@ absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
+       ids.size() <= 16 && output_heads == 1 && gpu_optimized_single_buffer_cache_) {
+     work_groups.assign(ids.size(), {std::string(kDecodeSignatureRunner), 1});
+   }
++  // Qualification only: feed known tokens through the small causal verifier.
++  // Require a pending token so every graph position is real, never padding.
++  if (std::getenv("CALL_GEMMA_QUALIFY_VERIFY_PREFILL") != nullptr &&
++      ids.size() > 1 && ids.size() <= 16 && output_heads == 1 &&
++      gpu_optimized_single_buffer_cache_) {
++    const auto [pending_step, pending_tokens] = llm_context_->processed_context()
++                             .processed_tokens().GetNextUnprocessedToken();
++    if (!pending_tokens.empty()) {
++      LITERT_ASSIGN_OR_RETURN(auto signature, compiled_model_->FindSignature("verify"));
++      LITERT_ASSIGN_OR_RETURN(auto positions, signature.InputTensorType("input_pos"));
++      const auto dimensions = positions.Layout().Dimensions();
++      RET_CHECK_EQ(dimensions.size(), 1);
++      const int width = dimensions[0];
++      RET_CHECK_GT(width, 0);
++      work_groups.clear();
++      size_t remaining = ids.size();
++      while (remaining >= width) {
++        work_groups.emplace_back("verify", width);
++        remaining -= width;
++      }
++      if (remaining > 1 &&
++          std::getenv("CALL_GEMMA_QUALIFY_VERIFY_TAIL") != nullptr) {
++        // Static buffers retain the graph width. Runtime active-token bounds
++        // limit cache writes and attention to the real, known suffix.
++        work_groups.emplace_back("verify", remaining);
++      } else {
++        while (remaining-- > 0) {
++          work_groups.emplace_back(std::string(kDecodeSignatureRunner), 1);
++        }
++      }
++    }
++  }
+   const bool trace_prefill = std::getenv("CALL_GEMMA_TRACE_PREFILL") != nullptr;
+   for (int i = 0; i < work_groups.size(); ++i) {
+     const auto prefill_started = std::chrono::steady_clock::now();

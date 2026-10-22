@@ -1,0 +1,554 @@
+diff --git a/runtime/executor/BUILD b/runtime/executor/BUILD
+index 832f7cffe67280e6ef1db46e463ade3e510e9146..c5dbba973d3c86797500e85e4ee75a49c6c0c34c 100644
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -658,6 +658,7 @@ cc_library(
+         ":llm_executor_processed_tokens",
+         ":llm_executor_settings",
+         ":llm_processed_context",
++        ":mtp_cache",
+         "@com_google_absl//absl/algorithm:container",
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/log",
+diff --git a/runtime/executor/llm_litert_npu_compiled_model_executor.cc b/runtime/executor/llm_litert_npu_compiled_model_executor.cc
+index 3e4a2578aee965e0e3ab739ec4028820206c5f21..298ceb1dcd8c2127800727387e8f8262b133fd77 100644
+--- a/runtime/executor/llm_litert_npu_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_npu_compiled_model_executor.cc
+@@ -19,6 +19,7 @@
+ #include <cstdint>
+ #include <cstdlib>
+ #include <cstring>
++#include <limits>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -67,6 +68,7 @@
+ #include "runtime/executor/llm_executor_processed_tokens.h"
+ #include "runtime/executor/llm_executor_settings.h"
+ #include "runtime/executor/llm_processed_context.h"
++#include "runtime/executor/mtp_cache.h"
+ #include "runtime/executor/npu/llm_litert_npu_compiled_model_executor_utils.h"
+ #include "runtime/executor/npu/llm_litert_npu_dynamism.h"
+ #include "runtime/executor/npu/llm_litert_npu_embedder.h"
+@@ -115,6 +117,39 @@ constexpr absl::string_view kv_cache_slice_k_root_name = kKvCacheSliceKRootName;
+ constexpr absl::string_view kv_cache_slice_v_root_name = kKvCacheSliceVRootName;
+ constexpr absl::string_view kv_cache_slice_c_root_name = kKvCacheSliceCRootName;
+ 
++absl::StatusOr<int> GetMtpVerifierSteps(const ContextGroup& group) {
++  const auto& outputs =
++      group.text_decoder_inference_context.verify_output_buffers;
++  const auto activations =
++      outputs.find(TextDecoderSignatures::kLastLayerActivationsOutput);
++  if (activations == outputs.end()) {
++    return absl::FailedPreconditionError("MTP verifier activations unavailable.");
++  }
++  LITERT_ASSIGN_OR_RETURN(auto type, activations->second.TensorType());
++  const auto dimensions = type.Layout().Dimensions();
++  if (dimensions.size() != 3 || dimensions[0] != 1 || dimensions[1] <= 0 ||
++      dimensions[2] <= 0) {
++    return absl::FailedPreconditionError("Invalid MTP verifier activation shape.");
++  }
++  return dimensions[1];
++}
++
++absl::StatusOr<int> GetMtpVerifierSteps(
++    const std::vector<ContextGroup>& groups) {
++  if (groups.empty()) {
++    return absl::FailedPreconditionError("MTP context groups unavailable.");
++  }
++  ABSL_ASSIGN_OR_RETURN(const int steps, GetMtpVerifierSteps(groups.front()));
++  for (size_t i = 1; i < groups.size(); ++i) {
++    ABSL_ASSIGN_OR_RETURN(const int group_steps, GetMtpVerifierSteps(groups[i]));
++    if (group_steps != steps) {
++      return absl::FailedPreconditionError(
++          "MTP verifier length differs between context groups.");
++    }
++  }
++  return steps;
++}
++
+ constexpr char cache_k31[] = "kv_cache_k_31";
+ constexpr char cache_k25[] = "kv_cache_k_25";
+ constexpr char cache_v25[] = "kv_cache_v_25";
+@@ -836,6 +871,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Prefill(
+   if (IsNpuSyncWorkaroundEnabled()) {
+     lock.emplace(&execution_mutex_);
+   }
++  ResetSpeculativeState();
+   ran_decode_ = false;
+   auto start = absl::Now();
+   LITERT_ASSIGN_OR_RETURN(const auto* text_token_ids,
+@@ -1027,6 +1063,78 @@ LlmLiteRtNpuCompiledModelExecutor::DecodeNonSpeculative(
+   return std::vector<std::vector<int>>{{max_index}};
+ }
+ 
++void LlmLiteRtNpuCompiledModelExecutor::ResetSpeculativeState() {
++  pending_accepted_tokens_.clear();
++  last_verify_activations_.clear();
++  has_valid_verify_activations_ = false;
++}
++
++int LlmLiteRtNpuCompiledModelExecutor::SnapshotContextCapacity(
++    const ContextGroup& group) const {
++  int capacity = std::numeric_limits<int>::max();
++  if (is_dynamic_model_) {
++    capacity = dynamic_kv_cache_capacity_;
++  } else if (group.context_size > 0) {
++    capacity = group.context_size;
++  }
++  // Match the verifier's logical bound, including its uncached bonus token.
++  return std::min<int64_t>(
++      capacity, static_cast<int64_t>(executor_settings_.GetMaxNumTokens()) - 1);
++}
++
++void LlmLiteRtNpuCompiledModelExecutor::RecordMtpSnapshotGeometry() {
++  if (speculative_decoding_type_ == SpeculativeDecodingType::kNone ||
++      !mtp_snapshot_geometry_valid_) {
++    return;
++  }
++  if (executor_metadata_ == nullptr ||
++      !executor_metadata_->has_llm_executor_metadata()) {
++    mtp_snapshot_geometry_valid_ = false;
++    return;
++  }
++  const auto& metadata = executor_metadata_->llm_executor_metadata();
++  const int window = metadata.attention_mask_settings().sliding_window_size();
++  for (const auto& group : context_groups_) {
++    const int capacity = SnapshotContextCapacity(group);
++    const auto verify_steps = GetMtpVerifierSteps(group);
++    if (!verify_steps.ok()) {
++      mtp_snapshot_geometry_valid_ = false;
++      return;
++    }
++    for (const auto& state : metadata.state_buffers()) {
++      const bool local =
++          state.type() == proto::StateBuffer::TYPE_LOCAL_KEY_CACHE ||
++          state.type() == proto::StateBuffer::TYPE_LOCAL_VALUE_CACHE;
++      if (!local && state.type() != proto::StateBuffer::TYPE_GLOBAL_KEY_CACHE &&
++          state.type() != proto::StateBuffer::TYPE_GLOBAL_VALUE_CACHE) {
++        continue;
++      }
++      auto buffer = group.input_kv_cache_buffers.find(state.decode_input_name());
++      if (buffer == group.input_kv_cache_buffers.end()) {
++        buffer = group.input_kv_cache_buffers.find(state.prefill_input_name());
++      }
++      if (buffer == group.input_kv_cache_buffers.end() ||
++          !state.has_sequence_axis() || state.sequence_axis() < 0) {
++        mtp_snapshot_geometry_valid_ = false;
++        return;
++      }
++      auto type = buffer->second.TensorType();
++      if (!type.HasValue() ||
++          static_cast<size_t>(state.sequence_axis()) >=
++              type->Layout().Dimensions().size()) {
++        mtp_snapshot_geometry_valid_ = false;
++        return;
++      }
++      const int actual = type->Layout().Dimensions()[state.sequence_axis()];
++      if (local ? !IsMtpRingSnapshotSafe(actual, window, *verify_steps)
++                : actual < capacity) {
++        mtp_snapshot_geometry_valid_ = false;
++        return;
++      }
++    }
++  }
++}
++
+ absl::StatusOr<std::vector<std::vector<int>>>
+ LlmLiteRtNpuCompiledModelExecutor::PopPendingAcceptedToken(
+     absl::Time start_time) {
+@@ -1109,6 +1217,29 @@ LlmLiteRtNpuCompiledModelExecutor::Decode(
+   int mtp_start_step = internal_start_step;
+   int mtp_start_token_id = pending_input_token[0]->id();
+ 
++  // The complete verifier batch must fit before any token is processed. Near
++  // the context limit, use the ordinary one-token decode rather than writing
++  // a speculative suffix past the allocation (or wrapping a global cache).
++  ABSL_ASSIGN_OR_RETURN(const int verify_steps,
++                        GetMtpVerifierSteps(ActiveContextGroup()));
++  // An accepted-all batch also returns an uncached bonus token. Reserve its
++  // logical position even though it does not occupy a verifier cache row.
++  int64_t capacity = std::min<int64_t>(
++      static_cast<int64_t>(executor_settings_.GetMaxNumTokens()) - 1,
++      std::numeric_limits<int>::max());
++  if (!is_dynamic_model_ && !sorted_supported_context_sizes_.empty() &&
++      sorted_supported_context_sizes_.back() > 0) {
++    capacity =
++        std::min<int64_t>(capacity, sorted_supported_context_sizes_.back());
++  }
++  const int64_t verify_start =
++      static_cast<int64_t>(internal_start_step) +
++      (has_valid_verify_activations_ ? 0 : 1);
++  if (!MtpBatchFits(verify_start, verify_steps, capacity)) {
++    ResetSpeculativeState();
++    return DecodeNonSpeculative(decode_params, start);
++  }
++
+   auto start_mark = absl::Now();
+   LITERT_RETURN_IF_ERROR(processed_tokens_.MarkPendingInputTokenAsProcessed());
+   latency_stats_.decode_token_queue_latency_us +=
+@@ -1152,16 +1283,8 @@ LlmLiteRtNpuCompiledModelExecutor::Decode(
+ 
+   // Ensure the active context group can accommodate the entire verification
+   // batch (anchor token + N draft tokens).
+-  LITERT_ASSIGN_OR_RETURN(
+-      RankedTensorType verify_output_tensor_type,
+-      ActiveContextGroup()
+-          .text_decoder_inference_context
+-          .verify_output_buffers[MtpSignatures::kInputActivations]
+-          .TensorType());
+-  const int drafter_sequence_length =
+-      verify_output_tensor_type.Layout().Dimensions()[1] - 1;
+   LITERT_RETURN_IF_ERROR(
+-      SwitchContextSizeIfRequired(mtp_start_step + drafter_sequence_length));
++      SwitchContextSizeIfRequired(mtp_start_step + verify_steps));
+ 
+   LITERT_ASSIGN_OR_RETURN(std::vector<int> draft_tokens,
+                           RunDrafterLoop(mtp_start_step, mtp_start_token_id));
+@@ -1384,8 +1507,9 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::GrowDynamicKVCache(
+   ContextGroup retired_group = std::move(old_group);
+   context_groups_[0] = std::move(built.group);
+   active_context_group_index_ = 0;
+-  LITERT_RETURN_IF_ERROR(RebindActiveContextGroup());
+   dynamic_kv_cache_capacity_ = built.resolved_context_size;
++  RecordMtpSnapshotGeometry();
++  LITERT_RETURN_IF_ERROR(RebindActiveContextGroup());
+ 
+   ABSL_LOG(INFO) << "Dynamic KV cache grown from " << old_capacity << " to "
+                  << dynamic_kv_cache_capacity_
+@@ -2336,8 +2460,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
+   }
+   LITERT_RETURN_IF_ERROR(processed_tokens_.RollBackToStep(0));
+   latency_stats_ = {};
+-  last_verify_activations_.clear();
+-  pending_accepted_tokens_.clear();
++  ResetSpeculativeState();
+ 
+   for (auto& group : context_groups_) {
+     LITERT_RETURN_IF_ERROR(ClearKVCache(
+@@ -2360,13 +2483,100 @@ absl::StatusOr<StateTensorBuffers> DuplicateNpuState(const ContextGroup& group)
+   return buffers;
+ }
+ 
++// A verifier can write V future rows before the first returned token ends a
++// turn. A cold-start stop can also cause Prefill to replay the previous token.
++// R >= W + V, plus any further logical rollback, ensures those writes only
++// replace expired local-ring entries.
++// Full-attention K/V uses causal positions; recurrent state cannot be rewound
++// this way. Read the physical R from each tensor, not metadata's minimum size.
++absl::Status ValidateNpuMtpSnapshot(
++    const nlohmann::json& descriptors,
++    const proto::ExecutorMetadata* metadata, int verify_steps,
++    int current_step, int token_count, int nominal_capacity) {
++  if (metadata == nullptr || !metadata->has_llm_executor_metadata() ||
++      metadata->llm_executor_metadata().state_buffers().empty() ||
++      !descriptors.is_object() || descriptors.empty()) {
++    return absl::FailedPreconditionError(
++        "MTP cache persistence requires declared KV state metadata.");
++  }
++  const auto& llm = metadata->llm_executor_metadata();
++  const int64_t rollback_steps =
++      std::max<int64_t>(0, static_cast<int64_t>(token_count) - current_step);
++  std::vector<bool> covered(llm.state_buffers_size(), false);
++  for (auto it = descriptors.begin(); it != descriptors.end(); ++it) {
++    const proto::StateBuffer* declared = nullptr;
++    int index = -1;
++    for (int i = 0; i < llm.state_buffers_size(); ++i) {
++      const auto& candidate = llm.state_buffers(i);
++      if (it.key() == candidate.prefill_input_name() ||
++          it.key() == candidate.decode_input_name()) {
++        if (declared != nullptr) {
++          return absl::FailedPreconditionError("Ambiguous MTP state metadata.");
++        }
++        declared = &candidate;
++        index = i;
++      }
++    }
++    if (declared == nullptr || covered[index] ||
++        absl::StartsWith(it.key(), kKvCacheCRootName)) {
++      return absl::FailedPreconditionError("MTP state is not independent KV.");
++    }
++    covered[index] = true;
++    bool local;
++    switch (declared->type()) {
++      case proto::StateBuffer::TYPE_GLOBAL_KEY_CACHE:
++      case proto::StateBuffer::TYPE_GLOBAL_VALUE_CACHE:
++        local = false;
++        break;
++      case proto::StateBuffer::TYPE_LOCAL_KEY_CACHE:
++      case proto::StateBuffer::TYPE_LOCAL_VALUE_CACHE:
++        local = true;
++        break;
++      default:
++        return absl::FailedPreconditionError(
++            "MTP cache persistence requires pure key/value state.");
++    }
++    const auto& descriptor = it.value();
++    if (!declared->has_sequence_axis() || declared->sequence_axis() < 0 ||
++        !descriptor.contains("shape") || !descriptor["shape"].is_array() ||
++        static_cast<size_t>(declared->sequence_axis()) >=
++            descriptor["shape"].size()) {
++      return absl::FailedPreconditionError("Invalid MTP cache sequence axis.");
++    }
++    ABSL_ASSIGN_OR_RETURN(
++        const int capacity,
++        ReadContextInteger(descriptor["shape"][declared->sequence_axis()]));
++    if (capacity <= 0) {
++      return absl::FailedPreconditionError("Invalid MTP cache capacity.");
++    }
++    if (local) {
++      if (!llm.has_attention_mask_settings() ||
++          !llm.attention_mask_settings().has_sliding_window_size() ||
++          !IsMtpRingSnapshotSafe(
++              capacity, llm.attention_mask_settings().sliding_window_size(),
++              verify_steps, rollback_steps)) {
++        return absl::FailedPreconditionError(
++            "MTP local cache lacks space for the verifier, window and rewind.");
++      }
++    } else if (capacity < std::max(verify_steps, nominal_capacity) ||
++               static_cast<int64_t>(std::max(current_step, token_count)) >
++                   static_cast<int64_t>(capacity) + 1) {
++      return absl::FailedPreconditionError("MTP global cache capacity exceeded.");
++    }
++  }
++  if (!std::all_of(covered.begin(), covered.end(),
++                   [](bool value) { return value; })) {
++    return absl::FailedPreconditionError("MTP state metadata is incomplete.");
++  }
++  return absl::OkStatus();
++}
++
+ // Before reallocating a dynamic context, check names, types and every axis that
+ // cannot change with its sequence capacity. Exact allocated descriptors are
+ // checked again before writing any tensor.
+ absl::Status ValidateNpuStateForResize(
+     const ParsedSerializedState& state, const StateTensorBuffers& buffers,
+-    const NpuModelGeometry& geometry, int capacity,
+-    const proto::ExecutorMetadata* metadata) {
++    int capacity) {
+   if (state.tensors.size() != buffers.size()) {
+     return absl::FailedPreconditionError("NPU state buffer count mismatch.");
+   }
+@@ -2384,39 +2594,12 @@ absl::Status ValidateNpuStateForResize(
+       if (absl::StartsWith(tensor.name, kKvCacheVRootName)) axis = 3;
+     }
+     if (axis >= 0) {
+-      int entries = capacity;
+-      const proto::StateBuffer* declared = nullptr;
+-      if (metadata != nullptr) {
+-        for (const auto& info : metadata->llm_executor_metadata().state_buffers()) {
+-          if (tensor.name == info.prefill_input_name() ||
+-              tensor.name == info.decode_input_name()) {
+-            declared = &info;
+-            break;
+-          }
+-        }
+-      }
+-      if (declared != nullptr) {
+-        if (declared->has_sequence_axis() && declared->sequence_axis() != axis) {
+-          return absl::FailedPreconditionError("Incompatible NPU sequence axis.");
+-        }
+-        if (declared->has_minimum_sequence_length()) {
+-          entries = std::max(entries, declared->minimum_sequence_length());
+-        }
+-        if (declared->has_maximum_sequence_length()) {
+-          entries = std::min(entries, declared->maximum_sequence_length());
+-        }
+-      } else {
+-        const auto info = geometry.kv_buffer_info.find(tensor.name);
+-        if (info != geometry.kv_buffer_info.end() && info->second.is_local) {
+-          // Heuristic local caches have a fixed physical ring-buffer length.
+-          ABSL_ASSIGN_OR_RETURN(entries,
+-                                ReadContextInteger(expected["shape"][axis]));
+-        }
+-      }
+-      if (entries <= 0) {
++      if (capacity <= 0) {
+         return absl::FailedPreconditionError("Invalid NPU cache capacity.");
+       }
+-      expected["shape"][axis] = entries;
++      // ResizeDynamicInputs requests the same capacity for every K/V tensor;
++      // it does not apply the metadata's local-cache minimum or maximum.
++      expected["shape"][axis] = capacity;
+     }
+     // The parser has already checked that bytes exactly matches shape/type.
+     expected["bytes"] = tensor.descriptor.at("bytes");
+@@ -2431,14 +2614,26 @@ absl::Status ValidateNpuStateForResize(
+ 
+ absl::StatusOr<SerializedLlmContext>
+ LlmLiteRtNpuCompiledModelExecutor::SerializeContext() const {
+-  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
+-    return absl::FailedPreconditionError(
+-        "Disable speculative decoding for persistent NPU sessions; verifier "
+-        "state cannot be rolled back to the completed turn boundary.");
+-  }
+   if (context_groups_.empty()) {
+     return absl::FailedPreconditionError("No NPU context to serialize.");
+   }
++  int verify_steps = 0;
++  ABSL_ASSIGN_OR_RETURN(auto buffers, DuplicateNpuState(ActiveContextGroup()));
++  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
++    if (!mtp_snapshot_geometry_valid_) {
++      return absl::FailedPreconditionError(
++          "NPU MTP cache used an unsafe KV allocation.");
++    }
++    ABSL_ASSIGN_OR_RETURN(verify_steps, GetMtpVerifierSteps(context_groups_));
++    nlohmann::json descriptors = nlohmann::json::object();
++    for (const auto& [name, buffer] : buffers) {
++      ABSL_ASSIGN_OR_RETURN(descriptors[name], DescribeStateTensor(buffer));
++    }
++    ABSL_RETURN_IF_ERROR(ValidateNpuMtpSnapshot(
++        descriptors, executor_metadata_, verify_steps, current_step_,
++        processed_tokens_.TokenCount(),
++        SnapshotContextCapacity(ActiveContextGroup())));
++  }
+   nlohmann::json backend = {
+       {"kind", "npu"},
+       {"configuration",
+@@ -2448,12 +2643,14 @@ LlmLiteRtNpuCompiledModelExecutor::SerializeContext() const {
+       {"group", active_context_group_index_},
+       {"capacity", dynamic_kv_cache_capacity_},
+   };
++  if (verify_steps > 0) {
++    backend["configuration"]["mtp_verifier_steps"] = verify_steps;
++  }
+   SerializedLlmContext result;
+   ABSL_ASSIGN_OR_RETURN(
+       result.metadata,
+       SerializeContextMetadata(executor_settings_, processed_tokens_,
+                                current_step_, ran_decode_, std::move(backend)));
+-  ABSL_ASSIGN_OR_RETURN(auto buffers, DuplicateNpuState(ActiveContextGroup()));
+   LegacyMapState state(std::move(buffers));
+   ABSL_ASSIGN_OR_RETURN(result.state, state.Serialize());
+   return result;
+@@ -2461,22 +2658,28 @@ LlmLiteRtNpuCompiledModelExecutor::SerializeContext() const {
+ 
+ absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
+     absl::string_view metadata, absl::string_view state) {
+-  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
+-    return absl::FailedPreconditionError(
+-        "Disable speculative decoding for persistent NPU sessions; verifier "
+-        "state cannot be rolled back to the completed turn boundary.");
+-  }
+   if (current_step_ != 0 || context_groups_.empty()) {
+     return absl::FailedPreconditionError("LoadContext requires a fresh context.");
+   }
++  int verify_steps = 0;
++  if (speculative_decoding_type_ != SpeculativeDecodingType::kNone) {
++    if (!mtp_snapshot_geometry_valid_) {
++      return absl::FailedPreconditionError(
++          "NPU MTP cache used an unsafe KV allocation.");
++    }
++    ABSL_ASSIGN_OR_RETURN(verify_steps, GetMtpVerifierSteps(context_groups_));
++  }
+   ABSL_ASSIGN_OR_RETURN(auto context,
+                         ParseContextMetadata(metadata, executor_settings_));
+   const auto& backend = context.backend;
+-  const nlohmann::json configuration = {
++  nlohmann::json configuration = {
+       {"dynamic", is_dynamic_model_},
+       {"speculative_decoding", static_cast<int>(speculative_decoding_type_)},
+       {"kv_initial_value", kv_cache_init_value_},
+   };
++  if (verify_steps > 0) {
++    configuration["mtp_verifier_steps"] = verify_steps;
++  }
+   if (backend.size() != 4 || !backend.contains("kind") ||
+       backend["kind"] != "npu" || !backend.contains("configuration") ||
+       backend["configuration"].dump() != configuration.dump() ||
+@@ -2492,9 +2695,12 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
+       (!is_dynamic_model_ && capacity != 0)) {
+     return absl::FailedPreconditionError("Invalid NPU context group.");
+   }
+-  const int context_limit = is_dynamic_model_
+-                                ? capacity
+-                                : context_groups_[group_index].context_size;
++  const int context_limit =
++      is_dynamic_model_
++          ? std::min<int64_t>(
++                capacity,
++                static_cast<int64_t>(executor_settings_.GetMaxNumTokens()) - 1)
++          : SnapshotContextCapacity(context_groups_[group_index]);
+   // The final logical token may still be pending and absent from the cache.
+   if (context_limit > 0 &&
+       static_cast<int64_t>(context.current_step) >
+@@ -2531,12 +2737,19 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
+   if (parsed.metadata != nlohmann::json{{"kind", "legacy_map"}}) {
+     return absl::FailedPreconditionError("Invalid NPU state representation.");
+   }
++  if (verify_steps > 0) {
++    nlohmann::json descriptors = nlohmann::json::object();
++    for (const auto& tensor : parsed.tensors) {
++      descriptors[tensor.name] = tensor.descriptor;
++    }
++    ABSL_RETURN_IF_ERROR(ValidateNpuMtpSnapshot(
++        descriptors, executor_metadata_, verify_steps, context.current_step,
++        context.tokens.TokenCount(), context_limit));
++  }
+   ABSL_ASSIGN_OR_RETURN(auto buffers,
+                         DuplicateNpuState(context_groups_[group_index]));
+   if (is_dynamic_model_ && capacity != dynamic_kv_cache_capacity_) {
+-    ABSL_RETURN_IF_ERROR(ValidateNpuStateForResize(
+-        parsed, buffers, context_groups_[0].geometry, capacity,
+-        executor_metadata_));
++    ABSL_RETURN_IF_ERROR(ValidateNpuStateForResize(parsed, buffers, capacity));
+     if (text_decoder_model_ == nullptr) {
+       return absl::FailedPreconditionError("NPU model unavailable for resizing.");
+     }
+@@ -2567,6 +2780,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
+     context_groups_[0] = std::move(built.group);
+     active_context_group_index_ = 0;
+     dynamic_kv_cache_capacity_ = built.resolved_context_size;
++    RecordMtpSnapshotGeometry();
+     LITERT_RETURN_IF_ERROR(RebindActiveContextGroup());
+   } else {
+     ABSL_RETURN_IF_ERROR(LoadSerializedState(parsed, buffers));
+@@ -2576,6 +2790,10 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::LoadContext(
+   processed_tokens_ = std::move(context.tokens);
+   current_step_ = context.current_step;
+   ran_decode_ = context.ran_decode;
++  // The next operation supplies a new prompt; queued predictions and verifier
++  // activations belong to the saved turn. Prefill/Decode rebuild the drafter's
++  // inputs from the restored KV and pending input token.
++  ResetSpeculativeState();
+   return absl::OkStatus();
+ }
+ 
+diff --git a/runtime/executor/llm_litert_npu_compiled_model_executor.h b/runtime/executor/llm_litert_npu_compiled_model_executor.h
+index 5314e15cb675d49d8758c7818021292085a5c37d..16c8291124fc472596df53b4df6cf904e9ee03e3 100644
+--- a/runtime/executor/llm_litert_npu_compiled_model_executor.h
++++ b/runtime/executor/llm_litert_npu_compiled_model_executor.h
+@@ -253,6 +253,7 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
+       drafter_aux_context_->drafter_mask.SetCompiledModel(
+           &drafter_aux_context_->mtp_aux_compiled_model);
+     }
++    RecordMtpSnapshotGeometry();
+   }
+ 
+  private:
+@@ -328,6 +329,17 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
+   absl::StatusOr<std::vector<std::vector<int>>> DecodeNonSpeculative(
+       const ExecutorDecodeParams& decode_params, absl::Time start_time);
+ 
++  // Discards speculative results belonging to the previous turn. This does
++  // not copy or modify the KV tensors.
++  void ResetSpeculativeState();
++
++  int SnapshotContextCapacity(const ContextGroup& group) const;
++
++  // Remember unsafe KV allocations, including dynamic groups that
++  // may later be retired. Such a group may already have overwritten history.
++  // Called only when buffers are allocated, never in the token loop.
++  void RecordMtpSnapshotGeometry();
++
+   // Run the drafter loop for MTP.
+   // Persistent buffer to store the sliced activations from the last verifier
+   // run, to be used as input for the next speculative cycle.
+@@ -547,6 +559,7 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
+   // MTP / Speculative Decoding members.
+   SpeculativeDecodingType speculative_decoding_type_ =
+       SpeculativeDecodingType::kNone;
++  bool mtp_snapshot_geometry_valid_ = true;
+   std::optional<DrafterContext> drafter_context_;
+   std::optional<DrafterAuxContext> drafter_aux_context_;
+ 

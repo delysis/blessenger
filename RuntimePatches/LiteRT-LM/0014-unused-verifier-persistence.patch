@@ -1,0 +1,15 @@
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index 200d3ed..bf2915a 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -1605,6 +1605,10 @@ LlmLiteRtCompiledModelExecutorBase::GetPrefillSignatureKey() const {
+ 
+ absl::StatusOr<int>
+ LlmLiteRtCompiledModelExecutorBase::GetMtpVerifySteps() const {
++  // A verifier signature in the model does not mean speculative decoding ran.
++  // Without a loaded drafter, Decode cannot have executed an MTP round. Keep
++  // the strict rollback/layout checks whenever a drafter does exist.
++  if (mtp_drafter_ == nullptr) return 0;
+   for (int i = 0; i < compiled_model_->GetNumSignatures(); ++i) {
+     LITERT_ASSIGN_OR_RETURN(auto signature, compiled_model_->GetSignature(i));
+     if (signature.Key() != "verify") continue;

@@ -1,0 +1,193 @@
+{
+  "format_version": 1,
+  "repository": "google-ai-edge/LiteRT-LM",
+  "revision": "5f25078c9439e176615af5ba42636ed904fca847",
+  "scope": "Source/API inspection and exact pinned artifact metadata. This record does not claim native Swift, Gemma, Metal or ANE execution.",
+  "upstream": [
+    {
+      "path": "c/engine.h",
+      "git_blob_sha1": "eec75355ffe879047f3148335a0670935b7aa219",
+      "symbols": "Threading model; session configuration",
+      "proof": "Serialize handle use; cancellation from a generation callback is the documented exception.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/c/engine.h"
+    },
+    {
+      "path": "c/conversation.h",
+      "git_blob_sha1": "f951ad7137e165d882ff4113c0f8aa686d333d69",
+      "symbols": "conversation_config_create; set_system_message; send_message_stream; wait_until_done; get_token_count",
+      "proof": "Use the actual C signatures, JSON system content, background callback contract and explicit completion barrier.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/c/conversation.h"
+    },
+    {
+      "path": "c/conversation.cc",
+      "git_blob_sha1": "34b2455b6912b8858970df9b2a967a859c7fc607",
+      "symbols": "CreateConversationCallback; conversation creation; stream/wait wrappers",
+      "proof": "Native callbacks borrow chunk storage for the callback duration; copy chunk/error strings before returning.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/c/conversation.cc"
+    },
+    {
+      "path": "runtime/conversation/conversation.cc",
+      "git_blob_sha1": "dadc75e517fbbb32412958b9abcaaeb036260d92",
+      "symbols": "Conversation::GetTokenCount; Conversation::CountTokens",
+      "proof": "Current count is the Session position. CountTokens preprocesses the new message, including the first-turn preface when appropriate, without appending history.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/conversation/conversation.cc"
+    },
+    {
+      "path": "runtime/core/session_utils.cc",
+      "git_blob_sha1": "2a10baabdf10b7236c5034ec0e106cdf7ac22635",
+      "symbols": "CalculateInputDataTokens; CalculateAudioTokens; CalculateStreamingAudioTokens",
+      "proof": "Input count derives from text tokens and audio frame geometry; InputAudioEnd contributes one token.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/core/session_utils.cc"
+    },
+    {
+      "path": "runtime/conversation/model_data_processor/gemma4_data_processor.cc",
+      "git_blob_sha1": "b63db479fb64e0c32cd6832094a44251214c8be3",
+      "symbols": "Gemma4DataProcessor::Create; ToInputDataVectorImpl",
+      "proof": "Selects the raw-PCM or mel preprocessor from the actual model configuration and appends audio-end input.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/conversation/model_data_processor/gemma4_data_processor.cc"
+    },
+    {
+      "path": "runtime/conversation/model_data_processor/multimodal_processor_helper.cc",
+      "git_blob_sha1": "dc25d4e458fafe254697567311e90f99a5dc0b38",
+      "symbols": "ProcessMultimodalPrompt",
+      "proof": "Preprocesses each audio file and immediately resets the preprocessor; the setup counting probe leaves no buffered frames.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/conversation/model_data_processor/multimodal_processor_helper.cc"
+    },
+    {
+      "path": "support/preprocessor/audio_preprocessor.h",
+      "git_blob_sha1": "c92e992daa3e3f3a5b7db72a9edd2b7fbeae7103",
+      "symbols": "AudioPreprocessorConfig::CreateDefaultGemma4Config",
+      "proof": "Raw frames use length/hop 640; mel frames use length 320/hop 160. Geometry depends on the configured sample rate and frame policy.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/support/preprocessor/audio_preprocessor.h"
+    },
+    {
+      "path": "support/preprocessor/audio_preprocessor_miniaudio.cc",
+      "git_blob_sha1": "c73b965cb7628e3f14ff6d965760d9d41318eb39",
+      "symbols": "AudioPreprocessorMiniAudio::Preprocess",
+      "proof": "Builds tensor sequence dimensions from the number of raw or mel frames, with no silence-dependent branch.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/support/preprocessor/audio_preprocessor_miniaudio.cc"
+    },
+    {
+      "path": "support/preprocessor/audio_preprocessor_utils.cc",
+      "git_blob_sha1": "8dc6df569e7687759b654ce180156ce36b4ce9d9",
+      "symbols": "GetFramedSegments; GetWindowedSignalsForFft; ToLogMelSpectrogram",
+      "proof": "Counts windows from sample lengths and padding; signal transforms preserve frame count.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/support/preprocessor/audio_preprocessor_utils.cc"
+    },
+    {
+      "path": "runtime/executor/litert_compiled_model_executor_utils.cc",
+      "git_blob_sha1": "e860093d74b41e4d9883fca8a442a76d519165e7",
+      "symbols": "GetOptimizedPrefillWorkGroups",
+      "proof": "Falls back to the smallest prefill runner as capacity shrinks and rejects input that cannot fit. Both artifact receipts expose a 128-token runner.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/litert_compiled_model_executor_utils.cc"
+    },
+    {
+      "path": "runtime/core/tasks.cc",
+      "git_blob_sha1": "8419d38f9bc05bdf9d700286a9df4030d8f0a9f0",
+      "symbols": "Tasks::Prefill; Tasks::Decode; ShouldStop",
+      "proof": "Decode checks output/context limits after a returned token batch. Reaching the context limit can finish with MaxNumTokensReached; repeated restoration of that cache does not free capacity.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/core/tasks.cc"
+    },
+    {
+      "path": "runtime/executor/llm_litert_compiled_model_executor.cc",
+      "git_blob_sha1": "76dd6d95e21f47da013a02a362f721cdd1553e7d",
+      "symbols": "InitializeSampler; CreateNewContext; Decode",
+      "proof": "Ordinary execution retains its initialized sampler across turns; a new context starts from configured sampling state. Patches 0004/0008 add checkpoint loading and reset transient sampling/priming state.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/llm_litert_compiled_model_executor.cc"
+    },
+    {
+      "path": "runtime/executor/llm_litert_mtp_drafter.cc",
+      "git_blob_sha1": "73fd90ac3390faff47a8405e266cad22d479ec60",
+      "symbols": "UpdateVerifierSamplerConfig; Draft",
+      "proof": "MTP uses its own verifier sampling/transient state; the checkpoint patches re-prime instead of serializing random-generator state.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/llm_litert_mtp_drafter.cc"
+    },
+    {
+      "path": "runtime/framework/resource_management/threaded_execution_manager.cc",
+      "git_blob_sha1": "ebd055d8a20c5d5f44ffb837f46498fe2da8d5fa",
+      "symbols": "ThreadedExecutionManager::WaitUntilDone",
+      "proof": "A wait timeout is not a lifetime barrier. The Swift bridge retains handles and callback storage while retrying DeadlineExceeded.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/resource_management/threaded_execution_manager.cc"
+    },
+    {
+      "path": "runtime/executor/magic_number_configs_helper.cc",
+      "git_blob_sha1": "803ba707e7da4f86fb505e2c15e2f843e857c874",
+      "symbols": "IsMagicNumber; GetMagicNumbersFromModel; GetTargetNumber; GetLiteRtEnvOptions",
+      "proof": "A prime mask dimension greater than 10 marks context resize. Requested positive capacity must be strictly below the marker; otherwise the helper uses its smaller default multiple 256.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/executor/magic_number_configs_helper.cc"
+    },
+    {
+      "path": "runtime/util/litert_util.cc",
+      "git_blob_sha1": "509200ee9de84b1dcb646857035f6c6640148252",
+      "symbols": "CreateEnvironment",
+      "proof": "CPU/GPU environment creation enables the magic-number configuration helper by default.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/util/litert_util.cc"
+    },
+    {
+      "path": "runtime/core/session_advanced.cc",
+      "git_blob_sha1": "ddc3d7b7560fb8fa55dec58f7468969e4b985c16",
+      "symbols": "SessionAdvanced::~SessionAdvanced",
+      "proof": "Destructor ignores a bounded WaitUntilDone failure. Deletion alone cannot justify releasing borrowed callback data.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/core/session_advanced.cc"
+    },
+    {
+      "path": "runtime/core/engine_advanced_impl.cc",
+      "git_blob_sha1": "fd846acd331106194e0e2cc1dd95a60d12a26e54",
+      "symbols": "EngineAdvancedImpl::~EngineAdvancedImpl",
+      "proof": "After its bounded wait, engine destruction resets the execution manager. The cancellation fixture retains callback storage through this operation.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/core/engine_advanced_impl.cc"
+    },
+    {
+      "path": "runtime/framework/threadpool.cc",
+      "git_blob_sha1": "5a3a805f97de6b3f0d9788196a8f58ff77766a97",
+      "symbols": "ThreadPool::~ThreadPool; RunWorker",
+      "proof": "Pool destruction stops scheduling and joins workers; workers process pending closures before exiting. Execution-manager destruction resets execution then callback pools.",
+      "url": "https://github.com/google-ai-edge/LiteRT-LM/blob/5f25078c9439e176615af5ba42636ed904fca847/runtime/framework/threadpool.cc"
+    }
+  ],
+  "local_extensions": {
+    "patch": "../RuntimePatches/LiteRT-LM/0011-gemma-conversation-cache.patch",
+    "bridge": "The appended C count_tokens function forwards to existing Conversation::CountTokens. Conversation save/load are new APIs; they are not claimed to exist at the upstream pin.",
+    "runtime": "../Sources/CallGemma/Runtime/GemmaRuntime.swift",
+    "checkpoint_store": "../Sources/CallGemma/Runtime/CheckpointStore.swift",
+    "counting_policy": "During setup, count one app-generated 30-second mono 16 kHz WAV with the actual system preface in a fresh conversation. Per turn, query only the current token count.",
+    "reserve": "Counted input + configured maximum output 256 + conservative padding 256. The padding covers up to 127 tokens from prefill_128, possible Session BOS accounting, and at most 4 tokens of overshoot from a cold four-step MTP batch.",
+    "rollover": "Before submitting a turn that exceeds this reserve, remove and sync CURRENT, replace the live conversation, and announce lost prior context. A failed or interrupted new turn therefore cannot recover the retired full cache.",
+    "rng": "Only completed-turn model context and exact history are restored. Sampler RNG is not serialized; loading creates fresh sampling/verification state from the target configuration. Subsequent stochastic draws/text need not match an uninterrupted process.",
+    "cancellation_qualification": "Session cancellation callback storage survives both Session and Engine deletion. Callback-accessor and async-start errors terminate the isolated child process rather than mark a fake final callback or unwind possibly borrowed storage. Native cancellation remains unrun."
+  },
+  "artifact_geometry": [
+    {
+      "model": "Gemma4 12B",
+      "artifact_sha256": "58fd31b778ca2c21c80d634fb34fc5a89d11d563a38dfd3cbf1b40dbf252a8b6",
+      "prefill_lengths": [
+        128,
+        1024
+      ],
+      "verifier_steps": 4,
+      "source": "../RuntimePatches/validation/int8-metal-codec/12b-shapes.json",
+      "audio_source": "../RuntimePatches/validation/stateless-audio/12b-audio-signatures.json",
+      "source_sha256": "3650332180666269283396d9cb49b79f5535acd161a9e7ec5a1ef5e8e43b6dc2"
+    },
+    {
+      "model": "Gemma4 E4B",
+      "artifact_sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+      "prefill_lengths": [
+        128,
+        1024
+      ],
+      "verifier_steps": 4,
+      "context_magic_number": 32003,
+      "largest_aligned_requested_capacity": 32000,
+      "capacity_reason": "32003 is the observed prime mask/KV dimension. A 32768 request falls back to 32000, so 32768 is not a usable-capacity guarantee. Automatic E4B selection below 16 GiB currently caps at 8192.",
+      "source": "../RuntimePatches/validation/int8-metal-codec/e4b-shapes.json",
+      "source_sha256": "e9605ba67361bc1d7fa5e1d82ad93b633ed91f4b40929e457a36413132b09d32",
+      "audio_source": "../RuntimePatches/validation/stateless-audio/e4b-audio-signatures.json"
+    }
+  ],
+  "review": {
+    "readme": "../README.md",
+    "result": "Context rollover, completed-turn persistence, explicit random-generator limitation and native-validation limitations agree with the inspected implementation.",
+    "limitation": "The setup reserve remains a source-derived conservative bound pending the two-artifact Mac qualification gate."
+  }
+}

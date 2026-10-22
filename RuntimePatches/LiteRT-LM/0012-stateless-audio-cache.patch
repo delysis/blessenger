@@ -1,0 +1,577 @@
+Subject: [PATCH] Admit stateless audio contexts at completed LLM cache boundaries
+
+Gemma4 12B's adapter-less encoder is classified as streaming even though
+its sole src_inputs input and features output retain no state between
+whole-utterance Encode calls. The previous blanket AudioContext guard
+therefore rejected completed direct-audio conversations.
+
+Add a checkpoint-only capability that defaults to unsupported. The LiteRT
+implementation admits only an unbuffered encoder with that actual layout,
+no adapter or overlap, and empty live/stored audio contexts. Advanced
+audio sessions remain unsupported because their EncodeAudio operations
+do not establish the ordinary session's completed-turn boundary.
+
+Try-acquire the audio lease before any context mutation and reuse it
+through the existing context switch. No token-loop bookkeeping or audio
+state copies are added. Tests cover real stateless-encoder continuation,
+retained/stateful/buffered rejection, and nonblocking lease retry.
+
+Base: google-ai-edge/LiteRT-LM 5f25078c9439e176615af5ba42636ed904fca847
+Apply after 0001-0011 in the LiteRT-LM patch sequence.
+
+Bounded artifact evidence SHA-256:
+  12b-audio-signatures.json: 28937cbba56b710b2dfa4a7c4539219b31c92466aca8fed82b7258cdbc59b0cb
+  12b-audio-ranges.json: 0d3103f600ebed6a36b987e95ad8c628b5d62a5b10ef35902d690229d84cf687
+  e4b-audio-signatures.json: 7e2ddea638edbaed1d3a4105024da320ec637edac860f4c818be578026050f7c
+  e4b-audio-ranges.json: 93afa5c26766561a399620c502666554f98ff86124bee8af5f68315c0947ef9c
+  source-receipts.json: 98078d65462ba21333fa733f157b6da76e70ad0d4b6ca4cb6414e7f2eb8f2f3e
+
+Existing CPU fixture Git blob: de87e4b0b36963ee779a8bd98f5144739258b324
+Native tests were not run here; syntax-only attempts stopped at missing
+real dependency headers. Exact diagnostics accompany the evidence.
+
+---
+diff --git a/runtime/executor/audio/audio_executor_base.h b/runtime/executor/audio/audio_executor_base.h
+index 45149690a9ca2e4094e589e361a05672085bd8ce..c4845de5ffc6f43a6985a7ef66b40330d9fd3eaf 100644
+--- a/runtime/executor/audio/audio_executor_base.h
++++ b/runtime/executor/audio/audio_executor_base.h
+@@ -77,6 +77,16 @@ class AudioExecutorBase {
+     return absl::UnimplementedError("Not implemented.");
+   }
+ 
++  // Checks that a completed-turn LLM cache can omit the audio context. A null
++  // argument checks the live executor; otherwise the context must come from
++  // this executor. Call only while holding its exclusive lease. Stateful or
++  // partially buffered audio needs a separate persistence contract.
++  virtual absl::Status ValidateContextForCache(
++      const AudioContext* audio_context = nullptr) const {
++    return absl::UnimplementedError(
++        "Audio context cannot be omitted from an LLM cache.");
++  }
++
+   // Get the audio executor properties.
+   virtual absl::StatusOr<AudioExecutorProperties> GetAudioExecutorProperties()
+       const {
+diff --git a/runtime/executor/audio_litert_compiled_model_executor.cc b/runtime/executor/audio_litert_compiled_model_executor.cc
+index cb072781283cc3601ef232c8330a7aa832650158..719cddc5325560ecd445ff12a4c275cdfe563edf 100644
+--- a/runtime/executor/audio_litert_compiled_model_executor.cc
++++ b/runtime/executor/audio_litert_compiled_model_executor.cc
+@@ -1496,6 +1496,35 @@ AudioLiteRtCompiledModelExecutor::AudioStreamingEncoder::RestoreContext(
+   return absl::OkStatus();
+ }
+ 
++absl::Status AudioLiteRtCompiledModelExecutor::ValidateContextForCache(
++    const AudioContext* audio_context) const {
++  const auto& inputs = audio_encoder_->GetInputBuffersMap();
++  const auto& outputs = audio_encoder_->GetOutputBuffersMap();
++  // Adapter-less Gemma4 exports are classified as streaming, but their sole
++  // audio input and features output carry no state between Encode calls.
++  // Without buffering or overlap, each call consumes its whole utterance.
++  if (audio_adapter_ != nullptr || !audio_encoder_->IsStreaming() ||
++      executor_settings_.GetAudioBufferingEnabled() ||
++      executor_properties_.streaming_chunk_overlap_size != 0 ||
++      inputs.size() != 1 ||
++      absl::c_find(kAudioInputNames, inputs.begin()->first) ==
++          kAudioInputNames.end() ||
++      outputs.size() != 1 || !outputs.contains(kFeaturesName)) {
++    return absl::UnimplementedError(
++        "LLM cache requires an unbuffered, stateless audio encoder.");
++  }
++  if (audio_context != nullptr) {
++    if (!static_cast<const AudioStreamingContext&>(*audio_context).IsEmpty()) {
++      return absl::FailedPreconditionError("Audio context retains stream state.");
++    }
++  } else if (!audio_encoder_->GetBufferedSpectrogram().empty() ||
++             !static_cast<const AudioStreamingEncoder*>(audio_encoder_.get())
++                  ->IsFirstChunk()) {
++    return absl::FailedPreconditionError("Audio executor retains stream state.");
++  }
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<AudioContext>>
+ AudioLiteRtCompiledModelExecutor::CreateNewContext() {
+   if (!audio_encoder_->IsStreaming()) {
+diff --git a/runtime/executor/audio_litert_compiled_model_executor.h b/runtime/executor/audio_litert_compiled_model_executor.h
+index d46701579f7f3d54dc409a7c5edf4431b69cfcf5..ddb27fd68a8b800549ff90f0cebdb1802dc35979 100644
+--- a/runtime/executor/audio_litert_compiled_model_executor.h
++++ b/runtime/executor/audio_litert_compiled_model_executor.h
+@@ -60,6 +60,13 @@ class AudioStreamingContext : public AudioContext {
+   }
+   std::vector<float>& buffered_spectrogram() { return buffered_spectrogram_; }
+ 
++  // Input/output scratch buffers are excluded from this context. An empty
++  // context can be recreated without retaining any earlier audio.
++  bool IsEmpty() const {
++    return state_buffers_.empty() && buffered_spectrogram_.empty() &&
++           is_first_chunk_;
++  }
++
+   // Returns whether the next encoded chunk is the first chunk of the stream.
+   //
+   // args: none.
+@@ -172,6 +179,9 @@ class AudioLiteRtCompiledModelExecutor : public AudioExecutor {
+   absl::Status RestoreContext(
+       std::unique_ptr<AudioContext> audio_context) override;
+ 
++  absl::Status ValidateContextForCache(
++      const AudioContext* audio_context = nullptr) const override;
++
+   // Loads the LoRA model into the audio executor.
+   absl::Status LoadLoRA(uint32_t lora_id,
+                         const ModelAssets& model_assets) override {
+diff --git a/runtime/executor/audio_litert_compiled_model_executor_test.cc b/runtime/executor/audio_litert_compiled_model_executor_test.cc
+index da7b8c7568ab4e073eb3819477c4d7d0b2cdb93f..c1eaa666e27901b95c2b8fbaf3de96e80a6da077 100644
+--- a/runtime/executor/audio_litert_compiled_model_executor_test.cc
++++ b/runtime/executor/audio_litert_compiled_model_executor_test.cc
+@@ -684,6 +684,96 @@ TEST_F(AudioLiteRtCompiledModelExecutorTest,
+             absl::StatusCode::kUnimplemented);
+ }
+ 
++TEST_F(AudioLiteRtCompiledModelExecutorTest,
++       CacheCheckpointStatelessAudioContinuesWithFreshContext) {
++  const auto model_path =
++      (std::filesystem::path(::testing::SrcDir()) /
++       std::string(kTestAudioNoMaskModelPath)).string();
++  ASSERT_OK_AND_ASSIGN(auto executor,
++                       CreateAudioExecutor(*env_, model_path, 0, Backend::CPU));
++  ASSERT_OK(executor->ValidateContextForCache());
++
++  // A non-multiple of the encoder window exercises zero-padding and the final
++  // partial window. With buffering disabled no frames survive this call.
++  std::vector<float> samples(13 * kSpectrogramFrequencySlots, 1.0f);
++  ASSERT_OK_AND_ASSIGN(
++      auto input, CreateTensorBuffer<const float>(
++                      samples, RankedTensorType(
++                                   GetElementType<float>(),
++                                   Layout(Dimensions(
++                                       {1, 13, kSpectrogramFrequencySlots})))));
++  ASSERT_OK(executor->Encode(input));
++  ASSERT_OK(executor->ValidateContextForCache());
++  ASSERT_OK_AND_ASSIGN(auto context, executor->CloneContext());
++  ASSERT_TRUE(static_cast<AudioStreamingContext*>(context.get())->IsEmpty());
++  ASSERT_OK(executor->ValidateContextForCache(context.get()));
++
++  // The next utterance's embeddings agree with a newly created audio executor;
++  // the LLM checkpoint does not need to contain the old audio input or output.
++  std::vector<float> silence(samples.size(), 0.0f);
++  ASSERT_TRUE(input.Write<float>(absl::MakeConstSpan(silence)).HasValue());
++  ASSERT_OK_AND_ASSIGN(auto continued, executor->Encode(input));
++  ASSERT_OK_AND_ASSIGN(auto continued_buffer,
++                       continued.GetMutableProjectedAudioEmbeddingsPtr());
++  ASSERT_OK_AND_ASSIGN(auto continued_values,
++                       GetDataAsVector<float>(*continued_buffer));
++  ASSERT_OK_AND_ASSIGN(auto restored,
++                       CreateAudioExecutor(*env_, model_path, 0, Backend::CPU));
++  ASSERT_OK(restored->ValidateContextForCache(context.get()));
++  ASSERT_OK(restored->RestoreContext(std::move(context)));
++  ASSERT_OK_AND_ASSIGN(auto resumed, restored->Encode(input));
++  ASSERT_OK_AND_ASSIGN(auto resumed_buffer,
++                       resumed.GetMutableProjectedAudioEmbeddingsPtr());
++  ASSERT_OK_AND_ASSIGN(auto resumed_values,
++                       GetDataAsVector<float>(*resumed_buffer));
++  EXPECT_EQ(resumed.GetValidTokens(), continued.GetValidTokens());
++  EXPECT_EQ(resumed_values, continued_values);
++}
++
++TEST_F(AudioLiteRtCompiledModelExecutorTest,
++       CacheCheckpointRejectsBufferingAndRecurrentAudio) {
++  for (const auto path : {kTestAudioNoMaskModelPath, kTestAudioStreamingModelPath}) {
++    ASSERT_OK_AND_ASSIGN(
++        auto executor,
++        CreateAudioExecutor(
++            *env_, (std::filesystem::path(::testing::SrcDir()) /
++                    std::string(path)).string(),
++            0, Backend::CPU,
++            /*audio_buffering_enabled=*/path == kTestAudioNoMaskModelPath));
++    EXPECT_THAT(executor->ValidateContextForCache(),
++                testing::status::StatusIs(absl::StatusCode::kUnimplemented));
++  }
++}
++
++TEST_F(AudioLiteRtCompiledModelExecutorTest,
++       CacheCheckpointRejectsNonemptyStoredAudioContext) {
++  ASSERT_OK_AND_ASSIGN(
++      auto executor,
++      CreateAudioExecutor(
++          *env_, (std::filesystem::path(::testing::SrcDir()) /
++                  std::string(kTestAudioNoMaskModelPath)).string(),
++          0, Backend::CPU));
++  ASSERT_OK_AND_ASSIGN(auto context, executor->CreateNewContext());
++  auto* streaming = static_cast<AudioStreamingContext*>(context.get());
++  streaming->buffered_spectrogram().push_back(1.0f);
++  EXPECT_THAT(executor->ValidateContextForCache(context.get()),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  streaming->buffered_spectrogram().clear();
++  streaming->SetIsFirstChunk(false);
++  EXPECT_THAT(executor->ValidateContextForCache(context.get()),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  streaming->SetIsFirstChunk(true);
++  ASSERT_OK(executor->ValidateContextForCache(context.get()));
++  ASSERT_OK_AND_ASSIGN(
++      auto state, CreateTensorBuffer<const float>(
++                      std::vector<float>{1.0f},
++                      RankedTensorType(GetElementType<float>(),
++                                       Layout(Dimensions({1})))));
++  streaming->state_buffers().emplace("unexpected_state", std::move(state));
++  EXPECT_THAT(executor->ValidateContextForCache(context.get()),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++}
++
+ TEST_F(AudioLiteRtCompiledModelExecutorTest,
+        ContextManagement_StreamingEncoder_CreateCloneRestore) {
+   ASSERT_OK_AND_ASSIGN(
+diff --git a/runtime/framework/resource_management/BUILD b/runtime/framework/resource_management/BUILD
+index 3a62edd98f4ff681b9d07d8f076ae0956bd1cd66..9242437f840f6d128143b978aa726610306fe32e 100644
+--- a/runtime/framework/resource_management/BUILD
++++ b/runtime/framework/resource_management/BUILD
+@@ -327,11 +327,14 @@ cc_test(
+         ":resource_manager",
+         "@com_google_googletest//:gtest_main",
+         "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/time",
+         "//runtime/engine:engine_settings",
++        "//runtime/executor:audio_executor",
+         "//runtime/executor:executor_stats",
+         "//runtime/executor:fake_llm_executor",
+         "//runtime/executor:llm_executor",
++        "//runtime/executor:llm_executor_io_types",
+         "//runtime/framework/resource_management/context_handler",
+         "//runtime/util:test_utils",
+     ],
+diff --git a/runtime/framework/resource_management/execution_manager_test.cc b/runtime/framework/resource_management/execution_manager_test.cc
+index 0fc13bfe6eb50d73f0175358d6579d8123dcb1c5..87e42678174251ce62f842a8b6ed378bd904d4fd 100644
+--- a/runtime/framework/resource_management/execution_manager_test.cc
++++ b/runtime/framework/resource_management/execution_manager_test.cc
+@@ -342,6 +342,22 @@ TEST_P(ExecutionManagerTest, CacheSaveRejectsUnfinishedDependency) {
+               testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
+ }
+ 
++TEST_P(ExecutionManagerTest, CacheRejectsAdvancedAudioSession) {
++  auto executor = std::make_unique<CacheTestLlmExecutor>();
++  EXPECT_CALL(*executor, SerializeContext()).Times(0);
++  EXPECT_CALL(*executor, LoadContext(testing::_, testing::_)).Times(0);
++  CreateExecutionManager(std::move(executor));
++  ASSERT_OK_AND_ASSIGN(auto config, CreateDefaultSessionConfig());
++  // EncodeAudio/FlushAudio do not change the ordinary SessionState, so that
++  // state alone cannot establish a completed audio stream.
++  config.SetEnableAudioSessionAdvanced(true);
++  ASSERT_OK_AND_ASSIGN(auto id, execution_manager_->RegisterNewSession(config));
++  EXPECT_THAT(execution_manager_->SerializeSessionContext(id, {}),
++              testing::status::StatusIs(absl::StatusCode::kUnimplemented));
++  EXPECT_THAT(execution_manager_->LoadSessionContext(id, "metadata", "state", 7),
++              testing::status::StatusIs(absl::StatusCode::kUnimplemented));
++}
++
+ TEST_P(ExecutionManagerTest, CacheLoadRejectsAUsedSessionRewoundToZero) {
+   auto executor = std::make_unique<CacheTestLlmExecutor>();
+   EXPECT_CALL(*executor, LoadContext(testing::_, testing::_)).Times(0);
+diff --git a/runtime/framework/resource_management/resource_manager.cc b/runtime/framework/resource_management/resource_manager.cc
+index cfc4892577271475ebd7d09b4d1af45ab856b155..f52e42770b63a7fe60801b8ea329403234b94ec9 100644
+--- a/runtime/framework/resource_management/resource_manager.cc
++++ b/runtime/framework/resource_management/resource_manager.cc
+@@ -198,6 +198,11 @@ class LockedAudioExecutor : public AudioExecutor {
+     return audio_executor_->RestoreContext(std::move(audio_context));
+   }
+ 
++  absl::Status ValidateContextForCache(
++      const AudioContext* audio_context = nullptr) const override {
++    return audio_executor_->ValidateContextForCache(audio_context);
++  }
++
+   absl::Status LoadLoRA(uint32_t lora_id,
+                         const ModelAssets& model_assets) override {
+     return audio_executor_->LoadLoRA(lora_id, model_assets);
+@@ -775,18 +780,31 @@ ResourceManager::TryAcquireExecutorWithContextHandler(
+     return absl::FailedPreconditionError("Executor is busy.");
+   }
+   MovableMutexLock lock(&executor_mutex_, std::adopt_lock);
++  std::unique_ptr<AudioExecutor> audio_lease;
+   if (new_context_handler->HasAudioContext() ||
+       (current_handler_ != nullptr && current_handler_->HasAudioContext())) {
+-    return absl::UnimplementedError(
+-        "A streaming audio context cannot be persisted as an LLM cache.");
++    if (!audio_executor_mutex_.TryLock()) {
++      return absl::FailedPreconditionError("Audio executor is busy.");
++    }
++    MovableMutexLock audio_lock(&audio_executor_mutex_, std::adopt_lock);
++    RET_CHECK_NE(audio_executor_, nullptr);
++    audio_lease = std::make_unique<LockedAudioExecutor>(
++        audio_executor_, std::move(audio_lock));
++    ABSL_RETURN_IF_ERROR(audio_lease->ValidateContextForCache());
++    if (new_context_handler->HasAudioContext()) {
++      ABSL_RETURN_IF_ERROR(audio_lease->ValidateContextForCache(
++          &new_context_handler->GetAudioContext()));
++    }
+   }
+   return AcquireExecutorWithContextHandlerLocked(std::move(new_context_handler),
+-                                                 std::move(lock));
++                                                 std::move(lock),
++                                                 audio_lease.get());
+ }
+ 
+ absl::StatusOr<std::unique_ptr<LlmExecutor>>
+ ResourceManager::AcquireExecutorWithContextHandlerLocked(
+-    std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock) {
++    std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock,
++    AudioExecutor* leased_audio_executor) {
+   RET_CHECK_NE(llm_executor_, nullptr) << "Llm executor should not be null, "
+                                           "please do not delete the shared "
+                                           "executor in ResourceManager at "
+@@ -857,12 +875,21 @@ ResourceManager::AcquireExecutorWithContextHandlerLocked(
+     ABSL_RETURN_IF_ERROR(llm_executor_->RestoreContext(std::move(llm_context)));
+   }
+ 
++  // Cache IO supplies a nonblocking lease acquired before context mutation.
++  // Ordinary context switches acquire their audio lease here as before.
++  std::unique_ptr<AudioExecutor> owned_audio_executor;
++  if (leased_audio_executor == nullptr &&
++      ((current_handler_ != nullptr && current_handler_->HasAudioContext()) ||
++       new_context_handler->HasAudioContext())) {
++    ABSL_ASSIGN_OR_RETURN(owned_audio_executor, AcquireAudioExecutor());
++    leased_audio_executor = owned_audio_executor.get();
++  }
++
+   // If the current handler has an audio context, update it from audio
+   // executor and save it back to the current handler.
+   if (current_handler_ != nullptr && current_handler_->HasAudioContext()) {
+-    ABSL_ASSIGN_OR_RETURN(auto audio_executor, AcquireAudioExecutor());
+     ABSL_ASSIGN_OR_RETURN(auto current_audio_context,
+-                          audio_executor->CloneContext());
++                          leased_audio_executor->CloneContext());
+     ABSL_RETURN_IF_ERROR(
+         current_handler_->SetAudioContext(std::move(current_audio_context)));
+   }
+@@ -870,12 +897,12 @@ ResourceManager::AcquireExecutorWithContextHandlerLocked(
+   // If the new handler has an audio context, audio executor will restore
+   // the audio context from the new handler.
+   if (new_context_handler->HasAudioContext()) {
+-    ABSL_ASSIGN_OR_RETURN(auto audio_executor, AcquireAudioExecutor());
+     ABSL_ASSIGN_OR_RETURN(
+         auto audio_context_cloned,
+-        audio_executor->CloneContext(new_context_handler->GetAudioContext()));
++        leased_audio_executor->CloneContext(
++            new_context_handler->GetAudioContext()));
+     ABSL_RETURN_IF_ERROR(
+-        audio_executor->RestoreContext(std::move(audio_context_cloned)));
++        leased_audio_executor->RestoreContext(std::move(audio_context_cloned)));
+   }
+ 
+   current_handler_ = new_context_handler;
+diff --git a/runtime/framework/resource_management/resource_manager.h b/runtime/framework/resource_management/resource_manager.h
+index ce818ef78fe13f2c7e397f53aff4d054c5a8b271..330758dbfca651b4c8470c17ac64fa3316026995 100644
+--- a/runtime/framework/resource_management/resource_manager.h
++++ b/runtime/framework/resource_management/resource_manager.h
+@@ -127,8 +127,8 @@ class ResourceManager {
+       ABSL_LOCKS_EXCLUDED(executor_mutex_)
+           ABSL_LOCKS_EXCLUDED(audio_executor_mutex_);
+ 
+-  // Nonblocking acquisition for explicit cache IO. Rejects an occupied executor
+-  // and streaming audio contexts, whose context switch requires another lease.
++  // Nonblocking acquisition for explicit cache IO. Audio contexts are allowed
++  // only when their executor can prove that no audio state needs persistence.
+   absl::StatusOr<std::unique_ptr<LlmExecutor>>
+   TryAcquireExecutorWithContextHandler(
+       std::shared_ptr<ContextHandler> new_context_handle)
+@@ -174,9 +174,9 @@ class ResourceManager {
+  private:
+   absl::StatusOr<std::unique_ptr<LlmExecutor>>
+   AcquireExecutorWithContextHandlerLocked(
+-      std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock)
+-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executor_mutex_)
+-          ABSL_LOCKS_EXCLUDED(audio_executor_mutex_);
++      std::shared_ptr<ContextHandler> new_context_handler, MovableMutexLock lock,
++      AudioExecutor* leased_audio_executor = nullptr)
++      ABSL_EXCLUSIVE_LOCKS_REQUIRED(executor_mutex_);
+ 
+   // Creates the litert environment if it is not created yet.
+   absl::Status MaybeCreateLitertEnv();
+diff --git a/runtime/framework/resource_management/resource_manager_test.cc b/runtime/framework/resource_management/resource_manager_test.cc
+index 52f19f6ee05ca9a9121c064de94683cd1b778641..ced89af41b049cf7d0e09e63c9d05cfaa83b88ba 100644
+--- a/runtime/framework/resource_management/resource_manager_test.cc
++++ b/runtime/framework/resource_management/resource_manager_test.cc
+@@ -22,11 +22,14 @@
+ #include <gmock/gmock.h>
+ #include <gtest/gtest.h>
+ #include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
+ #include "absl/time/time.h"  // from @com_google_absl
+ #include "runtime/engine/engine_settings.h"
++#include "runtime/executor/audio/audio_executor.h"
+ #include "runtime/executor/executor_stats.h"
+ #include "runtime/executor/fake_llm_executor.h"
+ #include "runtime/executor/llm_executor.h"
++#include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/util/test_utils.h"  // IWYU pragma: keep
+ 
+ namespace litert::lm {
+@@ -102,5 +105,116 @@ TEST(ResourceManagerTest, CacheLeaseRejectsBusyExecutorAndCanBeRetried) {
+   EXPECT_OK(manager->TryAcquireExecutorWithContextHandler(handler));
+ }
+ 
++class CacheAudioContext : public AudioContext {
++ public:
++  explicit CacheAudioContext(bool pending = false) : pending(pending) {}
++  absl::StatusOr<std::unique_ptr<AudioContext>> Clone() const override {
++    return std::make_unique<CacheAudioContext>(*this);
++  }
++  bool pending;
++};
++
++class CacheAudioExecutor : public AudioExecutor {
++ public:
++  absl::StatusOr<ExecutorAudioData> Encode(const TensorBuffer&) override {
++    return absl::UnimplementedError("Not used in the lease tests.");
++  }
++  absl::Status ValidateContextForCache(
++      const AudioContext* context = nullptr) const override {
++    if (!stateless) return absl::UnimplementedError("Stateful audio.");
++    const bool has_pending =
++        context != nullptr ? static_cast<const CacheAudioContext*>(context)->pending
++                           : pending;
++    if (has_pending) {
++      return absl::FailedPreconditionError("Partial audio.");
++    }
++    return absl::OkStatus();
++  }
++  absl::StatusOr<std::unique_ptr<AudioContext>> CloneContext() override {
++    return std::make_unique<CacheAudioContext>(pending);
++  }
++  absl::StatusOr<std::unique_ptr<AudioContext>> CloneContext(
++      const AudioContext& context) override {
++    return context.Clone();
++  }
++  absl::Status RestoreContext(std::unique_ptr<AudioContext> context) override {
++    pending = static_cast<CacheAudioContext*>(context.get())->pending;
++    ++restores;
++    return absl::OkStatus();
++  }
++  bool stateless = true;
++  bool pending = false;
++  int restores = 0;
++};
++
++class AudioCacheLeaseTest : public testing::Test {
++ protected:
++  void SetUp() override {
++    auto audio = std::make_unique<CacheAudioExecutor>();
++    audio_ = audio.get();
++    ASSERT_OK_AND_ASSIGN(
++        manager_, ResourceManager::Create(
++                      nullptr, std::make_unique<StatsFakeLlmExecutor>(&resets_),
++                      nullptr, nullptr, nullptr, std::move(audio)));
++    ASSERT_OK_AND_ASSIGN(
++        auto handler,
++        manager_->CreateContextHandler(SessionConfig::CreateDefault()));
++    handler_ = std::move(handler);
++    ASSERT_OK(handler_->SetAudioContext(std::make_unique<CacheAudioContext>()));
++  }
++
++  int resets_ = 0;
++  CacheAudioExecutor* audio_ = nullptr;
++  std::unique_ptr<ResourceManager> manager_;
++  std::shared_ptr<ContextHandler> handler_;
++};
++
++TEST_F(AudioCacheLeaseTest, StatelessAudioCanBeAcquiredAndSwitched) {
++  {
++    ASSERT_OK_AND_ASSIGN(
++        auto lease, manager_->TryAcquireExecutorWithContextHandler(handler_));
++    EXPECT_EQ(audio_->restores, 1);
++  }
++  ASSERT_OK_AND_ASSIGN(
++      auto other, manager_->CreateContextHandler(SessionConfig::CreateDefault()));
++  ASSERT_OK(other->SetAudioContext(std::make_unique<CacheAudioContext>()));
++  std::shared_ptr<ContextHandler> other_handler = std::move(other);
++  {
++    ASSERT_OK_AND_ASSIGN(
++        auto lease, manager_->TryAcquireExecutorWithContextHandler(other_handler));
++    EXPECT_EQ(audio_->restores, 2);
++  }
++  EXPECT_OK(manager_->TryAcquireExecutorWithContextHandler(handler_));
++  EXPECT_EQ(audio_->restores, 3);
++}
++
++TEST_F(AudioCacheLeaseTest, BusyAudioRejectsBeforeContextSwitchAndCanBeRetried) {
++  {
++    ASSERT_OK_AND_ASSIGN(auto audio_lease, manager_->AcquireAudioExecutor());
++    EXPECT_THAT(manager_->TryAcquireExecutorWithContextHandler(handler_),
++                testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++    EXPECT_EQ(audio_->restores, 0);
++  }
++  EXPECT_OK(manager_->TryAcquireExecutorWithContextHandler(handler_));
++  EXPECT_EQ(audio_->restores, 1);
++}
++
++TEST_F(AudioCacheLeaseTest, StatefulAndPartialAudioRejectBeforeContextSwitch) {
++  audio_->stateless = false;
++  EXPECT_THAT(manager_->TryAcquireExecutorWithContextHandler(handler_),
++              testing::status::StatusIs(absl::StatusCode::kUnimplemented));
++  audio_->stateless = true;
++  audio_->pending = true;
++  EXPECT_THAT(manager_->TryAcquireExecutorWithContextHandler(handler_),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  audio_->pending = false;
++  ASSERT_OK(handler_->SetAudioContext(std::make_unique<CacheAudioContext>(true)));
++  EXPECT_THAT(manager_->TryAcquireExecutorWithContextHandler(handler_),
++              testing::status::StatusIs(absl::StatusCode::kFailedPrecondition));
++  EXPECT_EQ(audio_->restores, 0);
++  ASSERT_OK(handler_->SetAudioContext(std::make_unique<CacheAudioContext>()));
++  EXPECT_OK(manager_->TryAcquireExecutorWithContextHandler(handler_));
++}
++
+ }  // namespace
+ }  // namespace litert::lm
+diff --git a/runtime/framework/resource_management/serial_execution_manager.cc b/runtime/framework/resource_management/serial_execution_manager.cc
+index 4c74134f2939916ff79988392129883efdb40007..3f163b833244fe7e471bdc9e3fe7d9b50f7b93f0 100644
+--- a/runtime/framework/resource_management/serial_execution_manager.cc
++++ b/runtime/framework/resource_management/serial_execution_manager.cc
+@@ -1189,6 +1189,10 @@ SerialExecutionManager::SerializeSessionContext(
+       return absl::NotFoundError("Session not found.");
+     }
+     session = found->second;
++    if (session->session_config.EnableAudioSessionAdvanced()) {
++      return absl::UnimplementedError(
++          "LLM cache does not persist an advanced audio session.");
++    }
+     if (!session->active_tasks.empty()) {
+       return absl::FailedPreconditionError("Session is busy.");
+     }
+@@ -1218,6 +1222,10 @@ absl::Status SerialExecutionManager::LoadSessionContext(
+       return absl::NotFoundError("Session not found.");
+     }
+     session = found->second;
++    if (session->session_config.EnableAudioSessionAdvanced()) {
++      return absl::UnimplementedError(
++          "LLM cache does not persist an advanced audio session.");
++    }
+     if (!session->active_tasks.empty()) {
+       return absl::FailedPreconditionError("Session is busy.");
+     }
+diff --git a/runtime/framework/resource_management/threaded_execution_manager.cc b/runtime/framework/resource_management/threaded_execution_manager.cc
+index 2c09bbfb6c2d7febdc3b0f9d716e1c213467ff4b..f71826dc0d7ab7c0f0d74ad3603158d6127d03ea 100644
+--- a/runtime/framework/resource_management/threaded_execution_manager.cc
++++ b/runtime/framework/resource_management/threaded_execution_manager.cc
+@@ -1336,6 +1336,10 @@ ThreadedExecutionManager::SerializeSessionContext(
+       return absl::NotFoundError("Session not found.");
+     }
+     session = found->second;
++    if (session->session_config.EnableAudioSessionAdvanced()) {
++      return absl::UnimplementedError(
++          "LLM cache does not persist an advanced audio session.");
++    }
+     if (!session->active_tasks.empty()) {
+       return absl::FailedPreconditionError("Session is busy.");
+     }
+@@ -1366,6 +1370,10 @@ absl::Status ThreadedExecutionManager::LoadSessionContext(
+       return absl::NotFoundError("Session not found.");
+     }
+     session = found->second;
++    if (session->session_config.EnableAudioSessionAdvanced()) {
++      return absl::UnimplementedError(
++          "LLM cache does not persist an advanced audio session.");
++    }
+     if (!session->active_tasks.empty()) {
+       return absl::FailedPreconditionError("Session is busy.");
+     }

@@ -1,0 +1,4289 @@
+{
+  "cache_only": true,
+  "additional_downloaded_bytes": 0,
+  "signatures": {
+    "decode": {
+      "subgraph_index": 0,
+      "complete": true,
+      "operators_visited": 2712,
+      "composites": [
+        {
+          "operator_index": 6,
+          "table_offset_in_target": 61921668,
+          "options_table_offset_in_target": 61921712,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 10,
+          "table_offset_in_target": 61914596,
+          "options_table_offset_in_target": 61914640,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 21,
+          "table_offset_in_target": 61872352,
+          "options_table_offset_in_target": 61872396,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 22,
+          "table_offset_in_target": 61872020,
+          "options_table_offset_in_target": 61872064,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 23,
+          "table_offset_in_target": 61871688,
+          "options_table_offset_in_target": 61871732,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 58,
+          "table_offset_in_target": 61862724,
+          "options_table_offset_in_target": 61862792,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 63,
+          "table_offset_in_target": 61861256,
+          "options_table_offset_in_target": 61861304,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 70,
+          "table_offset_in_target": 61858080,
+          "options_table_offset_in_target": 61858128,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 79,
+          "table_offset_in_target": 61824624,
+          "options_table_offset_in_target": 61824668,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 81,
+          "table_offset_in_target": 61824120,
+          "options_table_offset_in_target": 61824164,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 92,
+          "table_offset_in_target": 61544208,
+          "options_table_offset_in_target": 61544252,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 102,
+          "table_offset_in_target": 61507396,
+          "options_table_offset_in_target": 61507440,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 105,
+          "table_offset_in_target": 61506644,
+          "options_table_offset_in_target": 61506688,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 116,
+          "table_offset_in_target": 61464400,
+          "options_table_offset_in_target": 61464444,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 117,
+          "table_offset_in_target": 61464068,
+          "options_table_offset_in_target": 61464112,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 118,
+          "table_offset_in_target": 61463736,
+          "options_table_offset_in_target": 61463780,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 140,
+          "table_offset_in_target": 61456692,
+          "options_table_offset_in_target": 61456760,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 141,
+          "table_offset_in_target": 61456296,
+          "options_table_offset_in_target": 61456344,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 144,
+          "table_offset_in_target": 61454148,
+          "options_table_offset_in_target": 61454196,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 151,
+          "table_offset_in_target": 61421456,
+          "options_table_offset_in_target": 61421500,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 153,
+          "table_offset_in_target": 61420952,
+          "options_table_offset_in_target": 61420996,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 164,
+          "table_offset_in_target": 61141056,
+          "options_table_offset_in_target": 61141100,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 174,
+          "table_offset_in_target": 61104244,
+          "options_table_offset_in_target": 61104288,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 177,
+          "table_offset_in_target": 61103492,
+          "options_table_offset_in_target": 61103536,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 188,
+          "table_offset_in_target": 61061248,
+          "options_table_offset_in_target": 61061292,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 189,
+          "table_offset_in_target": 61060916,
+          "options_table_offset_in_target": 61060960,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 190,
+          "table_offset_in_target": 61060584,
+          "options_table_offset_in_target": 61060628,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 212,
+          "table_offset_in_target": 61053540,
+          "options_table_offset_in_target": 61053608,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 213,
+          "table_offset_in_target": 61053144,
+          "options_table_offset_in_target": 61053192,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 216,
+          "table_offset_in_target": 61050996,
+          "options_table_offset_in_target": 61051044,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 223,
+          "table_offset_in_target": 61018304,
+          "options_table_offset_in_target": 61018348,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 225,
+          "table_offset_in_target": 61017800,
+          "options_table_offset_in_target": 61017844,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 236,
+          "table_offset_in_target": 60737904,
+          "options_table_offset_in_target": 60737948,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 246,
+          "table_offset_in_target": 60701092,
+          "options_table_offset_in_target": 60701136,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 249,
+          "table_offset_in_target": 60700340,
+          "options_table_offset_in_target": 60700384,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 260,
+          "table_offset_in_target": 60658096,
+          "options_table_offset_in_target": 60658140,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 261,
+          "table_offset_in_target": 60657764,
+          "options_table_offset_in_target": 60657808,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 262,
+          "table_offset_in_target": 60657432,
+          "options_table_offset_in_target": 60657476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 284,
+          "table_offset_in_target": 60650388,
+          "options_table_offset_in_target": 60650456,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 285,
+          "table_offset_in_target": 60649992,
+          "options_table_offset_in_target": 60650040,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 288,
+          "table_offset_in_target": 60647844,
+          "options_table_offset_in_target": 60647892,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 295,
+          "table_offset_in_target": 60615152,
+          "options_table_offset_in_target": 60615196,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 297,
+          "table_offset_in_target": 60614648,
+          "options_table_offset_in_target": 60614692,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 308,
+          "table_offset_in_target": 60334752,
+          "options_table_offset_in_target": 60334796,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 318,
+          "table_offset_in_target": 60297940,
+          "options_table_offset_in_target": 60297984,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 321,
+          "table_offset_in_target": 60297188,
+          "options_table_offset_in_target": 60297232,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 332,
+          "table_offset_in_target": 60254944,
+          "options_table_offset_in_target": 60254988,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 333,
+          "table_offset_in_target": 60254612,
+          "options_table_offset_in_target": 60254656,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 334,
+          "table_offset_in_target": 60254280,
+          "options_table_offset_in_target": 60254324,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 356,
+          "table_offset_in_target": 60247236,
+          "options_table_offset_in_target": 60247304,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 357,
+          "table_offset_in_target": 60246840,
+          "options_table_offset_in_target": 60246888,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 360,
+          "table_offset_in_target": 60244692,
+          "options_table_offset_in_target": 60244740,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 367,
+          "table_offset_in_target": 60212000,
+          "options_table_offset_in_target": 60212044,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 369,
+          "table_offset_in_target": 60211496,
+          "options_table_offset_in_target": 60211540,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 380,
+          "table_offset_in_target": 59931600,
+          "options_table_offset_in_target": 59931644,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 390,
+          "table_offset_in_target": 59894788,
+          "options_table_offset_in_target": 59894832,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 393,
+          "table_offset_in_target": 59894036,
+          "options_table_offset_in_target": 59894080,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 404,
+          "table_offset_in_target": 59814928,
+          "options_table_offset_in_target": 59814972,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 405,
+          "table_offset_in_target": 59814596,
+          "options_table_offset_in_target": 59814640,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 406,
+          "table_offset_in_target": 59814264,
+          "options_table_offset_in_target": 59814308,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 432,
+          "table_offset_in_target": 59807500,
+          "options_table_offset_in_target": 59807568,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 433,
+          "table_offset_in_target": 59807104,
+          "options_table_offset_in_target": 59807152,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 440,
+          "table_offset_in_target": 59803792,
+          "options_table_offset_in_target": 59803840,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 449,
+          "table_offset_in_target": 59770360,
+          "options_table_offset_in_target": 59770404,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 451,
+          "table_offset_in_target": 59769856,
+          "options_table_offset_in_target": 59769900,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 462,
+          "table_offset_in_target": 59489960,
+          "options_table_offset_in_target": 59490004,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 472,
+          "table_offset_in_target": 59453148,
+          "options_table_offset_in_target": 59453192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 475,
+          "table_offset_in_target": 59452396,
+          "options_table_offset_in_target": 59452440,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 486,
+          "table_offset_in_target": 59410152,
+          "options_table_offset_in_target": 59410196,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 487,
+          "table_offset_in_target": 59409820,
+          "options_table_offset_in_target": 59409864,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 488,
+          "table_offset_in_target": 59409488,
+          "options_table_offset_in_target": 59409532,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 510,
+          "table_offset_in_target": 59402444,
+          "options_table_offset_in_target": 59402512,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 511,
+          "table_offset_in_target": 59402048,
+          "options_table_offset_in_target": 59402096,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 514,
+          "table_offset_in_target": 59399900,
+          "options_table_offset_in_target": 59399948,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 521,
+          "table_offset_in_target": 59367208,
+          "options_table_offset_in_target": 59367252,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 523,
+          "table_offset_in_target": 59366704,
+          "options_table_offset_in_target": 59366748,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 534,
+          "table_offset_in_target": 59086808,
+          "options_table_offset_in_target": 59086852,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 544,
+          "table_offset_in_target": 59049996,
+          "options_table_offset_in_target": 59050040,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 547,
+          "table_offset_in_target": 59049244,
+          "options_table_offset_in_target": 59049288,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 558,
+          "table_offset_in_target": 59007000,
+          "options_table_offset_in_target": 59007044,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 559,
+          "table_offset_in_target": 59006668,
+          "options_table_offset_in_target": 59006712,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 560,
+          "table_offset_in_target": 59006336,
+          "options_table_offset_in_target": 59006380,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 582,
+          "table_offset_in_target": 58999292,
+          "options_table_offset_in_target": 58999360,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 583,
+          "table_offset_in_target": 58998896,
+          "options_table_offset_in_target": 58998944,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 586,
+          "table_offset_in_target": 58996748,
+          "options_table_offset_in_target": 58996796,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 593,
+          "table_offset_in_target": 58964056,
+          "options_table_offset_in_target": 58964100,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 595,
+          "table_offset_in_target": 58963552,
+          "options_table_offset_in_target": 58963596,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 606,
+          "table_offset_in_target": 58683656,
+          "options_table_offset_in_target": 58683700,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 616,
+          "table_offset_in_target": 58646844,
+          "options_table_offset_in_target": 58646888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 619,
+          "table_offset_in_target": 58646092,
+          "options_table_offset_in_target": 58646136,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 630,
+          "table_offset_in_target": 58603848,
+          "options_table_offset_in_target": 58603892,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 631,
+          "table_offset_in_target": 58603516,
+          "options_table_offset_in_target": 58603560,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 632,
+          "table_offset_in_target": 58603184,
+          "options_table_offset_in_target": 58603228,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 654,
+          "table_offset_in_target": 58596140,
+          "options_table_offset_in_target": 58596208,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 655,
+          "table_offset_in_target": 58595744,
+          "options_table_offset_in_target": 58595792,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 658,
+          "table_offset_in_target": 58593596,
+          "options_table_offset_in_target": 58593644,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 665,
+          "table_offset_in_target": 58560904,
+          "options_table_offset_in_target": 58560948,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 667,
+          "table_offset_in_target": 58560400,
+          "options_table_offset_in_target": 58560444,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 678,
+          "table_offset_in_target": 58280504,
+          "options_table_offset_in_target": 58280548,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 688,
+          "table_offset_in_target": 58243692,
+          "options_table_offset_in_target": 58243736,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 691,
+          "table_offset_in_target": 58242940,
+          "options_table_offset_in_target": 58242984,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 702,
+          "table_offset_in_target": 58200696,
+          "options_table_offset_in_target": 58200740,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 703,
+          "table_offset_in_target": 58200364,
+          "options_table_offset_in_target": 58200408,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 704,
+          "table_offset_in_target": 58200032,
+          "options_table_offset_in_target": 58200076,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 726,
+          "table_offset_in_target": 58192988,
+          "options_table_offset_in_target": 58193056,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 727,
+          "table_offset_in_target": 58192592,
+          "options_table_offset_in_target": 58192640,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 730,
+          "table_offset_in_target": 58190444,
+          "options_table_offset_in_target": 58190492,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 737,
+          "table_offset_in_target": 58157752,
+          "options_table_offset_in_target": 58157796,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 739,
+          "table_offset_in_target": 58157248,
+          "options_table_offset_in_target": 58157292,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 750,
+          "table_offset_in_target": 57877352,
+          "options_table_offset_in_target": 57877396,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 760,
+          "table_offset_in_target": 57840540,
+          "options_table_offset_in_target": 57840584,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 763,
+          "table_offset_in_target": 57839784,
+          "options_table_offset_in_target": 57839828,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 774,
+          "table_offset_in_target": 57797480,
+          "options_table_offset_in_target": 57797524,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 775,
+          "table_offset_in_target": 57797148,
+          "options_table_offset_in_target": 57797192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 776,
+          "table_offset_in_target": 57796812,
+          "options_table_offset_in_target": 57796856,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 798,
+          "table_offset_in_target": 57789740,
+          "options_table_offset_in_target": 57789808,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 799,
+          "table_offset_in_target": 57789340,
+          "options_table_offset_in_target": 57789388,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 802,
+          "table_offset_in_target": 57787184,
+          "options_table_offset_in_target": 57787232,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 809,
+          "table_offset_in_target": 57754476,
+          "options_table_offset_in_target": 57754520,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 811,
+          "table_offset_in_target": 57753964,
+          "options_table_offset_in_target": 57754008,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 822,
+          "table_offset_in_target": 57474016,
+          "options_table_offset_in_target": 57474060,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 832,
+          "table_offset_in_target": 57437188,
+          "options_table_offset_in_target": 57437232,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 835,
+          "table_offset_in_target": 57436428,
+          "options_table_offset_in_target": 57436472,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 846,
+          "table_offset_in_target": 57357256,
+          "options_table_offset_in_target": 57357300,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 847,
+          "table_offset_in_target": 57356924,
+          "options_table_offset_in_target": 57356968,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 848,
+          "table_offset_in_target": 57356588,
+          "options_table_offset_in_target": 57356632,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 870,
+          "table_offset_in_target": 57349516,
+          "options_table_offset_in_target": 57349584,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 871,
+          "table_offset_in_target": 57349116,
+          "options_table_offset_in_target": 57349164,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 874,
+          "table_offset_in_target": 57346960,
+          "options_table_offset_in_target": 57347008,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 881,
+          "table_offset_in_target": 57314252,
+          "options_table_offset_in_target": 57314296,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 883,
+          "table_offset_in_target": 57313740,
+          "options_table_offset_in_target": 57313784,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 894,
+          "table_offset_in_target": 57033792,
+          "options_table_offset_in_target": 57033836,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 904,
+          "table_offset_in_target": 56996964,
+          "options_table_offset_in_target": 56997008,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 907,
+          "table_offset_in_target": 56996204,
+          "options_table_offset_in_target": 56996248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 918,
+          "table_offset_in_target": 56953896,
+          "options_table_offset_in_target": 56953940,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 919,
+          "table_offset_in_target": 56953564,
+          "options_table_offset_in_target": 56953608,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 920,
+          "table_offset_in_target": 56953228,
+          "options_table_offset_in_target": 56953272,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 942,
+          "table_offset_in_target": 56946156,
+          "options_table_offset_in_target": 56946224,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 943,
+          "table_offset_in_target": 56945756,
+          "options_table_offset_in_target": 56945804,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 946,
+          "table_offset_in_target": 56943600,
+          "options_table_offset_in_target": 56943648,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 953,
+          "table_offset_in_target": 56910892,
+          "options_table_offset_in_target": 56910936,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 955,
+          "table_offset_in_target": 56910380,
+          "options_table_offset_in_target": 56910424,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 966,
+          "table_offset_in_target": 56630432,
+          "options_table_offset_in_target": 56630476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 976,
+          "table_offset_in_target": 56593604,
+          "options_table_offset_in_target": 56593648,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 979,
+          "table_offset_in_target": 56592844,
+          "options_table_offset_in_target": 56592888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 990,
+          "table_offset_in_target": 56550536,
+          "options_table_offset_in_target": 56550580,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 991,
+          "table_offset_in_target": 56550204,
+          "options_table_offset_in_target": 56550248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 992,
+          "table_offset_in_target": 56549868,
+          "options_table_offset_in_target": 56549912,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1014,
+          "table_offset_in_target": 56542796,
+          "options_table_offset_in_target": 56542864,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1015,
+          "table_offset_in_target": 56542396,
+          "options_table_offset_in_target": 56542444,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1018,
+          "table_offset_in_target": 56540240,
+          "options_table_offset_in_target": 56540288,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1025,
+          "table_offset_in_target": 56507532,
+          "options_table_offset_in_target": 56507576,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1027,
+          "table_offset_in_target": 56507020,
+          "options_table_offset_in_target": 56507064,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1038,
+          "table_offset_in_target": 56227072,
+          "options_table_offset_in_target": 56227116,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1048,
+          "table_offset_in_target": 56190244,
+          "options_table_offset_in_target": 56190288,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1051,
+          "table_offset_in_target": 56189484,
+          "options_table_offset_in_target": 56189528,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1062,
+          "table_offset_in_target": 56147176,
+          "options_table_offset_in_target": 56147220,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1063,
+          "table_offset_in_target": 56146844,
+          "options_table_offset_in_target": 56146888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1064,
+          "table_offset_in_target": 56146508,
+          "options_table_offset_in_target": 56146552,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1086,
+          "table_offset_in_target": 56139436,
+          "options_table_offset_in_target": 56139504,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1087,
+          "table_offset_in_target": 56139036,
+          "options_table_offset_in_target": 56139084,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1090,
+          "table_offset_in_target": 56136880,
+          "options_table_offset_in_target": 56136928,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1097,
+          "table_offset_in_target": 56104172,
+          "options_table_offset_in_target": 56104216,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1099,
+          "table_offset_in_target": 56103660,
+          "options_table_offset_in_target": 56103704,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1110,
+          "table_offset_in_target": 55823712,
+          "options_table_offset_in_target": 55823756,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1120,
+          "table_offset_in_target": 55786884,
+          "options_table_offset_in_target": 55786928,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1123,
+          "table_offset_in_target": 55786124,
+          "options_table_offset_in_target": 55786168,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1134,
+          "table_offset_in_target": 55743816,
+          "options_table_offset_in_target": 55743860,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1135,
+          "table_offset_in_target": 55743484,
+          "options_table_offset_in_target": 55743528,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1136,
+          "table_offset_in_target": 55743148,
+          "options_table_offset_in_target": 55743192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1158,
+          "table_offset_in_target": 55736076,
+          "options_table_offset_in_target": 55736144,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1159,
+          "table_offset_in_target": 55735676,
+          "options_table_offset_in_target": 55735724,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1162,
+          "table_offset_in_target": 55733520,
+          "options_table_offset_in_target": 55733568,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1169,
+          "table_offset_in_target": 55700812,
+          "options_table_offset_in_target": 55700856,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1171,
+          "table_offset_in_target": 55700300,
+          "options_table_offset_in_target": 55700344,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1182,
+          "table_offset_in_target": 55420352,
+          "options_table_offset_in_target": 55420396,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1192,
+          "table_offset_in_target": 55383524,
+          "options_table_offset_in_target": 55383568,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1195,
+          "table_offset_in_target": 55382764,
+          "options_table_offset_in_target": 55382808,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1206,
+          "table_offset_in_target": 55340456,
+          "options_table_offset_in_target": 55340500,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1207,
+          "table_offset_in_target": 55340124,
+          "options_table_offset_in_target": 55340168,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1208,
+          "table_offset_in_target": 55339788,
+          "options_table_offset_in_target": 55339832,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1230,
+          "table_offset_in_target": 55332716,
+          "options_table_offset_in_target": 55332784,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1231,
+          "table_offset_in_target": 55332316,
+          "options_table_offset_in_target": 55332364,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1234,
+          "table_offset_in_target": 55330160,
+          "options_table_offset_in_target": 55330208,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1241,
+          "table_offset_in_target": 55297452,
+          "options_table_offset_in_target": 55297496,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1243,
+          "table_offset_in_target": 55296940,
+          "options_table_offset_in_target": 55296984,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1254,
+          "table_offset_in_target": 55016992,
+          "options_table_offset_in_target": 55017036,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1264,
+          "table_offset_in_target": 54980164,
+          "options_table_offset_in_target": 54980208,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1267,
+          "table_offset_in_target": 54979404,
+          "options_table_offset_in_target": 54979448,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1278,
+          "table_offset_in_target": 54900232,
+          "options_table_offset_in_target": 54900276,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1279,
+          "table_offset_in_target": 54899900,
+          "options_table_offset_in_target": 54899944,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1280,
+          "table_offset_in_target": 54899564,
+          "options_table_offset_in_target": 54899608,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1302,
+          "table_offset_in_target": 54892492,
+          "options_table_offset_in_target": 54892560,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1303,
+          "table_offset_in_target": 54892092,
+          "options_table_offset_in_target": 54892140,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1306,
+          "table_offset_in_target": 54889936,
+          "options_table_offset_in_target": 54889984,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1313,
+          "table_offset_in_target": 54857228,
+          "options_table_offset_in_target": 54857272,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1315,
+          "table_offset_in_target": 54856716,
+          "options_table_offset_in_target": 54856760,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1326,
+          "table_offset_in_target": 54576768,
+          "options_table_offset_in_target": 54576812,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1336,
+          "table_offset_in_target": 54539940,
+          "options_table_offset_in_target": 54539984,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1339,
+          "table_offset_in_target": 54539180,
+          "options_table_offset_in_target": 54539224,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1350,
+          "table_offset_in_target": 54496872,
+          "options_table_offset_in_target": 54496916,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1351,
+          "table_offset_in_target": 54496540,
+          "options_table_offset_in_target": 54496584,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1352,
+          "table_offset_in_target": 54496204,
+          "options_table_offset_in_target": 54496248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1374,
+          "table_offset_in_target": 54489132,
+          "options_table_offset_in_target": 54489200,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1375,
+          "table_offset_in_target": 54488732,
+          "options_table_offset_in_target": 54488780,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1378,
+          "table_offset_in_target": 54486576,
+          "options_table_offset_in_target": 54486624,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1385,
+          "table_offset_in_target": 54453868,
+          "options_table_offset_in_target": 54453912,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1387,
+          "table_offset_in_target": 54453356,
+          "options_table_offset_in_target": 54453400,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1398,
+          "table_offset_in_target": 54173408,
+          "options_table_offset_in_target": 54173452,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1408,
+          "table_offset_in_target": 54136580,
+          "options_table_offset_in_target": 54136624,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1411,
+          "table_offset_in_target": 54135820,
+          "options_table_offset_in_target": 54135864,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1422,
+          "table_offset_in_target": 54093512,
+          "options_table_offset_in_target": 54093556,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1423,
+          "table_offset_in_target": 54093180,
+          "options_table_offset_in_target": 54093224,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1424,
+          "table_offset_in_target": 54092844,
+          "options_table_offset_in_target": 54092888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1446,
+          "table_offset_in_target": 54085772,
+          "options_table_offset_in_target": 54085840,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1447,
+          "table_offset_in_target": 54085372,
+          "options_table_offset_in_target": 54085420,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1450,
+          "table_offset_in_target": 54083216,
+          "options_table_offset_in_target": 54083264,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1457,
+          "table_offset_in_target": 54050508,
+          "options_table_offset_in_target": 54050552,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1459,
+          "table_offset_in_target": 54049996,
+          "options_table_offset_in_target": 54050040,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1470,
+          "table_offset_in_target": 53770048,
+          "options_table_offset_in_target": 53770092,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1480,
+          "table_offset_in_target": 53733220,
+          "options_table_offset_in_target": 53733264,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1483,
+          "table_offset_in_target": 53732460,
+          "options_table_offset_in_target": 53732504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1494,
+          "table_offset_in_target": 53690152,
+          "options_table_offset_in_target": 53690196,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1495,
+          "table_offset_in_target": 53689820,
+          "options_table_offset_in_target": 53689864,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1496,
+          "table_offset_in_target": 53689484,
+          "options_table_offset_in_target": 53689528,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1518,
+          "table_offset_in_target": 53682412,
+          "options_table_offset_in_target": 53682480,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1519,
+          "table_offset_in_target": 53682012,
+          "options_table_offset_in_target": 53682060,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1522,
+          "table_offset_in_target": 53679856,
+          "options_table_offset_in_target": 53679904,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1529,
+          "table_offset_in_target": 53647148,
+          "options_table_offset_in_target": 53647192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1531,
+          "table_offset_in_target": 53646636,
+          "options_table_offset_in_target": 53646680,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1542,
+          "table_offset_in_target": 53366688,
+          "options_table_offset_in_target": 53366732,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1552,
+          "table_offset_in_target": 53329860,
+          "options_table_offset_in_target": 53329904,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1555,
+          "table_offset_in_target": 53329100,
+          "options_table_offset_in_target": 53329144,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1566,
+          "table_offset_in_target": 53286792,
+          "options_table_offset_in_target": 53286836,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1567,
+          "table_offset_in_target": 53286460,
+          "options_table_offset_in_target": 53286504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1568,
+          "table_offset_in_target": 53286124,
+          "options_table_offset_in_target": 53286168,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1590,
+          "table_offset_in_target": 53279052,
+          "options_table_offset_in_target": 53279120,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1591,
+          "table_offset_in_target": 53278652,
+          "options_table_offset_in_target": 53278700,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1594,
+          "table_offset_in_target": 53276496,
+          "options_table_offset_in_target": 53276544,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1601,
+          "table_offset_in_target": 53243788,
+          "options_table_offset_in_target": 53243832,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1603,
+          "table_offset_in_target": 53243276,
+          "options_table_offset_in_target": 53243320,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1614,
+          "table_offset_in_target": 52963328,
+          "options_table_offset_in_target": 52963372,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1624,
+          "table_offset_in_target": 52926500,
+          "options_table_offset_in_target": 52926544,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1627,
+          "table_offset_in_target": 52925740,
+          "options_table_offset_in_target": 52925784,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1638,
+          "table_offset_in_target": 52883432,
+          "options_table_offset_in_target": 52883476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1639,
+          "table_offset_in_target": 52883100,
+          "options_table_offset_in_target": 52883144,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1640,
+          "table_offset_in_target": 52882764,
+          "options_table_offset_in_target": 52882808,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1662,
+          "table_offset_in_target": 52875692,
+          "options_table_offset_in_target": 52875760,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1663,
+          "table_offset_in_target": 52875292,
+          "options_table_offset_in_target": 52875340,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1666,
+          "table_offset_in_target": 52873136,
+          "options_table_offset_in_target": 52873184,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1673,
+          "table_offset_in_target": 52840428,
+          "options_table_offset_in_target": 52840472,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1675,
+          "table_offset_in_target": 52839916,
+          "options_table_offset_in_target": 52839960,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1686,
+          "table_offset_in_target": 52559968,
+          "options_table_offset_in_target": 52560012,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1696,
+          "table_offset_in_target": 52523140,
+          "options_table_offset_in_target": 52523184,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1699,
+          "table_offset_in_target": 52522380,
+          "options_table_offset_in_target": 52522424,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1710,
+          "table_offset_in_target": 52443208,
+          "options_table_offset_in_target": 52443252,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1711,
+          "table_offset_in_target": 52442876,
+          "options_table_offset_in_target": 52442920,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1712,
+          "table_offset_in_target": 52442540,
+          "options_table_offset_in_target": 52442584,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1734,
+          "table_offset_in_target": 52435468,
+          "options_table_offset_in_target": 52435536,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1735,
+          "table_offset_in_target": 52435068,
+          "options_table_offset_in_target": 52435116,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1738,
+          "table_offset_in_target": 52432912,
+          "options_table_offset_in_target": 52432960,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1745,
+          "table_offset_in_target": 52400204,
+          "options_table_offset_in_target": 52400248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1747,
+          "table_offset_in_target": 52399692,
+          "options_table_offset_in_target": 52399736,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1758,
+          "table_offset_in_target": 52119744,
+          "options_table_offset_in_target": 52119788,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1768,
+          "table_offset_in_target": 52082916,
+          "options_table_offset_in_target": 52082960,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1771,
+          "table_offset_in_target": 52082156,
+          "options_table_offset_in_target": 52082200,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1776,
+          "table_offset_in_target": 52055356,
+          "options_table_offset_in_target": 52055400,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1787,
+          "table_offset_in_target": 52051756,
+          "options_table_offset_in_target": 52051804,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1790,
+          "table_offset_in_target": 52049600,
+          "options_table_offset_in_target": 52049648,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1797,
+          "table_offset_in_target": 52016892,
+          "options_table_offset_in_target": 52016936,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1799,
+          "table_offset_in_target": 52016380,
+          "options_table_offset_in_target": 52016424,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1810,
+          "table_offset_in_target": 51736432,
+          "options_table_offset_in_target": 51736476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1820,
+          "table_offset_in_target": 51699604,
+          "options_table_offset_in_target": 51699648,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1823,
+          "table_offset_in_target": 51698844,
+          "options_table_offset_in_target": 51698888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1828,
+          "table_offset_in_target": 51672044,
+          "options_table_offset_in_target": 51672088,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1839,
+          "table_offset_in_target": 51668444,
+          "options_table_offset_in_target": 51668492,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1842,
+          "table_offset_in_target": 51666288,
+          "options_table_offset_in_target": 51666336,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1849,
+          "table_offset_in_target": 51633580,
+          "options_table_offset_in_target": 51633624,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1851,
+          "table_offset_in_target": 51633068,
+          "options_table_offset_in_target": 51633112,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1862,
+          "table_offset_in_target": 51353120,
+          "options_table_offset_in_target": 51353164,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1872,
+          "table_offset_in_target": 51316292,
+          "options_table_offset_in_target": 51316336,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1875,
+          "table_offset_in_target": 51315532,
+          "options_table_offset_in_target": 51315576,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1880,
+          "table_offset_in_target": 51288732,
+          "options_table_offset_in_target": 51288776,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1891,
+          "table_offset_in_target": 51285132,
+          "options_table_offset_in_target": 51285180,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1894,
+          "table_offset_in_target": 51282976,
+          "options_table_offset_in_target": 51283024,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1901,
+          "table_offset_in_target": 51250268,
+          "options_table_offset_in_target": 51250312,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1903,
+          "table_offset_in_target": 51249756,
+          "options_table_offset_in_target": 51249800,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1914,
+          "table_offset_in_target": 50969808,
+          "options_table_offset_in_target": 50969852,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1924,
+          "table_offset_in_target": 50932980,
+          "options_table_offset_in_target": 50933024,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1927,
+          "table_offset_in_target": 50932220,
+          "options_table_offset_in_target": 50932264,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1932,
+          "table_offset_in_target": 50905420,
+          "options_table_offset_in_target": 50905464,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1943,
+          "table_offset_in_target": 50901820,
+          "options_table_offset_in_target": 50901868,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1946,
+          "table_offset_in_target": 50899664,
+          "options_table_offset_in_target": 50899712,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1953,
+          "table_offset_in_target": 50866956,
+          "options_table_offset_in_target": 50867000,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1955,
+          "table_offset_in_target": 50866444,
+          "options_table_offset_in_target": 50866488,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1966,
+          "table_offset_in_target": 50586496,
+          "options_table_offset_in_target": 50586540,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1976,
+          "table_offset_in_target": 50549668,
+          "options_table_offset_in_target": 50549712,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1979,
+          "table_offset_in_target": 50548908,
+          "options_table_offset_in_target": 50548952,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1984,
+          "table_offset_in_target": 50522108,
+          "options_table_offset_in_target": 50522152,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1995,
+          "table_offset_in_target": 50518508,
+          "options_table_offset_in_target": 50518556,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1998,
+          "table_offset_in_target": 50516352,
+          "options_table_offset_in_target": 50516400,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2005,
+          "table_offset_in_target": 50483644,
+          "options_table_offset_in_target": 50483688,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2007,
+          "table_offset_in_target": 50483132,
+          "options_table_offset_in_target": 50483176,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2018,
+          "table_offset_in_target": 50203184,
+          "options_table_offset_in_target": 50203228,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2028,
+          "table_offset_in_target": 50166356,
+          "options_table_offset_in_target": 50166400,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2031,
+          "table_offset_in_target": 50165596,
+          "options_table_offset_in_target": 50165640,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2036,
+          "table_offset_in_target": 50114220,
+          "options_table_offset_in_target": 50114264,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2047,
+          "table_offset_in_target": 50110620,
+          "options_table_offset_in_target": 50110668,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2050,
+          "table_offset_in_target": 50108464,
+          "options_table_offset_in_target": 50108512,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2057,
+          "table_offset_in_target": 50075756,
+          "options_table_offset_in_target": 50075800,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2059,
+          "table_offset_in_target": 50075244,
+          "options_table_offset_in_target": 50075288,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2070,
+          "table_offset_in_target": 49795296,
+          "options_table_offset_in_target": 49795340,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2080,
+          "table_offset_in_target": 49758468,
+          "options_table_offset_in_target": 49758512,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2083,
+          "table_offset_in_target": 49757708,
+          "options_table_offset_in_target": 49757752,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2088,
+          "table_offset_in_target": 49730908,
+          "options_table_offset_in_target": 49730952,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2099,
+          "table_offset_in_target": 49727308,
+          "options_table_offset_in_target": 49727356,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2102,
+          "table_offset_in_target": 49725152,
+          "options_table_offset_in_target": 49725200,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2109,
+          "table_offset_in_target": 49692444,
+          "options_table_offset_in_target": 49692488,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2111,
+          "table_offset_in_target": 49691932,
+          "options_table_offset_in_target": 49691976,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2122,
+          "table_offset_in_target": 49411984,
+          "options_table_offset_in_target": 49412028,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2132,
+          "table_offset_in_target": 49375156,
+          "options_table_offset_in_target": 49375200,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2135,
+          "table_offset_in_target": 49374396,
+          "options_table_offset_in_target": 49374440,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2140,
+          "table_offset_in_target": 49347596,
+          "options_table_offset_in_target": 49347640,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2151,
+          "table_offset_in_target": 49343996,
+          "options_table_offset_in_target": 49344044,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2154,
+          "table_offset_in_target": 49341840,
+          "options_table_offset_in_target": 49341888,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2161,
+          "table_offset_in_target": 49309132,
+          "options_table_offset_in_target": 49309176,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2163,
+          "table_offset_in_target": 49308620,
+          "options_table_offset_in_target": 49308664,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2174,
+          "table_offset_in_target": 49028672,
+          "options_table_offset_in_target": 49028716,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2184,
+          "table_offset_in_target": 48991844,
+          "options_table_offset_in_target": 48991888,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2187,
+          "table_offset_in_target": 48991084,
+          "options_table_offset_in_target": 48991128,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2192,
+          "table_offset_in_target": 48964284,
+          "options_table_offset_in_target": 48964328,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2203,
+          "table_offset_in_target": 48960684,
+          "options_table_offset_in_target": 48960732,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2206,
+          "table_offset_in_target": 48958528,
+          "options_table_offset_in_target": 48958576,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2213,
+          "table_offset_in_target": 48925820,
+          "options_table_offset_in_target": 48925864,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2215,
+          "table_offset_in_target": 48925308,
+          "options_table_offset_in_target": 48925352,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2226,
+          "table_offset_in_target": 48645360,
+          "options_table_offset_in_target": 48645404,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2236,
+          "table_offset_in_target": 48608532,
+          "options_table_offset_in_target": 48608576,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2239,
+          "table_offset_in_target": 48607772,
+          "options_table_offset_in_target": 48607816,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2244,
+          "table_offset_in_target": 48580972,
+          "options_table_offset_in_target": 48581016,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2255,
+          "table_offset_in_target": 48577372,
+          "options_table_offset_in_target": 48577420,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2258,
+          "table_offset_in_target": 48575216,
+          "options_table_offset_in_target": 48575264,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2265,
+          "table_offset_in_target": 48542508,
+          "options_table_offset_in_target": 48542552,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2267,
+          "table_offset_in_target": 48541996,
+          "options_table_offset_in_target": 48542040,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2278,
+          "table_offset_in_target": 48262048,
+          "options_table_offset_in_target": 48262092,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2288,
+          "table_offset_in_target": 48225220,
+          "options_table_offset_in_target": 48225264,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2291,
+          "table_offset_in_target": 48224460,
+          "options_table_offset_in_target": 48224504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2296,
+          "table_offset_in_target": 48197660,
+          "options_table_offset_in_target": 48197704,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2307,
+          "table_offset_in_target": 48194060,
+          "options_table_offset_in_target": 48194108,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2310,
+          "table_offset_in_target": 48191904,
+          "options_table_offset_in_target": 48191952,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2317,
+          "table_offset_in_target": 48159196,
+          "options_table_offset_in_target": 48159240,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2319,
+          "table_offset_in_target": 48158684,
+          "options_table_offset_in_target": 48158728,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2330,
+          "table_offset_in_target": 47878736,
+          "options_table_offset_in_target": 47878780,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2340,
+          "table_offset_in_target": 47841908,
+          "options_table_offset_in_target": 47841952,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2343,
+          "table_offset_in_target": 47841148,
+          "options_table_offset_in_target": 47841192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2348,
+          "table_offset_in_target": 47789772,
+          "options_table_offset_in_target": 47789816,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2359,
+          "table_offset_in_target": 47786172,
+          "options_table_offset_in_target": 47786220,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2362,
+          "table_offset_in_target": 47784016,
+          "options_table_offset_in_target": 47784064,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2369,
+          "table_offset_in_target": 47751308,
+          "options_table_offset_in_target": 47751352,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2371,
+          "table_offset_in_target": 47750796,
+          "options_table_offset_in_target": 47750840,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2382,
+          "table_offset_in_target": 47470848,
+          "options_table_offset_in_target": 47470892,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2392,
+          "table_offset_in_target": 47434020,
+          "options_table_offset_in_target": 47434064,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2395,
+          "table_offset_in_target": 47433260,
+          "options_table_offset_in_target": 47433304,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2400,
+          "table_offset_in_target": 47406460,
+          "options_table_offset_in_target": 47406504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2411,
+          "table_offset_in_target": 47402860,
+          "options_table_offset_in_target": 47402908,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2414,
+          "table_offset_in_target": 47400704,
+          "options_table_offset_in_target": 47400752,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2421,
+          "table_offset_in_target": 47367996,
+          "options_table_offset_in_target": 47368040,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2423,
+          "table_offset_in_target": 47367484,
+          "options_table_offset_in_target": 47367528,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2434,
+          "table_offset_in_target": 47087536,
+          "options_table_offset_in_target": 47087580,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2444,
+          "table_offset_in_target": 47050708,
+          "options_table_offset_in_target": 47050752,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2447,
+          "table_offset_in_target": 47049948,
+          "options_table_offset_in_target": 47049992,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2452,
+          "table_offset_in_target": 47023148,
+          "options_table_offset_in_target": 47023192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2463,
+          "table_offset_in_target": 47019548,
+          "options_table_offset_in_target": 47019596,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2466,
+          "table_offset_in_target": 47017392,
+          "options_table_offset_in_target": 47017440,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2473,
+          "table_offset_in_target": 46984684,
+          "options_table_offset_in_target": 46984728,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2475,
+          "table_offset_in_target": 46984172,
+          "options_table_offset_in_target": 46984216,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2486,
+          "table_offset_in_target": 46704224,
+          "options_table_offset_in_target": 46704268,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2496,
+          "table_offset_in_target": 46667396,
+          "options_table_offset_in_target": 46667440,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2499,
+          "table_offset_in_target": 46666636,
+          "options_table_offset_in_target": 46666680,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2504,
+          "table_offset_in_target": 46639836,
+          "options_table_offset_in_target": 46639880,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2515,
+          "table_offset_in_target": 46636236,
+          "options_table_offset_in_target": 46636284,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2518,
+          "table_offset_in_target": 46634080,
+          "options_table_offset_in_target": 46634128,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2525,
+          "table_offset_in_target": 46601372,
+          "options_table_offset_in_target": 46601416,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2527,
+          "table_offset_in_target": 46600860,
+          "options_table_offset_in_target": 46600904,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2538,
+          "table_offset_in_target": 46320912,
+          "options_table_offset_in_target": 46320956,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2548,
+          "table_offset_in_target": 46284084,
+          "options_table_offset_in_target": 46284128,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2551,
+          "table_offset_in_target": 46283324,
+          "options_table_offset_in_target": 46283368,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2556,
+          "table_offset_in_target": 46256524,
+          "options_table_offset_in_target": 46256568,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2567,
+          "table_offset_in_target": 46252924,
+          "options_table_offset_in_target": 46252972,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2570,
+          "table_offset_in_target": 46250768,
+          "options_table_offset_in_target": 46250816,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2577,
+          "table_offset_in_target": 46218060,
+          "options_table_offset_in_target": 46218104,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2579,
+          "table_offset_in_target": 46217548,
+          "options_table_offset_in_target": 46217592,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2590,
+          "table_offset_in_target": 45937600,
+          "options_table_offset_in_target": 45937644,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2600,
+          "table_offset_in_target": 45900772,
+          "options_table_offset_in_target": 45900816,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2603,
+          "table_offset_in_target": 45900012,
+          "options_table_offset_in_target": 45900056,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2608,
+          "table_offset_in_target": 45873212,
+          "options_table_offset_in_target": 45873256,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2619,
+          "table_offset_in_target": 45869612,
+          "options_table_offset_in_target": 45869660,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2622,
+          "table_offset_in_target": 45867456,
+          "options_table_offset_in_target": 45867504,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2629,
+          "table_offset_in_target": 45834748,
+          "options_table_offset_in_target": 45834792,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2631,
+          "table_offset_in_target": 45834236,
+          "options_table_offset_in_target": 45834280,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2642,
+          "table_offset_in_target": 45554288,
+          "options_table_offset_in_target": 45554332,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2652,
+          "table_offset_in_target": 45517460,
+          "options_table_offset_in_target": 45517504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2655,
+          "table_offset_in_target": 45516700,
+          "options_table_offset_in_target": 45516744,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2660,
+          "table_offset_in_target": 45465324,
+          "options_table_offset_in_target": 45465368,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2671,
+          "table_offset_in_target": 45461724,
+          "options_table_offset_in_target": 45461772,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2674,
+          "table_offset_in_target": 45459568,
+          "options_table_offset_in_target": 45459616,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2681,
+          "table_offset_in_target": 45426860,
+          "options_table_offset_in_target": 45426904,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2683,
+          "table_offset_in_target": 45426348,
+          "options_table_offset_in_target": 45426392,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2694,
+          "table_offset_in_target": 45146400,
+          "options_table_offset_in_target": 45146444,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2704,
+          "table_offset_in_target": 45109572,
+          "options_table_offset_in_target": 45109616,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2707,
+          "table_offset_in_target": 45108924,
+          "options_table_offset_in_target": 45108968,
+          "name": "odml.rms_norm"
+        }
+      ],
+      "total_operators": 2712
+    },
+    "verify": {
+      "subgraph_index": 3,
+      "complete": false,
+      "operators_visited": 2066,
+      "composites": [
+        {
+          "operator_index": 7,
+          "table_offset_in_target": 22517620,
+          "options_table_offset_in_target": 22517664,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 11,
+          "table_offset_in_target": 22510492,
+          "options_table_offset_in_target": 22510536,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 22,
+          "table_offset_in_target": 22468284,
+          "options_table_offset_in_target": 22468328,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 23,
+          "table_offset_in_target": 22467952,
+          "options_table_offset_in_target": 22467996,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 24,
+          "table_offset_in_target": 22467616,
+          "options_table_offset_in_target": 22467660,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 61,
+          "table_offset_in_target": 22458288,
+          "options_table_offset_in_target": 22458356,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 66,
+          "table_offset_in_target": 22456864,
+          "options_table_offset_in_target": 22456912,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 74,
+          "table_offset_in_target": 22453452,
+          "options_table_offset_in_target": 22453500,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 85,
+          "table_offset_in_target": 22419472,
+          "options_table_offset_in_target": 22419516,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 87,
+          "table_offset_in_target": 22418964,
+          "options_table_offset_in_target": 22419008,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 98,
+          "table_offset_in_target": 22139100,
+          "options_table_offset_in_target": 22139144,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 108,
+          "table_offset_in_target": 22102328,
+          "options_table_offset_in_target": 22102372,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 111,
+          "table_offset_in_target": 22101568,
+          "options_table_offset_in_target": 22101612,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 122,
+          "table_offset_in_target": 22059364,
+          "options_table_offset_in_target": 22059408,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 123,
+          "table_offset_in_target": 22059032,
+          "options_table_offset_in_target": 22059076,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 124,
+          "table_offset_in_target": 22058696,
+          "options_table_offset_in_target": 22058740,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 147,
+          "table_offset_in_target": 22051408,
+          "options_table_offset_in_target": 22051476,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 148,
+          "table_offset_in_target": 22051008,
+          "options_table_offset_in_target": 22051056,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 151,
+          "table_offset_in_target": 22048856,
+          "options_table_offset_in_target": 22048904,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 159,
+          "table_offset_in_target": 22015888,
+          "options_table_offset_in_target": 22015932,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 161,
+          "table_offset_in_target": 22015380,
+          "options_table_offset_in_target": 22015424,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 172,
+          "table_offset_in_target": 21735516,
+          "options_table_offset_in_target": 21735560,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 182,
+          "table_offset_in_target": 21698744,
+          "options_table_offset_in_target": 21698788,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 185,
+          "table_offset_in_target": 21697984,
+          "options_table_offset_in_target": 21698028,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 196,
+          "table_offset_in_target": 21655780,
+          "options_table_offset_in_target": 21655824,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 197,
+          "table_offset_in_target": 21655448,
+          "options_table_offset_in_target": 21655492,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 198,
+          "table_offset_in_target": 21655112,
+          "options_table_offset_in_target": 21655156,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 221,
+          "table_offset_in_target": 21647824,
+          "options_table_offset_in_target": 21647892,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 222,
+          "table_offset_in_target": 21647424,
+          "options_table_offset_in_target": 21647472,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 225,
+          "table_offset_in_target": 21645272,
+          "options_table_offset_in_target": 21645320,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 233,
+          "table_offset_in_target": 21612304,
+          "options_table_offset_in_target": 21612348,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 235,
+          "table_offset_in_target": 21611796,
+          "options_table_offset_in_target": 21611840,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 246,
+          "table_offset_in_target": 21331932,
+          "options_table_offset_in_target": 21331976,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 256,
+          "table_offset_in_target": 21295160,
+          "options_table_offset_in_target": 21295204,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 259,
+          "table_offset_in_target": 21294400,
+          "options_table_offset_in_target": 21294444,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 270,
+          "table_offset_in_target": 21252196,
+          "options_table_offset_in_target": 21252240,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 271,
+          "table_offset_in_target": 21251864,
+          "options_table_offset_in_target": 21251908,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 272,
+          "table_offset_in_target": 21251528,
+          "options_table_offset_in_target": 21251572,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 295,
+          "table_offset_in_target": 21244240,
+          "options_table_offset_in_target": 21244308,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 296,
+          "table_offset_in_target": 21243840,
+          "options_table_offset_in_target": 21243888,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 299,
+          "table_offset_in_target": 21241688,
+          "options_table_offset_in_target": 21241736,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 307,
+          "table_offset_in_target": 21208720,
+          "options_table_offset_in_target": 21208764,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 309,
+          "table_offset_in_target": 21208212,
+          "options_table_offset_in_target": 21208256,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 320,
+          "table_offset_in_target": 20928348,
+          "options_table_offset_in_target": 20928392,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 330,
+          "table_offset_in_target": 20891576,
+          "options_table_offset_in_target": 20891620,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 333,
+          "table_offset_in_target": 20890816,
+          "options_table_offset_in_target": 20890860,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 344,
+          "table_offset_in_target": 20848612,
+          "options_table_offset_in_target": 20848656,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 345,
+          "table_offset_in_target": 20848280,
+          "options_table_offset_in_target": 20848324,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 346,
+          "table_offset_in_target": 20847944,
+          "options_table_offset_in_target": 20847988,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 369,
+          "table_offset_in_target": 20840656,
+          "options_table_offset_in_target": 20840724,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 370,
+          "table_offset_in_target": 20840256,
+          "options_table_offset_in_target": 20840304,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 373,
+          "table_offset_in_target": 20838104,
+          "options_table_offset_in_target": 20838152,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 381,
+          "table_offset_in_target": 20805136,
+          "options_table_offset_in_target": 20805180,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 383,
+          "table_offset_in_target": 20804628,
+          "options_table_offset_in_target": 20804672,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 394,
+          "table_offset_in_target": 20524764,
+          "options_table_offset_in_target": 20524808,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 404,
+          "table_offset_in_target": 20487992,
+          "options_table_offset_in_target": 20488036,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 407,
+          "table_offset_in_target": 20487232,
+          "options_table_offset_in_target": 20487276,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 418,
+          "table_offset_in_target": 20408164,
+          "options_table_offset_in_target": 20408208,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 419,
+          "table_offset_in_target": 20407832,
+          "options_table_offset_in_target": 20407876,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 420,
+          "table_offset_in_target": 20407496,
+          "options_table_offset_in_target": 20407540,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 447,
+          "table_offset_in_target": 20400488,
+          "options_table_offset_in_target": 20400556,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 448,
+          "table_offset_in_target": 20400088,
+          "options_table_offset_in_target": 20400136,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 455,
+          "table_offset_in_target": 20396772,
+          "options_table_offset_in_target": 20396820,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 466,
+          "table_offset_in_target": 20362792,
+          "options_table_offset_in_target": 20362836,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 468,
+          "table_offset_in_target": 20362284,
+          "options_table_offset_in_target": 20362328,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 479,
+          "table_offset_in_target": 20082420,
+          "options_table_offset_in_target": 20082464,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 489,
+          "table_offset_in_target": 20045648,
+          "options_table_offset_in_target": 20045692,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 492,
+          "table_offset_in_target": 20044888,
+          "options_table_offset_in_target": 20044932,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 503,
+          "table_offset_in_target": 20002684,
+          "options_table_offset_in_target": 20002728,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 504,
+          "table_offset_in_target": 20002352,
+          "options_table_offset_in_target": 20002396,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 505,
+          "table_offset_in_target": 20002016,
+          "options_table_offset_in_target": 20002060,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 528,
+          "table_offset_in_target": 19994728,
+          "options_table_offset_in_target": 19994796,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 529,
+          "table_offset_in_target": 19994328,
+          "options_table_offset_in_target": 19994376,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 532,
+          "table_offset_in_target": 19992176,
+          "options_table_offset_in_target": 19992224,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 540,
+          "table_offset_in_target": 19959208,
+          "options_table_offset_in_target": 19959252,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 542,
+          "table_offset_in_target": 19958700,
+          "options_table_offset_in_target": 19958744,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 553,
+          "table_offset_in_target": 19678836,
+          "options_table_offset_in_target": 19678880,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 563,
+          "table_offset_in_target": 19642064,
+          "options_table_offset_in_target": 19642108,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 566,
+          "table_offset_in_target": 19641304,
+          "options_table_offset_in_target": 19641348,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 577,
+          "table_offset_in_target": 19599100,
+          "options_table_offset_in_target": 19599144,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 578,
+          "table_offset_in_target": 19598768,
+          "options_table_offset_in_target": 19598812,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 579,
+          "table_offset_in_target": 19598432,
+          "options_table_offset_in_target": 19598476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 602,
+          "table_offset_in_target": 19591144,
+          "options_table_offset_in_target": 19591212,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 603,
+          "table_offset_in_target": 19590744,
+          "options_table_offset_in_target": 19590792,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 606,
+          "table_offset_in_target": 19588592,
+          "options_table_offset_in_target": 19588640,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 614,
+          "table_offset_in_target": 19555624,
+          "options_table_offset_in_target": 19555668,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 616,
+          "table_offset_in_target": 19555116,
+          "options_table_offset_in_target": 19555160,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 627,
+          "table_offset_in_target": 19275252,
+          "options_table_offset_in_target": 19275296,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 637,
+          "table_offset_in_target": 19238480,
+          "options_table_offset_in_target": 19238524,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 640,
+          "table_offset_in_target": 19237720,
+          "options_table_offset_in_target": 19237764,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 651,
+          "table_offset_in_target": 19195516,
+          "options_table_offset_in_target": 19195560,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 652,
+          "table_offset_in_target": 19195184,
+          "options_table_offset_in_target": 19195228,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 653,
+          "table_offset_in_target": 19194848,
+          "options_table_offset_in_target": 19194892,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 676,
+          "table_offset_in_target": 19187560,
+          "options_table_offset_in_target": 19187628,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 677,
+          "table_offset_in_target": 19187160,
+          "options_table_offset_in_target": 19187208,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 680,
+          "table_offset_in_target": 19185008,
+          "options_table_offset_in_target": 19185056,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 688,
+          "table_offset_in_target": 19152040,
+          "options_table_offset_in_target": 19152084,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 690,
+          "table_offset_in_target": 19151532,
+          "options_table_offset_in_target": 19151576,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 701,
+          "table_offset_in_target": 18871668,
+          "options_table_offset_in_target": 18871712,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 711,
+          "table_offset_in_target": 18834896,
+          "options_table_offset_in_target": 18834940,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 714,
+          "table_offset_in_target": 18834136,
+          "options_table_offset_in_target": 18834180,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 725,
+          "table_offset_in_target": 18791932,
+          "options_table_offset_in_target": 18791976,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 726,
+          "table_offset_in_target": 18791600,
+          "options_table_offset_in_target": 18791644,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 727,
+          "table_offset_in_target": 18791264,
+          "options_table_offset_in_target": 18791308,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 750,
+          "table_offset_in_target": 18783976,
+          "options_table_offset_in_target": 18784044,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 751,
+          "table_offset_in_target": 18783576,
+          "options_table_offset_in_target": 18783624,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 754,
+          "table_offset_in_target": 18781424,
+          "options_table_offset_in_target": 18781472,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 762,
+          "table_offset_in_target": 18748456,
+          "options_table_offset_in_target": 18748500,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 764,
+          "table_offset_in_target": 18747948,
+          "options_table_offset_in_target": 18747992,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 775,
+          "table_offset_in_target": 18468084,
+          "options_table_offset_in_target": 18468128,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 785,
+          "table_offset_in_target": 18431312,
+          "options_table_offset_in_target": 18431356,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 788,
+          "table_offset_in_target": 18430552,
+          "options_table_offset_in_target": 18430596,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 799,
+          "table_offset_in_target": 18388300,
+          "options_table_offset_in_target": 18388344,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 800,
+          "table_offset_in_target": 18387964,
+          "options_table_offset_in_target": 18388008,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 801,
+          "table_offset_in_target": 18387628,
+          "options_table_offset_in_target": 18387672,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 824,
+          "table_offset_in_target": 18380304,
+          "options_table_offset_in_target": 18380372,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 825,
+          "table_offset_in_target": 18379904,
+          "options_table_offset_in_target": 18379952,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 828,
+          "table_offset_in_target": 18377744,
+          "options_table_offset_in_target": 18377792,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 836,
+          "table_offset_in_target": 18344768,
+          "options_table_offset_in_target": 18344812,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 838,
+          "table_offset_in_target": 18344256,
+          "options_table_offset_in_target": 18344300,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 849,
+          "table_offset_in_target": 18064368,
+          "options_table_offset_in_target": 18064412,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 859,
+          "table_offset_in_target": 18027572,
+          "options_table_offset_in_target": 18027616,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 862,
+          "table_offset_in_target": 18026812,
+          "options_table_offset_in_target": 18026856,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 873,
+          "table_offset_in_target": 17947692,
+          "options_table_offset_in_target": 17947736,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 874,
+          "table_offset_in_target": 17947356,
+          "options_table_offset_in_target": 17947400,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 875,
+          "table_offset_in_target": 17947020,
+          "options_table_offset_in_target": 17947064,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 898,
+          "table_offset_in_target": 17939696,
+          "options_table_offset_in_target": 17939764,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 899,
+          "table_offset_in_target": 17939296,
+          "options_table_offset_in_target": 17939344,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 902,
+          "table_offset_in_target": 17937136,
+          "options_table_offset_in_target": 17937184,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 910,
+          "table_offset_in_target": 17904160,
+          "options_table_offset_in_target": 17904204,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 912,
+          "table_offset_in_target": 17903648,
+          "options_table_offset_in_target": 17903692,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 923,
+          "table_offset_in_target": 17623760,
+          "options_table_offset_in_target": 17623804,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 933,
+          "table_offset_in_target": 17586964,
+          "options_table_offset_in_target": 17587008,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 936,
+          "table_offset_in_target": 17586204,
+          "options_table_offset_in_target": 17586248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 947,
+          "table_offset_in_target": 17543948,
+          "options_table_offset_in_target": 17543992,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 948,
+          "table_offset_in_target": 17543612,
+          "options_table_offset_in_target": 17543656,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 949,
+          "table_offset_in_target": 17543276,
+          "options_table_offset_in_target": 17543320,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 972,
+          "table_offset_in_target": 17535952,
+          "options_table_offset_in_target": 17536020,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 973,
+          "table_offset_in_target": 17535552,
+          "options_table_offset_in_target": 17535600,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 976,
+          "table_offset_in_target": 17533392,
+          "options_table_offset_in_target": 17533440,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 984,
+          "table_offset_in_target": 17500416,
+          "options_table_offset_in_target": 17500460,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 986,
+          "table_offset_in_target": 17499904,
+          "options_table_offset_in_target": 17499948,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 997,
+          "table_offset_in_target": 17220016,
+          "options_table_offset_in_target": 17220060,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1007,
+          "table_offset_in_target": 17183220,
+          "options_table_offset_in_target": 17183264,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1010,
+          "table_offset_in_target": 17182460,
+          "options_table_offset_in_target": 17182504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1021,
+          "table_offset_in_target": 17140204,
+          "options_table_offset_in_target": 17140248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1022,
+          "table_offset_in_target": 17139868,
+          "options_table_offset_in_target": 17139912,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1023,
+          "table_offset_in_target": 17139532,
+          "options_table_offset_in_target": 17139576,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1046,
+          "table_offset_in_target": 17132208,
+          "options_table_offset_in_target": 17132276,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1047,
+          "table_offset_in_target": 17131808,
+          "options_table_offset_in_target": 17131856,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1050,
+          "table_offset_in_target": 17129648,
+          "options_table_offset_in_target": 17129696,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1058,
+          "table_offset_in_target": 17096672,
+          "options_table_offset_in_target": 17096716,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1060,
+          "table_offset_in_target": 17096160,
+          "options_table_offset_in_target": 17096204,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1071,
+          "table_offset_in_target": 16816272,
+          "options_table_offset_in_target": 16816316,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1081,
+          "table_offset_in_target": 16779476,
+          "options_table_offset_in_target": 16779520,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1084,
+          "table_offset_in_target": 16778716,
+          "options_table_offset_in_target": 16778760,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1095,
+          "table_offset_in_target": 16736460,
+          "options_table_offset_in_target": 16736504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1096,
+          "table_offset_in_target": 16736124,
+          "options_table_offset_in_target": 16736168,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1097,
+          "table_offset_in_target": 16735788,
+          "options_table_offset_in_target": 16735832,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1120,
+          "table_offset_in_target": 16728464,
+          "options_table_offset_in_target": 16728532,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1121,
+          "table_offset_in_target": 16728064,
+          "options_table_offset_in_target": 16728112,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1124,
+          "table_offset_in_target": 16725904,
+          "options_table_offset_in_target": 16725952,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1132,
+          "table_offset_in_target": 16692928,
+          "options_table_offset_in_target": 16692972,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1134,
+          "table_offset_in_target": 16692416,
+          "options_table_offset_in_target": 16692460,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1145,
+          "table_offset_in_target": 16412528,
+          "options_table_offset_in_target": 16412572,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1155,
+          "table_offset_in_target": 16375732,
+          "options_table_offset_in_target": 16375776,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1158,
+          "table_offset_in_target": 16374972,
+          "options_table_offset_in_target": 16375016,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1169,
+          "table_offset_in_target": 16332716,
+          "options_table_offset_in_target": 16332760,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1170,
+          "table_offset_in_target": 16332380,
+          "options_table_offset_in_target": 16332424,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1171,
+          "table_offset_in_target": 16332044,
+          "options_table_offset_in_target": 16332088,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1194,
+          "table_offset_in_target": 16324720,
+          "options_table_offset_in_target": 16324788,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1195,
+          "table_offset_in_target": 16324320,
+          "options_table_offset_in_target": 16324368,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1198,
+          "table_offset_in_target": 16322160,
+          "options_table_offset_in_target": 16322208,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1206,
+          "table_offset_in_target": 16289184,
+          "options_table_offset_in_target": 16289228,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1208,
+          "table_offset_in_target": 16288672,
+          "options_table_offset_in_target": 16288716,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1219,
+          "table_offset_in_target": 16008784,
+          "options_table_offset_in_target": 16008828,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1229,
+          "table_offset_in_target": 15971988,
+          "options_table_offset_in_target": 15972032,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1232,
+          "table_offset_in_target": 15971228,
+          "options_table_offset_in_target": 15971272,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1243,
+          "table_offset_in_target": 15928972,
+          "options_table_offset_in_target": 15929016,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1244,
+          "table_offset_in_target": 15928636,
+          "options_table_offset_in_target": 15928680,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1245,
+          "table_offset_in_target": 15928300,
+          "options_table_offset_in_target": 15928344,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1268,
+          "table_offset_in_target": 15920976,
+          "options_table_offset_in_target": 15921044,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1269,
+          "table_offset_in_target": 15920576,
+          "options_table_offset_in_target": 15920624,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1272,
+          "table_offset_in_target": 15918416,
+          "options_table_offset_in_target": 15918464,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1280,
+          "table_offset_in_target": 15885440,
+          "options_table_offset_in_target": 15885484,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1282,
+          "table_offset_in_target": 15884928,
+          "options_table_offset_in_target": 15884972,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1293,
+          "table_offset_in_target": 15605040,
+          "options_table_offset_in_target": 15605084,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1303,
+          "table_offset_in_target": 15568244,
+          "options_table_offset_in_target": 15568288,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1306,
+          "table_offset_in_target": 15567484,
+          "options_table_offset_in_target": 15567528,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1317,
+          "table_offset_in_target": 15488364,
+          "options_table_offset_in_target": 15488408,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1318,
+          "table_offset_in_target": 15488028,
+          "options_table_offset_in_target": 15488072,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1319,
+          "table_offset_in_target": 15487692,
+          "options_table_offset_in_target": 15487736,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1342,
+          "table_offset_in_target": 15480368,
+          "options_table_offset_in_target": 15480436,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1343,
+          "table_offset_in_target": 15479968,
+          "options_table_offset_in_target": 15480016,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1346,
+          "table_offset_in_target": 15477808,
+          "options_table_offset_in_target": 15477856,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1354,
+          "table_offset_in_target": 15444832,
+          "options_table_offset_in_target": 15444876,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1356,
+          "table_offset_in_target": 15444320,
+          "options_table_offset_in_target": 15444364,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1367,
+          "table_offset_in_target": 15164432,
+          "options_table_offset_in_target": 15164476,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1377,
+          "table_offset_in_target": 15127636,
+          "options_table_offset_in_target": 15127680,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1380,
+          "table_offset_in_target": 15126876,
+          "options_table_offset_in_target": 15126920,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1391,
+          "table_offset_in_target": 15084620,
+          "options_table_offset_in_target": 15084664,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1392,
+          "table_offset_in_target": 15084284,
+          "options_table_offset_in_target": 15084328,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1393,
+          "table_offset_in_target": 15083948,
+          "options_table_offset_in_target": 15083992,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1416,
+          "table_offset_in_target": 15076624,
+          "options_table_offset_in_target": 15076692,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1417,
+          "table_offset_in_target": 15076224,
+          "options_table_offset_in_target": 15076272,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1420,
+          "table_offset_in_target": 15074064,
+          "options_table_offset_in_target": 15074112,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1428,
+          "table_offset_in_target": 15041088,
+          "options_table_offset_in_target": 15041132,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1430,
+          "table_offset_in_target": 15040576,
+          "options_table_offset_in_target": 15040620,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1441,
+          "table_offset_in_target": 14760688,
+          "options_table_offset_in_target": 14760732,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1451,
+          "table_offset_in_target": 14723892,
+          "options_table_offset_in_target": 14723936,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1454,
+          "table_offset_in_target": 14723132,
+          "options_table_offset_in_target": 14723176,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1465,
+          "table_offset_in_target": 14680876,
+          "options_table_offset_in_target": 14680920,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1466,
+          "table_offset_in_target": 14680540,
+          "options_table_offset_in_target": 14680584,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1467,
+          "table_offset_in_target": 14680204,
+          "options_table_offset_in_target": 14680248,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1490,
+          "table_offset_in_target": 14672880,
+          "options_table_offset_in_target": 14672948,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1491,
+          "table_offset_in_target": 14672480,
+          "options_table_offset_in_target": 14672528,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1494,
+          "table_offset_in_target": 14670320,
+          "options_table_offset_in_target": 14670368,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1502,
+          "table_offset_in_target": 14637344,
+          "options_table_offset_in_target": 14637388,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1504,
+          "table_offset_in_target": 14636832,
+          "options_table_offset_in_target": 14636876,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1515,
+          "table_offset_in_target": 14356944,
+          "options_table_offset_in_target": 14356988,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1525,
+          "table_offset_in_target": 14320148,
+          "options_table_offset_in_target": 14320192,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1528,
+          "table_offset_in_target": 14319388,
+          "options_table_offset_in_target": 14319432,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1539,
+          "table_offset_in_target": 14277132,
+          "options_table_offset_in_target": 14277176,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1540,
+          "table_offset_in_target": 14276796,
+          "options_table_offset_in_target": 14276840,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1541,
+          "table_offset_in_target": 14276460,
+          "options_table_offset_in_target": 14276504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1564,
+          "table_offset_in_target": 14269136,
+          "options_table_offset_in_target": 14269204,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1565,
+          "table_offset_in_target": 14268736,
+          "options_table_offset_in_target": 14268784,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1568,
+          "table_offset_in_target": 14266576,
+          "options_table_offset_in_target": 14266624,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1576,
+          "table_offset_in_target": 14233600,
+          "options_table_offset_in_target": 14233644,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1578,
+          "table_offset_in_target": 14233088,
+          "options_table_offset_in_target": 14233132,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1589,
+          "table_offset_in_target": 13953200,
+          "options_table_offset_in_target": 13953244,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1599,
+          "table_offset_in_target": 13916404,
+          "options_table_offset_in_target": 13916448,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1602,
+          "table_offset_in_target": 13915644,
+          "options_table_offset_in_target": 13915688,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1613,
+          "table_offset_in_target": 13873388,
+          "options_table_offset_in_target": 13873432,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1614,
+          "table_offset_in_target": 13873052,
+          "options_table_offset_in_target": 13873096,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1615,
+          "table_offset_in_target": 13872716,
+          "options_table_offset_in_target": 13872760,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1638,
+          "table_offset_in_target": 13865392,
+          "options_table_offset_in_target": 13865460,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1639,
+          "table_offset_in_target": 13864992,
+          "options_table_offset_in_target": 13865040,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1642,
+          "table_offset_in_target": 13862832,
+          "options_table_offset_in_target": 13862880,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1650,
+          "table_offset_in_target": 13829856,
+          "options_table_offset_in_target": 13829900,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1652,
+          "table_offset_in_target": 13829344,
+          "options_table_offset_in_target": 13829388,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1663,
+          "table_offset_in_target": 13549456,
+          "options_table_offset_in_target": 13549500,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1673,
+          "table_offset_in_target": 13512660,
+          "options_table_offset_in_target": 13512704,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1676,
+          "table_offset_in_target": 13511900,
+          "options_table_offset_in_target": 13511944,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1687,
+          "table_offset_in_target": 13469644,
+          "options_table_offset_in_target": 13469688,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1688,
+          "table_offset_in_target": 13469308,
+          "options_table_offset_in_target": 13469352,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1689,
+          "table_offset_in_target": 13468972,
+          "options_table_offset_in_target": 13469016,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1712,
+          "table_offset_in_target": 13461648,
+          "options_table_offset_in_target": 13461716,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1713,
+          "table_offset_in_target": 13461248,
+          "options_table_offset_in_target": 13461296,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1716,
+          "table_offset_in_target": 13459088,
+          "options_table_offset_in_target": 13459136,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1724,
+          "table_offset_in_target": 13426112,
+          "options_table_offset_in_target": 13426156,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1726,
+          "table_offset_in_target": 13425600,
+          "options_table_offset_in_target": 13425644,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1737,
+          "table_offset_in_target": 13145712,
+          "options_table_offset_in_target": 13145756,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1747,
+          "table_offset_in_target": 13108916,
+          "options_table_offset_in_target": 13108960,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1750,
+          "table_offset_in_target": 13108156,
+          "options_table_offset_in_target": 13108200,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1761,
+          "table_offset_in_target": 13029036,
+          "options_table_offset_in_target": 13029080,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1762,
+          "table_offset_in_target": 13028700,
+          "options_table_offset_in_target": 13028744,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1763,
+          "table_offset_in_target": 13028364,
+          "options_table_offset_in_target": 13028408,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1786,
+          "table_offset_in_target": 13021040,
+          "options_table_offset_in_target": 13021108,
+          "name": "odml.cache_update"
+        },
+        {
+          "operator_index": 1787,
+          "table_offset_in_target": 13020640,
+          "options_table_offset_in_target": 13020688,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1790,
+          "table_offset_in_target": 13018480,
+          "options_table_offset_in_target": 13018528,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1798,
+          "table_offset_in_target": 12985504,
+          "options_table_offset_in_target": 12985548,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1800,
+          "table_offset_in_target": 12984992,
+          "options_table_offset_in_target": 12985036,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1811,
+          "table_offset_in_target": 12705104,
+          "options_table_offset_in_target": 12705148,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1821,
+          "table_offset_in_target": 12668308,
+          "options_table_offset_in_target": 12668352,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1824,
+          "table_offset_in_target": 12667548,
+          "options_table_offset_in_target": 12667592,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1829,
+          "table_offset_in_target": 12640764,
+          "options_table_offset_in_target": 12640808,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1841,
+          "table_offset_in_target": 12636932,
+          "options_table_offset_in_target": 12636980,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1844,
+          "table_offset_in_target": 12634772,
+          "options_table_offset_in_target": 12634820,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1852,
+          "table_offset_in_target": 12601792,
+          "options_table_offset_in_target": 12601836,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1854,
+          "table_offset_in_target": 12601280,
+          "options_table_offset_in_target": 12601324,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1865,
+          "table_offset_in_target": 12321392,
+          "options_table_offset_in_target": 12321436,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1875,
+          "table_offset_in_target": 12284596,
+          "options_table_offset_in_target": 12284640,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1878,
+          "table_offset_in_target": 12283836,
+          "options_table_offset_in_target": 12283880,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1883,
+          "table_offset_in_target": 12257052,
+          "options_table_offset_in_target": 12257096,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1895,
+          "table_offset_in_target": 12253220,
+          "options_table_offset_in_target": 12253268,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1898,
+          "table_offset_in_target": 12251060,
+          "options_table_offset_in_target": 12251108,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1906,
+          "table_offset_in_target": 12218080,
+          "options_table_offset_in_target": 12218124,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1908,
+          "table_offset_in_target": 12217568,
+          "options_table_offset_in_target": 12217612,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1919,
+          "table_offset_in_target": 11937680,
+          "options_table_offset_in_target": 11937724,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1929,
+          "table_offset_in_target": 11900884,
+          "options_table_offset_in_target": 11900928,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1932,
+          "table_offset_in_target": 11900124,
+          "options_table_offset_in_target": 11900168,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1937,
+          "table_offset_in_target": 11873340,
+          "options_table_offset_in_target": 11873384,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1949,
+          "table_offset_in_target": 11869508,
+          "options_table_offset_in_target": 11869556,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1952,
+          "table_offset_in_target": 11867348,
+          "options_table_offset_in_target": 11867396,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 1960,
+          "table_offset_in_target": 11834368,
+          "options_table_offset_in_target": 11834412,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1962,
+          "table_offset_in_target": 11833856,
+          "options_table_offset_in_target": 11833900,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1973,
+          "table_offset_in_target": 11553968,
+          "options_table_offset_in_target": 11554012,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1983,
+          "table_offset_in_target": 11517172,
+          "options_table_offset_in_target": 11517216,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1986,
+          "table_offset_in_target": 11516412,
+          "options_table_offset_in_target": 11516456,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 1991,
+          "table_offset_in_target": 11489628,
+          "options_table_offset_in_target": 11489672,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2003,
+          "table_offset_in_target": 11485796,
+          "options_table_offset_in_target": 11485844,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2006,
+          "table_offset_in_target": 11483636,
+          "options_table_offset_in_target": 11483684,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2014,
+          "table_offset_in_target": 11450656,
+          "options_table_offset_in_target": 11450700,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2016,
+          "table_offset_in_target": 11450144,
+          "options_table_offset_in_target": 11450188,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2027,
+          "table_offset_in_target": 11170256,
+          "options_table_offset_in_target": 11170300,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2037,
+          "table_offset_in_target": 11133460,
+          "options_table_offset_in_target": 11133504,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2040,
+          "table_offset_in_target": 11132700,
+          "options_table_offset_in_target": 11132744,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2045,
+          "table_offset_in_target": 11105916,
+          "options_table_offset_in_target": 11105960,
+          "name": "odml.rms_norm"
+        },
+        {
+          "operator_index": 2057,
+          "table_offset_in_target": 11102084,
+          "options_table_offset_in_target": 11102132,
+          "name": "odml.runtime_bmm"
+        },
+        {
+          "operator_index": 2060,
+          "table_offset_in_target": 11099924,
+          "options_table_offset_in_target": 11099972,
+          "name": "odml.runtime_bmm"
+        }
+      ],
+      "total_operators": 2801,
+      "stop_reason": "Uncached metadata range; cache-only scan stopped"
+    }
+  }
+}

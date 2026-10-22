@@ -1,0 +1,513 @@
+diff --git a/runtime/core/BUILD b/runtime/core/BUILD
+index 603a1d50153c197bbfcdc8c14c1f87a341de8c82..a3f2976e55c1a2aa448c7e37b634e28819272dcc 100644
+--- a/runtime/core/BUILD
++++ b/runtime/core/BUILD
+@@ -386,6 +386,32 @@ cc_library(
+     }),
+ )
+ 
++cc_library(
++    name = "session_cache_file",
++    srcs = ["session_cache_file.cc"],
++    hdrs = ["session_cache_file.h"],
++    deps = [
++        "@com_google_absl//absl/cleanup",
++        "@com_google_absl//absl/crc:crc32c",
++        "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:status_macros",
++        "@com_google_absl//absl/status:statusor",
++        "@com_google_absl//absl/strings",
++        "@com_google_absl//absl/strings:string_view",
++        "//runtime/util:memory_mapped_file",
++    ],
++)
++
++cc_test(
++    name = "session_cache_file_test",
++    srcs = ["session_cache_file_test.cc"],
++    deps = [
++        ":session_cache_file",
++        "@com_google_absl//absl/status",
++        "@com_google_googletest//:gtest_main",
++    ],
++)
++
+ cc_library(
+     name = "audio_session_advanced",
+     srcs = ["audio_session_advanced.cc"],
+diff --git a/runtime/core/CMakeLists.txt b/runtime/core/CMakeLists.txt
+index 12aad93ccdd19de24da12230b8f5ac805f53585e..3b838e2a75823b8f739e4acfb1577a55ef8a5ceb 100644
+--- a/runtime/core/CMakeLists.txt
++++ b/runtime/core/CMakeLists.txt
+@@ -103,6 +103,7 @@ target_link_libraries(runtime_core_session_utils
+ # ==============================================================================
+ add_litertlm_library(runtime_core_session_advanced STATIC
+   session_advanced.cc
++  session_cache_file.cc
+ )
+ add_library(LiteRTLM::Runtime::Core::SessionAdvanced ALIAS runtime_core_session_advanced)
+ 
+@@ -114,6 +115,8 @@ target_include_directories(runtime_core_session_advanced
+ 
+ target_link_libraries(runtime_core_session_advanced
+   PUBLIC
++    absl::crc32c
++    LiteRTLM::Support::Util::MemoryMappedFile
+     LiteRTLM::Runtime::Core::Pipeline
+     LiteRTLM::Runtime::Core::SessionUtils
+     LiteRTLM::Runtime::Core::Tasks
+diff --git a/runtime/core/session_cache_file.cc b/runtime/core/session_cache_file.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..4c705fb21368ba32857ea861146d0faea8133b15
+--- /dev/null
++++ b/runtime/core/session_cache_file.cc
+@@ -0,0 +1,256 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/core/session_cache_file.h"
++
++#include <atomic>
++#include <cerrno>
++#include <chrono>
++#include <cstddef>
++#include <cstdint>
++#include <cstdio>
++#include <filesystem>
++#include <limits>
++#include <string>
++#include <system_error>
++#include <utility>
++
++#if defined(_WIN32)
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <io.h>
++#include <windows.h>
++#else
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <unistd.h>
++#endif
++
++#include "absl/cleanup/cleanup.h"       // from @com_google_absl
++#include "absl/crc/crc32c.h"            // from @com_google_absl
++#include "absl/status/status.h"        // from @com_google_absl
++#include "absl/status/status_macros.h"  // from @com_google_absl
++#include "absl/status/statusor.h"      // from @com_google_absl
++#include "absl/strings/str_cat.h"       // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "runtime/util/memory_mapped_file.h"
++
++namespace litert::lm {
++namespace {
++
++constexpr absl::string_view kMagic = "LRTLMCS1";
++constexpr size_t kHeaderSize = 40;
++constexpr size_t kMaxKeySize = 4096;
++constexpr size_t kMaxMetadataSize = 16 * 1024 * 1024;
++
++void AppendLittleEndian(std::string& out, uint64_t value, int bytes) {
++  for (int i = 0; i < bytes; ++i) {
++    out.push_back(static_cast<char>(value & 0xff));
++    value >>= 8;
++  }
++}
++
++uint64_t ReadLittleEndian(absl::string_view data) {
++  uint64_t value = 0;
++  for (size_t i = 0; i < data.size(); ++i) {
++    value |= uint64_t{static_cast<unsigned char>(data[i])} << (8 * i);
++  }
++  return value;
++}
++
++absl::Status CheckArguments(absl::string_view path, absl::string_view key) {
++  if (path.empty() || path.find('\0') != absl::string_view::npos ||
++      key.empty() || key.size() > kMaxKeySize) {
++    return absl::InvalidArgumentError("Invalid session cache path or key.");
++  }
++  return absl::OkStatus();
++}
++
++absl::crc32c_t Checksum(absl::string_view header, absl::string_view key,
++                        absl::string_view metadata, absl::string_view state) {
++  auto crc = absl::ComputeCrc32c(header);
++  crc = absl::ExtendCrc32c(crc, key);
++  crc = absl::ExtendCrc32c(crc, metadata);
++  return absl::ExtendCrc32c(crc, state);
++}
++
++absl::Status WriteAll(FILE* file, absl::string_view data) {
++  while (!data.empty()) {
++    const size_t written = std::fwrite(data.data(), 1, data.size(), file);
++    if (written == 0) {
++      return absl::ErrnoToStatus(errno ? errno : EIO,
++                                "Could not write session cache.");
++    }
++    data.remove_prefix(written);
++  }
++  return absl::OkStatus();
++}
++
++}  // namespace
++
++absl::Status WriteSessionCacheFile(absl::string_view path,
++                                   absl::string_view compatibility_key,
++                                   int last_prefill_token_id,
++                                   absl::string_view metadata,
++                                   absl::string_view state) {
++  ABSL_RETURN_IF_ERROR(CheckArguments(path, compatibility_key));
++  if (metadata.empty() || metadata.size() > kMaxMetadataSize || state.empty()) {
++    return absl::InvalidArgumentError("Invalid session cache payload.");
++  }
++  std::string header(kMagic);
++  AppendLittleEndian(header, compatibility_key.size(), 8);
++  AppendLittleEndian(header, metadata.size(), 8);
++  AppendLittleEndian(header, state.size(), 8);
++  AppendLittleEndian(header, static_cast<uint32_t>(last_prefill_token_id), 4);
++  AppendLittleEndian(header,
++                     static_cast<uint32_t>(Checksum(
++                         header, compatibility_key, metadata, state)),
++                     4);
++
++  const auto destination = std::filesystem::u8path(path.begin(), path.end());
++  std::filesystem::path temporary;
++  FILE* file = nullptr;
++  static std::atomic<uint64_t> sequence{0};
++  for (int attempt = 0; attempt < 16 && file == nullptr; ++attempt) {
++    temporary = destination;
++    temporary += absl::StrCat(
++        ".tmp.", std::chrono::steady_clock::now().time_since_epoch().count(),
++        ".", sequence.fetch_add(1, std::memory_order_relaxed));
++#if defined(_WIN32)
++    file = _wfopen(temporary.c_str(), L"wbx");
++#else
++    file = std::fopen(temporary.c_str(), "wbx");
++#endif
++    if (file == nullptr && errno != EEXIST) {
++      return absl::ErrnoToStatus(errno, "Could not create session cache.");
++    }
++  }
++  if (file == nullptr) {
++    return absl::AlreadyExistsError("Could not create a unique cache file.");
++  }
++  absl::Cleanup cleanup = [&] {
++    if (file != nullptr) std::fclose(file);
++    std::error_code ignored;
++    std::filesystem::remove(temporary, ignored);
++  };
++#if !defined(_WIN32)
++  if (fchmod(fileno(file), S_IRUSR | S_IWUSR) != 0) {
++    return absl::ErrnoToStatus(errno, "Could not restrict cache permissions.");
++  }
++#endif
++  ABSL_RETURN_IF_ERROR(WriteAll(file, header));
++  ABSL_RETURN_IF_ERROR(WriteAll(file, compatibility_key));
++  ABSL_RETURN_IF_ERROR(WriteAll(file, metadata));
++  ABSL_RETURN_IF_ERROR(WriteAll(file, state));
++  if (std::fflush(file) != 0) {
++    return absl::ErrnoToStatus(errno, "Could not flush session cache.");
++  }
++#if defined(_WIN32)
++  const int sync_result = _commit(_fileno(file));
++#else
++  int sync_result;
++  do {
++    sync_result = fsync(fileno(file));
++  } while (sync_result != 0 && errno == EINTR);
++#endif
++  if (sync_result != 0) {
++    return absl::ErrnoToStatus(errno, "Could not sync session cache.");
++  }
++  const int close_result = std::fclose(std::exchange(file, nullptr));
++  if (close_result != 0) {
++    return absl::ErrnoToStatus(errno, "Could not close session cache.");
++  }
++#if defined(_WIN32)
++  if (!MoveFileExW(temporary.c_str(), destination.c_str(),
++                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
++    return absl::InternalError(
++        absl::StrCat("Could not publish session cache: ", GetLastError()));
++  }
++#else
++  if (std::rename(temporary.c_str(), destination.c_str()) != 0) {
++    return absl::ErrnoToStatus(errno, "Could not publish session cache.");
++  }
++  const auto parent = destination.has_parent_path()
++                          ? destination.parent_path()
++                          : std::filesystem::path(".");
++  const int dir_fd = open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
++  if (dir_fd < 0) {
++    return absl::ErrnoToStatus(
++        errno, "Cache published; directory durability could not be confirmed.");
++  }
++  do {
++    sync_result = fsync(dir_fd);
++  } while (sync_result != 0 && errno == EINTR);
++  const int sync_errno = errno;
++  close(dir_fd);
++  if (sync_result != 0) {
++    return absl::ErrnoToStatus(
++        sync_errno, "Cache published; directory durability is uncertain.");
++  }
++#endif
++  return absl::OkStatus();
++}
++
++absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
++    absl::string_view path, absl::string_view compatibility_key) {
++  ABSL_RETURN_IF_ERROR(CheckArguments(path, compatibility_key));
++  ABSL_ASSIGN_OR_RETURN(
++      auto mapping,
++      MemoryMappedFile::Create(path, MemoryMappedFile::Access::kRead));
++  if (mapping->length() < kHeaderSize ||
++      mapping->length() > std::numeric_limits<size_t>::max()) {
++    return absl::DataLossError("Invalid session cache size.");
++  }
++  absl::string_view bytes(static_cast<const char*>(mapping->data()),
++                         static_cast<size_t>(mapping->length()));
++  const auto header = bytes.substr(0, kHeaderSize);
++  if (header.substr(0, 8) != kMagic) {
++    return absl::InvalidArgumentError("Unsupported session cache format.");
++  }
++  const uint64_t key_size = ReadLittleEndian(header.substr(8, 8));
++  const uint64_t metadata_size = ReadLittleEndian(header.substr(16, 8));
++  const uint64_t state_size = ReadLittleEndian(header.substr(24, 8));
++  bytes.remove_prefix(kHeaderSize);
++  if (key_size == 0 || key_size > kMaxKeySize || key_size > bytes.size()) {
++    return absl::DataLossError("Invalid session cache key length.");
++  }
++  const auto key = bytes.substr(0, key_size);
++  bytes.remove_prefix(key_size);
++  if (metadata_size == 0 || metadata_size > kMaxMetadataSize ||
++      metadata_size > bytes.size()) {
++    return absl::DataLossError("Invalid session cache metadata length.");
++  }
++  const auto metadata = bytes.substr(0, metadata_size);
++  bytes.remove_prefix(metadata_size);
++  if (state_size == 0 || state_size != bytes.size()) {
++    return absl::DataLossError("Invalid session cache state length.");
++  }
++  if (key != compatibility_key) {
++    return absl::FailedPreconditionError(
++        "Session cache compatibility key differs.");
++  }
++  const auto expected_crc = ReadLittleEndian(header.substr(36, 4));
++  if (static_cast<uint32_t>(Checksum(header.substr(0, 36), key, metadata, bytes)) !=
++      expected_crc) {
++    return absl::DataLossError("Session cache checksum mismatch.");
++  }
++  const uint32_t token_bits = ReadLittleEndian(header.substr(32, 4));
++  const int token_id = token_bits <= std::numeric_limits<int32_t>::max()
++                           ? static_cast<int>(token_bits)
++                           : -1 - static_cast<int>(UINT32_MAX - token_bits);
++  return MappedSessionCache{std::move(mapping), metadata, bytes, token_id};
++}
++
++}  // namespace litert::lm
+diff --git a/runtime/core/session_cache_file.h b/runtime/core/session_cache_file.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..2bac1943aebc18610668584c4fac7a4cf8a4e9c8
+--- /dev/null
++++ b/runtime/core/session_cache_file.h
+@@ -0,0 +1,52 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_CACHE_FILE_H_
++#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_CACHE_FILE_H_
++
++#include <memory>
++
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "runtime/util/memory_mapped_file.h"
++
++namespace litert::lm {
++
++// Views remain valid for the lifetime of mapping. The tensor payload is never
++// copied into a second, cache-sized host allocation during file loading.
++struct MappedSessionCache {
++  std::unique_ptr<MemoryMappedFile> mapping;
++  absl::string_view metadata;
++  absl::string_view state;
++  int last_prefill_token_id;
++};
++
++// Writes a complete file in the destination directory, flushes it, and replaces
++// path atomically. On a post-publication directory-sync error, the new file is
++// visible but its durability is uncertain; the returned error says so.
++absl::Status WriteSessionCacheFile(absl::string_view path,
++                                  absl::string_view compatibility_key,
++                                  int last_prefill_token_id,
++                                  absl::string_view metadata,
++                                  absl::string_view state);
++
++// Checks framing, compatibility key, and checksum before returning any views.
++// The application must not modify/truncate a published cache file in place.
++absl::StatusOr<MappedSessionCache> ReadSessionCacheFile(
++    absl::string_view path, absl::string_view compatibility_key);
++
++}  // namespace litert::lm
++
++#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_CACHE_FILE_H_
+diff --git a/runtime/core/session_cache_file_test.cc b/runtime/core/session_cache_file_test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..fb0471c242934d02558c093e4d313484420b7b27
+--- /dev/null
++++ b/runtime/core/session_cache_file_test.cc
+@@ -0,0 +1,129 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/core/session_cache_file.h"
++
++#include <chrono>
++#include <filesystem>
++#include <fstream>
++#include <iterator>
++#include <string>
++#include <system_error>
++
++#include <gtest/gtest.h>
++#include "absl/status/status.h"  // from @com_google_absl
++
++namespace litert::lm {
++namespace {
++
++class SessionCacheFileTest : public ::testing::Test {
++ protected:
++  void SetUp() override {
++    directory_ = std::filesystem::path(::testing::TempDir()) /
++                 ("session-cache-" + std::to_string(
++                     std::chrono::steady_clock::now().time_since_epoch().count()));
++    ASSERT_TRUE(std::filesystem::create_directory(directory_));
++    path_ = (directory_ / "session.cache").string();
++  }
++  void TearDown() override {
++    std::error_code ignored;
++    std::filesystem::remove_all(directory_, ignored);
++  }
++  std::string ReadBytes() {
++    std::ifstream file(path_, std::ios::binary);
++    return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
++  }
++  void ReplaceBytes(const std::string& data) {
++    std::ofstream file(path_, std::ios::binary | std::ios::trunc);
++    file.write(data.data(), data.size());
++    ASSERT_TRUE(file.good());
++  }
++  std::filesystem::path directory_;
++  std::string path_;
++};
++
++TEST_F(SessionCacheFileTest, RoundTripAndReplacement) {
++  const std::string state("\0\1\2\xff\0", 5);
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "verified-key", -3, "metadata", state).ok());
++  {
++    auto result = ReadSessionCacheFile(path_, "verified-key");
++    ASSERT_TRUE(result.ok()) << result.status();
++    EXPECT_EQ(result->metadata, "metadata");
++    EXPECT_EQ(result->state, state);
++    EXPECT_EQ(result->last_prefill_token_id, -3);
++    const auto* begin = static_cast<const char*>(result->mapping->data());
++    EXPECT_GE(result->state.data(), begin);
++    EXPECT_LE(result->state.data() + result->state.size(),
++              begin + result->mapping->length());
++  }
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "verified-key", 42, "new", "new-state").ok());
++  auto result = ReadSessionCacheFile(path_, "verified-key");
++  ASSERT_TRUE(result.ok()) << result.status();
++  EXPECT_EQ(result->metadata, "new");
++  EXPECT_EQ(result->state, "new-state");
++  EXPECT_EQ(result->last_prefill_token_id, 42);
++  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory_),
++                          std::filesystem::directory_iterator()), 1);
++}
++
++TEST_F(SessionCacheFileTest, WrongKeyDoesNotModifyFile) {
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "model-a", 1, "meta", "state").ok());
++  const auto original = ReadBytes();
++  EXPECT_EQ(ReadSessionCacheFile(path_, "model-b").status().code(),
++            absl::StatusCode::kFailedPrecondition);
++  EXPECT_EQ(ReadBytes(), original);
++}
++
++TEST_F(SessionCacheFileTest, RejectsEveryTruncationAndTrailingData) {
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "key", 1, "meta", "state").ok());
++  const auto original = ReadBytes();
++  for (size_t length = 0; length < original.size(); ++length) {
++    ReplaceBytes(original.substr(0, length));
++    EXPECT_FALSE(ReadSessionCacheFile(path_, "key").ok()) << length;
++  }
++  ReplaceBytes(original + "x");
++  EXPECT_EQ(ReadSessionCacheFile(path_, "key").status().code(),
++            absl::StatusCode::kDataLoss);
++}
++
++TEST_F(SessionCacheFileTest, RejectsCorruptionAcrossHeaderMetadataAndState) {
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "key", 7, "metadata", "payload").ok());
++  const auto original = ReadBytes();
++  for (size_t offset = 0; offset < original.size(); ++offset) {
++    auto changed = original;
++    changed[offset] ^= 0x40;
++    ReplaceBytes(changed);
++    EXPECT_FALSE(ReadSessionCacheFile(path_, "key").ok()) << offset;
++  }
++}
++
++TEST_F(SessionCacheFileTest, InvalidSavePreservesPreviousFile) {
++  ASSERT_TRUE(WriteSessionCacheFile(path_, "key", 1, "meta", "state").ok());
++  const auto original = ReadBytes();
++  EXPECT_FALSE(WriteSessionCacheFile(path_, "", 2, "new", "new-state").ok());
++  EXPECT_FALSE(WriteSessionCacheFile(path_, "key", 2, "", "new-state").ok());
++  EXPECT_FALSE(WriteSessionCacheFile(path_, "key", 2, "new", "").ok());
++  EXPECT_EQ(ReadBytes(), original);
++}
++
++TEST_F(SessionCacheFileTest, PublicationFailureRemovesOnlyTemporaryFile) {
++  ASSERT_TRUE(std::filesystem::create_directory(path_));
++  EXPECT_FALSE(WriteSessionCacheFile(path_, "key", 1, "meta", "state").ok());
++  EXPECT_TRUE(std::filesystem::is_directory(path_));
++  EXPECT_EQ(std::distance(std::filesystem::directory_iterator(directory_),
++                          std::filesystem::directory_iterator()), 1);
++}
++
++}  // namespace
++}  // namespace litert::lm

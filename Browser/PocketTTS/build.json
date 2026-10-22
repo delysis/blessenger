@@ -1,0 +1,31 @@
+{
+  "source": "https://github.com/gradium-ai/xn-ptts",
+  "revision": "49b9033e44ab0fbb935973eca3213757644d1bbb",
+  "wasmBindgen": "0.2.120",
+  "backend": "CPU, baseline SIMD, single thread",
+  "files": {
+    "LICENSE-APACHE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "LICENSE-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "README.md": "9622cec1ce42db168ff8f7d11465c8dba3b1cf2e8a33f8f6978ef8595788d436",
+    "blessenger-speech.mjs": "b2d3d9ab4ee949e900fd1ad48297044fe6cef29875eb844a94ace19ef916cad9",
+    "device.js": "b261780c034384efb013015012ba197738c06bf66ac54c909d7b67e2c26d446c",
+    "fetch.js": "fe28ae73b476a1b014098843335141efad3a943c98939a72d2d907ee4596582c",
+    "hub.js": "f6efff9bb477527b4ecd4cf617a3f6473dcea58e37763d431f582c7262bb19c3",
+    "index.d.ts": "ebfad0080c972e1a00618d4b6b1ce46c15df9bff8a17bd58d0fb011daefc993c",
+    "index.js": "46236d512812767e46a82685f95820e3e341373c6c52d8ab3e861badcbeb8a43",
+    "package.json": "a90fc33418afa2b9cbf4768524b021135b965ecdf993457505bfae3ac44a8428",
+    "simd.js": "002ae86d173038fe83449b623510c2e697f3837e3a9f39c2c7445525efd9fb3b",
+    "threads.js": "19782737d03b71e028b7924d80cd5d14820f23e28ca352e65975c1a0dfccea0f",
+    "wasm/phonon_tts.d.ts": "8b1290e7f1a36f0ed27581c9fdafb1140ebe56f1af408439e437602a04692101",
+    "wasm/phonon_tts.js": "29acec14a6cd276d0f80fdb1bb77d5a5a32913cbb27b47a432883ac25bd89824",
+    "wasm/phonon_tts_bg.wasm": "00697f9f07fdad28cae25943a1d4e302b803f5c7c6c378631cdc6ff67c82c06a",
+    "wasm/phonon_tts_bg.wasm.d.ts": "f87c1ee67e284477f1af72b320a644a8191f31d93704d56a2c7631e1a7139059",
+    "wav.js": "ffe180a940387cf3e5259e68b0a052934b9860034d2f9c82527c986e132d9ce1",
+    "worker.js": "9bfcf650f5d2af09b22268233993395a7182aa50f1d0eb9c01ffa60febb9b632",
+    "playback.mjs": "bc8477a1767f791fd11e233497580b15f6c8cd28f7d38af4541ab3dd546e1665",
+    "speech-seed.mjs": "a083826bb8480ed56ee2b24037a03f392d3a679fa3d16414d8959de150946c39",
+    "reference.mjs": "2da20b36e69ba93d3e741064a45f59d1f7e87bcfb7ecdd88f42580ffae00a0c8"
+  },
+  "patchSHA256": "136c76b4d5d482b6ef2e330e60cc326474f444f561d96ab07e52a0e18ab153ec",
+  "qualifiedAudio": false
+}

@@ -1,0 +1,85 @@
+{
+  "scope": "Synthetic held-out voice test only; not streaming or acoustic acceptance",
+  "feature_seconds": 6.296656207996421,
+  "embedding_shape": [
+    360,
+    41,
+    96
+  ],
+  "validation_trials": [
+    {
+      "features": "flatten",
+      "C": 0.001,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "flatten",
+      "C": 0.01,
+      "validation_accuracy": 0.8666666666666667
+    },
+    {
+      "features": "flatten",
+      "C": 0.1,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "flatten",
+      "C": 1,
+      "validation_accuracy": 0.9
+    },
+    {
+      "features": "pool",
+      "C": 0.001,
+      "validation_accuracy": 0.8333333333333334
+    },
+    {
+      "features": "pool",
+      "C": 0.01,
+      "validation_accuracy": 0.8333333333333334
+    },
+    {
+      "features": "pool",
+      "C": 0.1,
+      "validation_accuracy": 0.7333333333333333
+    },
+    {
+      "features": "pool",
+      "C": 1,
+      "validation_accuracy": 0.6666666666666666
+    }
+  ],
+  "chosen": {
+    "features": "flatten",
+    "C": 0.001
+  },
+  "test_accuracy": 0.8,
+  "classes": [
+    "gabor",
+    "other",
+    "peter"
+  ],
+  "test_confusion": [
+    [
+      9,
+      1,
+      0
+    ],
+    [
+      1,
+      8,
+      1
+    ],
+    [
+      2,
+      1,
+      7
+    ]
+  ],
+  "files": {
+    "work/wake-name-rd/models/embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+    "work/wake-name-rd/models/melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+    "work/wake-name-rd/dataset-01/manifest.json": "bd657abbb1cbb012ec759b44b126c458f43bf17157014b149000dbcf47d0f5fd"
+  },
+  "decision": "Not eligible for live routing: 80% on 30 held-out clips, including 2/10 non-name false classifications and 2 Peter-to-Gabor confusions. No microphone or streaming acceptance.",
+  "source_revision": "368c03716d1e92591906a84949bc477f3a834455"
+}

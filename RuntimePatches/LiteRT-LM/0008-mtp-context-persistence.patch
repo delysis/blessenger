@@ -1,0 +1,597 @@
+diff --git a/runtime/executor/BUILD b/runtime/executor/BUILD
+index 3bcc221ce6803415b793869c64820b90ab3d19b4..832f7cffe67280e6ef1db46e463ade3e510e9146 100644
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -371,6 +371,7 @@ cc_library(
+         ":llm_litert_compiled_model_cache_utils",
+         ":llm_litert_mtp_drafter",
+         ":llm_processed_context",
++        ":mtp_cache",
+         ":state_interface",
+         "@com_google_absl//absl/algorithm:container",
+         "@com_google_absl//absl/base:nullability",
+@@ -472,11 +473,13 @@ cc_test(
+         "@litert//litert/cc:litert_model",
+         "@litert//litert/cc:litert_tensor_buffer",
+         "@litert//litert/test:matchers",
++        "@nlohmann_json//:json",
+         "//runtime/components:model_resources",
+         "//runtime/components:model_resources_litert_lm",
+         "//runtime/components:sampler",
+         "//runtime/components/constrained_decoding:constrained_decoder",
+         "//runtime/components/constrained_decoding:fake_constraint",
++        "//runtime/proto:executor_metadata_cc_proto",
+         "//runtime/proto:llm_metadata_cc_proto",
+         "//runtime/util:convert_tensor_buffer",
+         "//runtime/util:litert_lm_loader",
+@@ -1395,6 +1398,7 @@ cc_library(
+         ":litert_compiled_model_executor_utils",
+         ":llm_executor_settings",
+         ":llm_executor_settings_utils",
++        ":mtp_cache",
+         ":state_interface",
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/log:absl_log",
+diff --git a/runtime/executor/litert/state.cc b/runtime/executor/litert/state.cc
+index a2f3c09f85412f294658c28acd3055705df1585f..12a4c196a9a3a4b04fe7659adeeb0d615f1a0a2e 100644
+--- a/runtime/executor/litert/state.cc
++++ b/runtime/executor/litert/state.cc
+@@ -337,6 +337,19 @@ absl::Status LitertState::Load(absl::string_view serialized_state) {
+   return Load(state);
+ }
+ 
++absl::StatusOr<nlohmann::json> LitertState::GetTensorDescriptors() const {
++  ABSL_ASSIGN_OR_RETURN(
++      auto data,
++      SerializationData(batch_size_, num_entries_, allocation_policy_,
++                        bank_1_is_input_, bank_1_state_buffers_,
++                        bank_2_state_buffers_));
++  nlohmann::json descriptors = nlohmann::json::object();
++  for (const auto& [name, buffer] : data.second) {
++    ABSL_ASSIGN_OR_RETURN(descriptors[name], DescribeStateTensor(buffer));
++  }
++  return descriptors;
++}
++
+ absl::Status LitertState::Load(const ParsedSerializedState& state) {
+   ABSL_RETURN_IF_ERROR(ValidateLoad(state));
+   ABSL_ASSIGN_OR_RETURN(
+diff --git a/runtime/executor/litert/state.h b/runtime/executor/litert/state.h
+index c2f66078849c25ba0f4f8822397e726a1aa4bfd5..4591dde26d31712741d6dd15c1b9e0e2d2148d72 100644
+--- a/runtime/executor/litert/state.h
++++ b/runtime/executor/litert/state.h
+@@ -65,6 +65,10 @@ class LitertState : public StateInterface {
+ 
+   absl::Status Load(absl::string_view serialized_state) override;
+ 
++  // Describes both state banks without copying tensor contents or changing the
++  // active bank. Keys use the same "1/name" and "2/name" form as Serialize().
++  absl::StatusOr<nlohmann::json> GetTensorDescriptors() const;
++
+   // Validate before resizing a fresh restore destination. Capacity changes are
+   // permitted only on declared dynamic dimensions with the in-place policy.
+   absl::Status ValidateLoad(const ParsedSerializedState& state,
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.cc b/runtime/executor/llm_litert_compiled_model_executor.cc
+index 4c2bc89990733794a246d6802d9b98ffc83eef0a..200d3ed5dacdd4d8ca1d051b34f353efd56efec6 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -59,6 +59,7 @@
+ #if defined(__APPLE__)
+ #include "litert/cc/options/litert_gpu_options.h"  // from @litert
+ #endif  // defined(__APPLE__)
++#include "nlohmann/json.hpp"  // from @nlohmann_json
+ #include "runtime/components/constrained_decoding/constrained_decoder.h"
+ #include "runtime/components/constrained_decoding/constraint.h"
+ #include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
+@@ -77,6 +78,7 @@
+ #include "runtime/executor/llm_executor_settings_utils.h"
+ #include "runtime/executor/llm_litert_compiled_model_cache_utils.h"
+ #include "runtime/executor/llm_litert_mtp_drafter.h"
++#include "runtime/executor/mtp_cache.h"
+ #include "runtime/executor/state_interface.h"
+ #include "runtime/proto/llm_metadata.pb.h"
+ #include "runtime/util/convert_tensor_buffer.h"
+@@ -1334,6 +1336,30 @@ LlmLiteRtCompiledModelExecutorBase::Decode(
+     enable_mtp_drafter = (mtp_drafter_ != nullptr);
+   }
+ 
++  if (enable_mtp_drafter) {
++    RET_CHECK(state_ != nullptr);
++    const bool primed =
++        llm_context_->runtime_state().ran_decode && was_mtp_primed;
++    // Every successful MTP round leaves its final token pending. Reading the
++    // count avoids allocating a token vector for this bounds check.
++    int64_t start = llm_context_->runtime_state().current_step;
++    if (primed) {
++      start = static_cast<int64_t>(llm_context_->processed_context()
++                                       .processed_tokens().TokenCount()) -
++              1;
++    }
++    int64_t capacity = state_->GetNumEntries();
++    const int64_t max_tokens = executor_settings_.GetMaxNumTokens();
++    if (max_tokens > 0) {
++      // An accepted-all round also emits a pending bonus token.
++      capacity = std::min(capacity, max_tokens - 1);
++    }
++    // Near the cache limit, use the existing one-token decode path. Check
++    // before consuming pending input or obtaining (and swapping) state banks.
++    enable_mtp_drafter =
++        MtpBatchFits(start, mtp_drafter_->verify_steps(), capacity);
++  }
++
+   std::vector<std::vector<int>> output_tokens_vector;
+   if (!enable_mtp_drafter) {
+     const absl::Time plain_start = absl::Now();
+@@ -1577,15 +1603,119 @@ LlmLiteRtCompiledModelExecutorBase::GetPrefillSignatureKey() const {
+   return prefill_signature_key;
+ }
+ 
+-absl::StatusOr<SerializedLlmContext>
+-LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+-  if (mtp_drafter_ != nullptr ||
+-      (executor_settings_.GetAdvancedSettings().has_value() &&
+-       executor_settings_.GetAdvancedSettings()->enable_speculative_decoding)) {
++absl::StatusOr<int>
++LlmLiteRtCompiledModelExecutorBase::GetMtpVerifySteps() const {
++  for (int i = 0; i < compiled_model_->GetNumSignatures(); ++i) {
++    LITERT_ASSIGN_OR_RETURN(auto signature, compiled_model_->GetSignature(i));
++    if (signature.Key() != "verify") continue;
++    LITERT_ASSIGN_OR_RETURN(auto positions,
++                            signature.InputTensorType("input_pos"));
++    const auto dimensions = positions.Layout().Dimensions();
++    if (dimensions.size() != 1 || dimensions[0] <= 0) {
++      return absl::FailedPreconditionError("Invalid MTP verifier length.");
++    }
++    return dimensions[0];
++  }
++  return 0;
++}
++
++absl::Status LlmLiteRtCompiledModelExecutorBase::ValidateMtpCacheForPersistence(
++    const proto::ExecutorMetadata* executor_metadata,
++    const nlohmann::json& tensor_descriptors, int verify_steps,
++    int current_step, int token_count, int num_entries, uint32_t max_tokens) {
++  if (verify_steps == 0) return absl::OkStatus();
++  if (executor_metadata == nullptr ||
++      executor_metadata->llm_executor_metadata().state_buffers().empty() ||
++      !tensor_descriptors.is_object()) {
++    return absl::FailedPreconditionError(
++        "MTP persistence requires explicitly typed KV cache metadata.");
++  }
++  const auto attention = GetAttentionMaskParams(executor_metadata);
++  auto causal_text = [](proto::AttentionMaskType type) {
++    return type == proto::ATTENTION_MASK_TYPE_CAUSAL ||
++           type == proto::ATTENTION_MASK_TYPE_VISION_BIDIRECTIONAL;
++  };
++  if (!causal_text(attention.global_type)) {
+     return absl::FailedPreconditionError(
+-        "Disable speculative decoding for persistent sessions; verifier state "
+-        "cannot be rolled back to the completed turn boundary.");
++        "MTP persistence requires causal generated-token attention.");
++  }
++  const int64_t rollback_steps =
++      std::max<int64_t>(0, static_cast<int64_t>(token_count) - current_step);
++  // A dynamic entry counter can coexist with smaller, fixed global tensors.
++  // Every global tensor must cover the verifier bound Decode actually used,
++  // including speculative rows hidden by an early stop.
++  int64_t verifier_capacity = num_entries;
++  if (max_tokens > 0) {
++    verifier_capacity = std::min<int64_t>(
++        verifier_capacity, static_cast<int64_t>(max_tokens) - 1);
++  }
++  size_t bank_sizes[2] = {};
++  absl::flat_hash_map<std::string, bool> names;
++  for (const auto& buffer :
++       executor_metadata->llm_executor_metadata().state_buffers()) {
++    const bool local =
++        buffer.type() == proto::StateBuffer::TYPE_LOCAL_KEY_CACHE ||
++        buffer.type() == proto::StateBuffer::TYPE_LOCAL_VALUE_CACHE;
++    if (!local && buffer.type() != proto::StateBuffer::TYPE_GLOBAL_KEY_CACHE &&
++        buffer.type() != proto::StateBuffer::TYPE_GLOBAL_VALUE_CACHE) {
++      return absl::FailedPreconditionError(
++          "MTP persistence cannot roll back recurrent or untyped state.");
++    }
++    std::string name;
++    for (const auto* candidate :
++         {&buffer.prefill_input_name(), &buffer.prefill_output_name(),
++          &buffer.decode_input_name(), &buffer.decode_output_name()}) {
++      if (candidate->empty()) continue;
++      if (!name.empty() && name != *candidate) {
++        return absl::FailedPreconditionError("Inconsistent KV cache names.");
++      }
++      name = *candidate;
++    }
++    if (name.empty() || !names.emplace(name, true).second ||
++        !buffer.has_sequence_axis() || buffer.sequence_axis() < 0) {
++      return absl::FailedPreconditionError("Invalid KV cache metadata.");
++    }
++    for (int bank = 0; bank < 2; ++bank) {
++      auto descriptor =
++          tensor_descriptors.find(absl::StrCat(bank + 1, "/", name));
++      if (descriptor == tensor_descriptors.end()) {
++        if (bank == 1) continue;
++        return absl::FailedPreconditionError("Missing KV cache buffer.");
++      }
++      ++bank_sizes[bank];
++      auto shape = descriptor->find("shape");
++      if (shape == descriptor->end() || !shape->is_array() ||
++          static_cast<size_t>(buffer.sequence_axis()) >= shape->size()) {
++        return absl::FailedPreconditionError("Invalid KV cache sequence axis.");
++      }
++      ABSL_ASSIGN_OR_RETURN(
++          int capacity, ReadContextInteger((*shape)[buffer.sequence_axis()]));
++      if (local) {
++        if (!causal_text(attention.local_type) ||
++            !IsMtpRingSnapshotSafe(
++                capacity, attention.sliding_window_size.value_or(0),
++                verify_steps, rollback_steps)) {
++          return absl::FailedPreconditionError(
++              "MTP local cache has insufficient ring capacity for the window, "
++              "verifier batch, and logical rewind.");
++        }
++      } else if (capacity < verify_steps || capacity < verifier_capacity ||
++                 static_cast<int64_t>(std::max(current_step, token_count)) >
++                     static_cast<int64_t>(capacity) + 1) {
++        return absl::FailedPreconditionError(
++            "MTP global cache capacity exceeded.");
++      }
++    }
++  }
++  if (bank_sizes[0] + bank_sizes[1] != tensor_descriptors.size() ||
++      (bank_sizes[1] != 0 && bank_sizes[1] != bank_sizes[0])) {
++    return absl::FailedPreconditionError("Unexpected MTP state buffers.");
+   }
++  return absl::OkStatus();
++}
++
++absl::StatusOr<SerializedLlmContext>
++LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+   if (llm_context_ == nullptr) {
+     return absl::FailedPreconditionError("No context to serialize.");
+   }
+@@ -1600,6 +1730,19 @@ LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+   if (active == nullptr) {
+     return absl::FailedPreconditionError("No state to serialize.");
+   }
++  ABSL_ASSIGN_OR_RETURN(int verify_steps, GetMtpVerifySteps());
++  if (verify_steps > 0) {
++    const auto* litert_state = dynamic_cast<const LitertState*>(active);
++    if (litert_state == nullptr) {
++      return absl::FailedPreconditionError("No compatible MTP cache state.");
++    }
++    ABSL_ASSIGN_OR_RETURN(auto descriptors,
++                          litert_state->GetTensorDescriptors());
++    ABSL_RETURN_IF_ERROR(ValidateMtpCacheForPersistence(
++        executor_metadata_, descriptors, verify_steps, runtime.current_step,
++        llm_context_->processed_context().processed_tokens().TokenCount(),
++        active->GetNumEntries(), executor_settings_.GetMaxNumTokens()));
++  }
+   nlohmann::json backend = {
+       {"kind", "litert"},
+       {"output_heads", heads},
+@@ -1608,6 +1751,7 @@ LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+                                 : nlohmann::json(nullptr)},
+       {"lora_active", llm_context_->processed_context().lora_id().has_value()},
+   };
++  if (verify_steps > 0) backend["mtp_verify_steps"] = verify_steps;
+   SerializedLlmContext result;
+   ABSL_ASSIGN_OR_RETURN(
+       result.metadata,
+@@ -1620,13 +1764,6 @@ LlmLiteRtCompiledModelExecutorBase::SerializeContext() const {
+ 
+ absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
+     absl::string_view metadata, absl::string_view state) {
+-  if (mtp_drafter_ != nullptr ||
+-      (executor_settings_.GetAdvancedSettings().has_value() &&
+-       executor_settings_.GetAdvancedSettings()->enable_speculative_decoding)) {
+-    return absl::FailedPreconditionError(
+-        "Disable speculative decoding for persistent sessions; verifier state "
+-        "cannot be rolled back to the completed turn boundary.");
+-  }
+   if (llm_context_ == nullptr || llm_context_->runtime_state().current_step != 0) {
+     return absl::FailedPreconditionError("LoadContext requires a fresh context.");
+   }
+@@ -1634,7 +1771,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
+                         ParseContextMetadata(metadata, executor_settings_));
+   const auto& config = llm_context_->runtime_config();
+   const int heads = config.output_heads.value_or(1);
+-  const nlohmann::json expected_backend = {
++  ABSL_ASSIGN_OR_RETURN(int verify_steps, GetMtpVerifySteps());
++  nlohmann::json expected_backend = {
+       {"kind", "litert"},
+       {"output_heads", heads},
+       {"tokens_per_decode", config.tokens_per_decode.has_value()
+@@ -1642,6 +1780,9 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
+                                 : nlohmann::json(nullptr)},
+       {"lora_active", llm_context_->processed_context().lora_id().has_value()},
+   };
++  // Validate the compiled verifier even when the target drafter is still lazy.
++  // This marker does not override the target's speculative-decoding options.
++  if (verify_steps > 0) expected_backend["mtp_verify_steps"] = verify_steps;
+   const int active_batch = context.ran_decode ? heads : 1;
+   if (context.backend.dump() != expected_backend.dump() || heads < 1 ||
+       context.candidate_count != static_cast<size_t>(active_batch)) {
+@@ -1676,6 +1817,16 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
+   ABSL_RETURN_IF_ERROR(litert_state->ValidateLoad(parsed, true));
+   ABSL_ASSIGN_OR_RETURN(
+       int entries, ReadContextInteger(parsed.metadata.at("num_entries")));
++  if (verify_steps > 0) {
++    nlohmann::json descriptors = nlohmann::json::object();
++    for (const auto& tensor : parsed.tensors) {
++      descriptors[tensor.name] = tensor.descriptor;
++    }
++    ABSL_RETURN_IF_ERROR(ValidateMtpCacheForPersistence(
++        executor_metadata_, descriptors, verify_steps, context.current_step,
++        context.tokens.TokenCount(), entries,
++        executor_settings_.GetMaxNumTokens()));
++  }
+   // The final logical token may still be pending and absent from the cache.
+   if (static_cast<int64_t>(context.current_step) >
+       static_cast<int64_t>(entries) + 1) {
+@@ -1709,6 +1860,8 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::LoadContext(
+   llm_context_->runtime_state().ran_decode = context.ran_decode;
+   // The target session retains its sampling configuration and fresh RNG.
+   sampler_.reset();
++  mtp_primed_ = false;
++  if (mtp_drafter_ != nullptr) mtp_drafter_->ResetForNewSession();
+   force_prepare_needed_ = false;
+   return absl::OkStatus();
+ }
+diff --git a/runtime/executor/llm_litert_compiled_model_executor.h b/runtime/executor/llm_litert_compiled_model_executor.h
+index 54840c378b40031ca5e5449105b8b8ac5315113e..222729a5f43d5f6875c878133157bfe904a0cedb 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor.h
++++ b/runtime/executor/llm_litert_compiled_model_executor.h
+@@ -36,6 +36,7 @@
+ #include "litert/cc/litert_options.h"  // from @litert
+ #include "litert/cc/litert_profiler.h"  // from @litert
+ #include "litert/cc/litert_tensor_buffer.h"  // from @litert
++#include "nlohmann/json_fwd.hpp"  // from @nlohmann_json
+ #include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
+ #include "runtime/components/model_resources.h"
+ #include "runtime/components/sampler.h"
+@@ -404,6 +405,14 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
+   // Gets the prefill signature key from the compiled model.
+   absl::StatusOr<std::string> GetPrefillSignatureKey() const;
+ 
++  // Zero means the compiled model has no MTP verifier signature.
++  absl::StatusOr<int> GetMtpVerifySteps() const;
++
++  static absl::Status ValidateMtpCacheForPersistence(
++      const proto::ExecutorMetadata* executor_metadata,
++      const nlohmann::json& tensor_descriptors, int verify_steps,
++      int current_step, int token_count, int num_entries, uint32_t max_tokens);
++
+   absl::StatusOr<litert::Profiler> GetProfiler() const;
+ 
+   // Clones the KV cache state.
+diff --git a/runtime/executor/llm_litert_compiled_model_executor_test.cc b/runtime/executor/llm_litert_compiled_model_executor_test.cc
+index ebd77f10c59456fa057de0a9697d4052fd27190d..b6d9c87bd7b3bf207c5799ce4c87d8739d2fad12 100644
+--- a/runtime/executor/llm_litert_compiled_model_executor_test.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor_test.cc
+@@ -52,6 +52,7 @@
+ #include "litert/cc/litert_model.h"  // from @litert
+ #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+ #include "litert/test/matchers.h"  // from @litert
++#include "nlohmann/json.hpp"  // from @nlohmann_json
+ #include "runtime/components/constrained_decoding/constrained_decoder.h"
+ #include "runtime/components/constrained_decoding/fake_constraint.h"
+ #include "runtime/components/model_resources.h"
+@@ -63,6 +64,7 @@
+ #include "runtime/executor/llm_executor_io_types.h"
+ #include "runtime/executor/llm_executor_settings.h"
+ #include "runtime/executor/llm_executor_settings_utils.h"
++#include "runtime/proto/executor_metadata.pb.h"
+ #include "runtime/proto/llm_metadata.pb.h"
+ #include "runtime/util/convert_tensor_buffer.h"
+ #include "runtime/util/litert_lm_loader.h"
+@@ -643,6 +645,8 @@ class FakeSamplerWithInputHandling : public Sampler {
+ class TestableLlmLiteRtCompiledModelExecutorStatic
+     : public LlmLiteRtCompiledModelExecutorStatic {
+  public:
++  using LlmLiteRtCompiledModelExecutorBase::ValidateMtpCacheForPersistence;
++
+   static void SetSamplerForTest(LlmLiteRtCompiledModelExecutorStatic* executor,
+                                 std::unique_ptr<Sampler> sampler) {
+     auto* testable =
+@@ -661,6 +665,83 @@ class TestableLlmLiteRtCompiledModelExecutorStatic
+   }
+ };
+ 
++TEST(LlmLiteRtCompiledModelExecutorStaticTest,
++     MtpSnapshotValidatesPhysicalCache) {
++  proto::ExecutorMetadata metadata;
++  auto* llm = metadata.mutable_llm_executor_metadata();
++  auto* attention = llm->mutable_attention_mask_settings();
++  attention->set_attention_mask_type(proto::ATTENTION_MASK_TYPE_CAUSAL);
++  attention->set_local_attention_mask_type(
++      proto::ATTENTION_MASK_TYPE_VISION_BIDIRECTIONAL);
++  attention->set_sliding_window_size(1024);
++  const struct {
++    const char* name;
++    proto::StateBuffer::Type type;
++    int axis;
++  } buffers[] = {
++      {"local_k", proto::StateBuffer::TYPE_LOCAL_KEY_CACHE, 2},
++      {"local_v", proto::StateBuffer::TYPE_LOCAL_VALUE_CACHE, 3},
++      {"global_k", proto::StateBuffer::TYPE_GLOBAL_KEY_CACHE, 2},
++      {"global_v", proto::StateBuffer::TYPE_GLOBAL_VALUE_CACHE, 3},
++  };
++  nlohmann::json descriptors = nlohmann::json::object();
++  for (const auto& buffer : buffers) {
++    auto* entry = llm->add_state_buffers();
++    entry->set_prefill_input_name(buffer.name);
++    entry->set_decode_output_name(buffer.name);
++    entry->set_type(buffer.type);
++    entry->set_sequence_axis(buffer.axis);
++    // The actual allocated shape, rather than this export maximum, controls
++    // admission after model/context resizing.
++    entry->set_maximum_sequence_length(4096);
++    std::vector<int> shape = {1, 8, 256, 256};
++    shape[buffer.axis] = 1152;
++    descriptors[absl::StrCat("1/", buffer.name)] = {{"shape", shape}};
++  }
++  auto validate = [&](int step = 1000, int token_count = 1000,
++                      int num_entries = 1152, uint32_t max_tokens = 1153) {
++    return TestableLlmLiteRtCompiledModelExecutorStatic::
++        ValidateMtpCacheForPersistence(
++            &metadata, descriptors, /*verify_steps=*/4, step, token_count,
++            num_entries, max_tokens);
++  };
++  EXPECT_OK(validate());
++  // A low visible token count cannot prove that a speculative suffix fit
++  // smaller fixed globals when the dynamic entry counter allowed more rows.
++  EXPECT_THAT(validate(10, 10, 2048, 4096),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  // The configured limit also bounds Decode, including its pending bonus.
++  EXPECT_OK(validate(10, 10, 2048, 1024));
++  descriptors["1/local_k"]["shape"][2] = 1027;
++  EXPECT_THAT(validate(), StatusIs(absl::StatusCode::kFailedPrecondition));
++  descriptors["1/local_k"]["shape"][2] = 1028;
++  EXPECT_OK(validate());
++  // Preserve enough history for a rewind behind the full returned MTP batch.
++  EXPECT_THAT(validate(995), StatusIs(absl::StatusCode::kFailedPrecondition));
++  descriptors["1/local_k"]["shape"][2] = 1033;
++  EXPECT_OK(validate(995));
++  // Key and value buffers have different sequence axes; validate both.
++  descriptors["1/local_v"]["shape"][3] = 1024;
++  EXPECT_THAT(validate(), StatusIs(absl::StatusCode::kFailedPrecondition));
++  descriptors["1/local_v"]["shape"][3] = 1152;
++  EXPECT_THAT(validate(1154, 1154),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  llm->mutable_state_buffers(0)->set_type(
++      proto::StateBuffer::TYPE_LINEAR_ATTENTION);
++  EXPECT_THAT(validate(), StatusIs(absl::StatusCode::kFailedPrecondition));
++  llm->mutable_state_buffers(0)->set_type(
++      proto::StateBuffer::TYPE_LOCAL_KEY_CACHE);
++  descriptors["2/local_k"] = descriptors["1/local_k"];
++  EXPECT_THAT(validate(), StatusIs(absl::StatusCode::kFailedPrecondition));
++  for (const auto& buffer : buffers) {
++    descriptors[absl::StrCat("2/", buffer.name)] =
++        descriptors[absl::StrCat("1/", buffer.name)];
++  }
++  EXPECT_OK(validate());
++  descriptors["2/local_v"]["shape"][3] = 1024;
++  EXPECT_THAT(validate(), StatusIs(absl::StatusCode::kFailedPrecondition));
++}
++
+ TEST(LlmLiteRtCompiledModelExecutorStaticTest,
+      SamplerInputHandlingMultiTurnTest) {
+   auto model_path =
+@@ -1936,7 +2017,13 @@ TEST(LlmLiteRtCompiledModelExecutorStaticTest, PersistentContextAcrossExecutors)
+   EXPECT_EQ(unchanged.metadata, empty.metadata);
+   EXPECT_EQ(unchanged.state, empty.state);
+ 
++  auto incompatible = nlohmann::json::parse(saved.metadata);
++  incompatible["backend"]["mtp_verify_steps"] = 4;
++  EXPECT_THAT(target->LoadContext(incompatible.dump(), saved.state),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  target->set_mtp_primed_for_testing(true);
+   ASSERT_OK(target->LoadContext(saved.metadata, saved.state));
++  EXPECT_FALSE(target->mtp_primed_for_testing());
+   ASSERT_OK_AND_ASSIGN(auto restored, target->SerializeContext());
+   EXPECT_EQ(restored.metadata, saved.metadata);
+   EXPECT_EQ(restored.state, saved.state);
+diff --git a/runtime/executor/llm_litert_mtp_drafter.cc b/runtime/executor/llm_litert_mtp_drafter.cc
+index 73fd90ac3390faff47a8405e266cad22d479ec60..433c3a0e9aa9d977087f53ccbd8ae6c8a9e321e2 100644
+--- a/runtime/executor/llm_litert_mtp_drafter.cc
++++ b/runtime/executor/llm_litert_mtp_drafter.cc
+@@ -61,6 +61,7 @@
+ #include "runtime/executor/litert_compiled_model_executor_utils.h"
+ #include "runtime/executor/llm_executor_settings.h"
+ #include "runtime/executor/llm_executor_settings_utils.h"
++#include "runtime/executor/mtp_cache.h"
+ #include "runtime/executor/state_interface.h"
+ #include "runtime/proto/llm_metadata.pb.h"
+ #include "runtime/util/convert_tensor_buffer.h"
+@@ -459,6 +460,13 @@ absl::Status LlmLiteRtMtpDrafter::UpdateVerifierSamplerConfig(
+       verifier_logits_data_type_);
+ }
+ 
++void LlmLiteRtMtpDrafter::ResetForNewSession() {
++  verifier_own_rand_gen_.Reset();
++  constraint_ = nullptr;
++  constraint_state_.reset();
++  last_verified_token_id_idx_ = -1;
++}
++
+ absl::Status LlmLiteRtMtpDrafter::PrepareDrafterInputBuffers(
+     int position, absl::flat_hash_map<absl::string_view, TensorBuffer>&
+                       output_kv_cache_buffers) {
+@@ -714,6 +722,12 @@ absl::StatusOr<std::vector<int>> LlmLiteRtMtpDrafter::RunVerification(
+ absl::StatusOr<std::vector<std::vector<int>>> LlmLiteRtMtpDrafter::Draft(
+     int position, int token_id, std::optional<TensorBuffer> activations,
+     StateInterface& state, const Constraint* constraint) {
++  // No masks, pending tokens, or state banks may be changed for a verifier
++  // batch that cannot fit in the allocated cache.
++  if (!MtpBatchFits(position, verify_steps(), state.GetNumEntries())) {
++    return absl::ResourceExhaustedError(
++        "MTP verifier batch exceeds KV capacity.");
++  }
+   auto* litert_state = dynamic_cast<LitertState*>(&state);
+   RET_CHECK(litert_state != nullptr);
+   LITERT_ASSIGN_OR_RETURN(
+diff --git a/runtime/executor/llm_litert_mtp_drafter.h b/runtime/executor/llm_litert_mtp_drafter.h
+index 8c7a9b617cef3cdc16f516aef4a3660b0a63884e..0bcb36bdaf21517fa4266aec38fc089140ab0cf8 100644
+--- a/runtime/executor/llm_litert_mtp_drafter.h
++++ b/runtime/executor/llm_litert_mtp_drafter.h
+@@ -65,11 +65,13 @@ inline int CountAcceptedPrefix(absl::Span<const int> verifier_ids,
+   return accepted;
+ }
+ 
+-// Owns a random number generator seeded with the last requested seed. The
+-// generator is only recreated when the seed changes, so that repeated requests
+-// with the same seed continue its stream instead of restarting it.
++// Owns a random number generator seeded with the last requested seed.
++// Until Reset(), the generator is only recreated when the seed changes, so
++// repeated requests with the same seed continue its stream.
+ class SeededRandomEngine {
+  public:
++  void Reset() { engine_.reset(); }
++
+   std::shared_ptr<std::default_random_engine> Get(int32_t seed) {
+     if (engine_ == nullptr || seed != seed_) {
+       engine_ = std::make_shared<std::default_random_engine>(seed);
+@@ -145,7 +147,7 @@ class LlmLiteRtMtpDrafter {
+   // shared random number generator `rand_gen` (typically the session sampler's
+   // configuration and generator), recreating it if its top-k capacity is too
+   // small. If `rand_gen` is null, the verifier uses its own generator seeded
+-  // with `sampler_params.seed()`, which is only reseeded when the seed changes.
++  // with `sampler_params.seed()`, reseeded on a new session or seed change.
+   // The drafter sampler stays greedy, which keeps the exact-match acceptance
+   // lossless with respect to the verifier's distribution.
+   absl::Status UpdateVerifierSamplerConfig(
+@@ -154,6 +156,12 @@ class LlmLiteRtMtpDrafter {
+ 
+   const MtpRoundStats& last_round_stats() const { return last_round_stats_; }
+ 
++  int verify_steps() const { return num_draft_steps_ + 1; }
++
++  // The next decode supplies fresh priming activations and reconfigures the
++  // verifier sampler. Do not retain another session's grammar state or RNG.
++  void ResetForNewSession();
++
+  private:
+   LlmLiteRtMtpDrafter(
+       CompiledModel mtp_drafter_model, SimpleSignature drafter_signature,
+diff --git a/runtime/executor/llm_litert_mtp_drafter_test.cc b/runtime/executor/llm_litert_mtp_drafter_test.cc
+index 9d6397b592e5d39fdefef211541354bb50a4699f..b44e2b8b61611025240b65f8b3f97c213f85119f 100644
+--- a/runtime/executor/llm_litert_mtp_drafter_test.cc
++++ b/runtime/executor/llm_litert_mtp_drafter_test.cc
+@@ -436,5 +436,17 @@ TEST(SeededRandomEngineTest, ReseedsWhenSeedChanges) {
+   EXPECT_EQ((*seven_again)(), reference_seven());
+ }
+ 
++TEST(SeededRandomEngineTest, NewSessionRestartsUnchangedSeed) {
++  SeededRandomEngine engine;
++  const auto previous = engine.Get(7);
++  previous->discard(19);
++  engine.Reset();
++  const auto restored = engine.Get(7);
++  EXPECT_NE(restored, previous);
++  std::default_random_engine reference(7);
++  EXPECT_EQ((*restored)(), reference());
++  EXPECT_EQ((*engine.Get(7))(), reference());
++}
++
+ }  // namespace
+ }  // namespace litert::lm

@@ -1,0 +1,5 @@
+0001-litert-lock-failure.patch
+0002-litert-host-staging-api.patch
+0003-litert-host-staging-providers.patch
+0004-gemma-metal-kv-checkpoint.patch
+0005-int8-metal-kv-checkpoint.patch

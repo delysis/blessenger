@@ -1,0 +1,5 @@
+module CLiteRTLM [system] {
+  header "../../Reference/LiteRT-LM/c/engine.h"
+  header "../../Reference/LiteRT-LM/c/conversation.h"
+  export *
+}

@@ -1,0 +1,885 @@
+diff --git a/runtime/executor/litert/BUILD b/runtime/executor/litert/BUILD
+index fa37206df3862e89f35e224d321fd122069de258..23eefdc2858e174a05642de1007176d088c86476 100644
+--- a/runtime/executor/litert/BUILD
++++ b/runtime/executor/litert/BUILD
+@@ -85,12 +85,56 @@ cc_library(
+     name = "legacy_map_state",
+     hdrs = ["legacy_map_state.h"],
+     deps = [
++        ":state_serialization",
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/status:statusor",
+         "@com_google_absl//absl/strings:string_view",
+         "@litert//litert/cc:litert_macros",
+         "@litert//litert/cc:litert_tensor_buffer",
++        "@nlohmann_json//:json",
+         "//runtime/executor:state_interface",
+     ],
+ )
++
++cc_library(
++    name = "state_serialization",
++    srcs = ["state_serialization.cc"],
++    hdrs = ["state_serialization.h"],
++    deps = [
++        "@com_google_absl//absl/container:flat_hash_map",
++        "@com_google_absl//absl/crc:crc32c",
++        "@com_google_absl//absl/status",
++        "@com_google_absl//absl/status:status_macros",
++        "@com_google_absl//absl/status:statusor",
++        "@com_google_absl//absl/strings:string_view",
++        "@litert//litert/c:litert_layout",
++        "@litert//litert/cc:litert_element_type",
++        "@litert//litert/cc:litert_macros",
++        "@litert//litert/cc:litert_tensor_buffer",
++        "@litert//litert/cc:litert_tensor_buffer_types",
++        "@nlohmann_json//:json",
++    ],
++)
++
++cc_test(
++    name = "state_serialization_test",
++    srcs = ["state_serialization_test.cc"],
++    deps = [
++        ":legacy_map_state",
++        ":state_serialization",
++        "@com_google_absl//absl/crc:crc32c",
++        "@com_google_absl//absl/status",
++        "@com_google_absl//absl/strings:string_view",
++        "@com_google_googletest//:gtest_main",
++        "@litert//litert/cc:litert_element_type",
++        "@litert//litert/cc:litert_environment",
++        "@litert//litert/cc:litert_layout",
++        "@litert//litert/cc:litert_ranked_tensor_type",
++        "@litert//litert/cc:litert_tensor_buffer",
++        "@litert//litert/cc:litert_tensor_buffer_types",
++        "@litert//litert/test:matchers",
++        "@nlohmann_json//:json",
++        "//runtime/util:test_utils",
++    ],
++)
+diff --git a/runtime/executor/litert/CMakeLists.txt b/runtime/executor/litert/CMakeLists.txt
+index 2c871c51cc6dc5fbe8bbe7e8c80ddefd9563c873..57e985d6b4ef0b8734a6c81851822a4214267e03 100644
+--- a/runtime/executor/litert/CMakeLists.txt
++++ b/runtime/executor/litert/CMakeLists.txt
+@@ -15,6 +15,24 @@
+ # ==============================================================================
+ # KV Cache
+ # ==============================================================================
++add_litertlm_library(runtime_executor_litert_state_serialization STATIC
++  state_serialization.cc
++)
++add_library(LiteRTLM::Runtime::Executor::Litert::StateSerialization
++    ALIAS runtime_executor_litert_state_serialization)
++
++target_include_directories(runtime_executor_litert_state_serialization
++  PRIVATE
++    ${LITERTLM_GENERATED_SRC_DIR}
++    ${LITERTLM_INCLUDE_PATHS}
++)
++
++target_link_libraries(runtime_executor_litert_state_serialization
++  PUBLIC
++    LITERTLM_DEPS
++    absl::crc32c
++)
++
+ add_litertlm_library(runtime_executor_litert_state STATIC
+   state.cc
+ )
+@@ -40,4 +58,5 @@ add_library(LiteRTLM::Runtime::Executor::Litert ALIAS runtime_executor_litert_li
+ 
+ target_link_libraries(runtime_executor_litert_libs INTERFACE
+   LiteRTLM::Runtime::Executor::Litert::State
++  LiteRTLM::Runtime::Executor::Litert::StateSerialization
+ )
+\ No newline at end of file
+diff --git a/runtime/executor/litert/legacy_map_state.h b/runtime/executor/litert/legacy_map_state.h
+index 64a76f3f017d03e2db06ab16a053d3a2e7315bae..6c440170285ff212690cfcc6e03b0accede6b5e9 100644
+--- a/runtime/executor/litert/legacy_map_state.h
++++ b/runtime/executor/litert/legacy_map_state.h
+@@ -23,8 +23,10 @@
+ #include "absl/status/status.h"  // from @com_google_absl
+ #include "absl/status/statusor.h"  // from @com_google_absl
+ #include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
+ #include "litert/cc/litert_macros.h"  // from @litert
+ #include "litert/cc/litert_tensor_buffer.h"  // from @litert
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/executor/state_interface.h"
+ 
+ namespace litert::lm {
+@@ -42,12 +44,20 @@ class LegacyMapState : public StateInterface {
+   int GetBatchSize() const override { return 0; }
+ 
+   absl::StatusOr<std::string> Serialize() const override {
+-    return absl::UnimplementedError(
+-        "Serialize not implemented in LegacyMapState");
++    return SerializeState({{"kind", "legacy_map"}}, buffers_);
+   }
+ 
+   absl::Status Load(absl::string_view serialized_state) override {
+-    return absl::UnimplementedError("Load not implemented in LegacyMapState");
++    auto state = ParseSerializedState(serialized_state);
++    if (!state.ok()) return state.status();
++    return Load(*state);
++  }
++
++  absl::Status Load(const ParsedSerializedState& state) {
++    if (state.metadata != nlohmann::json({{"kind", "legacy_map"}})) {
++      return absl::InvalidArgumentError("Incompatible legacy state metadata.");
++    }
++    return LoadSerializedState(state, buffers_);
+   }
+ 
+   absl::Status SelectAndCopyFrom(StateInterface& other,
+diff --git a/runtime/executor/litert/state_serialization.cc b/runtime/executor/litert/state_serialization.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f2115396025ab0bef334c5f44a0e504f9d5687e
+--- /dev/null
++++ b/runtime/executor/litert/state_serialization.cc
+@@ -0,0 +1,388 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/litert/state_serialization.h"
++
++#include <algorithm>
++#include <cstddef>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "absl/crc/crc32c.h"  // from @com_google_absl
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/status_macros.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "litert/c/litert_layout.h"  // from @litert
++#include "litert/cc/litert_element_type.h"  // from @litert
++#include "litert/cc/litert_macros.h"  // from @litert
++#include "litert/cc/litert_tensor_buffer_types.h"  // from @litert
++
++namespace litert::lm {
++namespace {
++
++constexpr absl::string_view kMagic = "LRTSTATE";
++constexpr size_t kPrefixBytes = 16;
++constexpr size_t kChecksumBytes = 4;
++constexpr size_t kMaxHeaderBytes = 1024 * 1024;
++constexpr size_t kMaxTensors = 4096;
++constexpr size_t kMaxNameBytes = 1024;
++
++void AppendInteger(std::string& out, uint64_t value, int bytes) {
++  for (int i = 0; i < bytes; ++i) {
++    out.push_back(static_cast<char>(value & 255));
++    value >>= 8;
++  }
++}
++
++uint64_t ReadInteger(absl::string_view bytes) {
++  uint64_t value = 0;
++  for (size_t i = 0; i < bytes.size(); ++i) {
++    value |= static_cast<uint64_t>(static_cast<uint8_t>(bytes[i])) << (8 * i);
++  }
++  return value;
++}
++
++const char* ByteOrder() {
++  const uint32_t one = 1;
++  return *reinterpret_cast<const uint8_t*>(&one) == 1 ? "little" : "big";
++}
++
++bool UnsignedInteger(const nlohmann::json& value, uint64_t& result) {
++  if (value.is_number_unsigned()) {
++    result = value.get<uint64_t>();
++    return true;
++  }
++  if (value.is_number_integer() && value.get<int64_t>() >= 0) {
++    result = static_cast<uint64_t>(value.get<int64_t>());
++    return true;
++  }
++  return false;
++}
++
++// Bound nesting before entering the JSON parser. Syntax and canonical encoding
++// are checked separately; braces inside strings do not contribute to depth.
++bool BoundedJsonDepth(absl::string_view text) {
++  int depth = 0;
++  bool in_string = false;
++  bool escaped = false;
++  for (char c : text) {
++    if (in_string) {
++      if (escaped) {
++        escaped = false;
++      } else if (c == '\\') {
++        escaped = true;
++      } else if (c == '"') {
++        in_string = false;
++      }
++    } else if (c == '"') {
++      in_string = true;
++    } else if (c == '{' || c == '[') {
++      if (++depth > 32) return false;
++    } else if (c == '}' || c == ']') {
++      if (--depth < 0) return false;
++    }
++  }
++  return depth == 0 && !in_string;
++}
++
++absl::StatusOr<size_t> DescriptorBytes(const nlohmann::json& descriptor) {
++  uint64_t type, bytes;
++  if (!descriptor.is_object() || descriptor.size() != 3 ||
++      !descriptor.contains("type") || !descriptor.contains("shape") ||
++      !descriptor.contains("bytes") ||
++      !UnsignedInteger(descriptor["type"], type) ||
++      type > std::numeric_limits<int>::max() ||
++      !UnsignedInteger(descriptor["bytes"], bytes) ||
++      !descriptor["shape"].is_array() ||
++      descriptor["shape"].size() > LITERT_TENSOR_MAX_RANK) {
++    return absl::DataLossError("Invalid state tensor descriptor.");
++  }
++  auto width = GetByteWidth(static_cast<ElementType>(type));
++  if (!width.has_value()) {
++    return absl::DataLossError("Unsupported state tensor element type.");
++  }
++  size_t elements = 1;
++  for (const auto& dim : descriptor["shape"]) {
++    uint64_t value;
++    if (!UnsignedInteger(dim, value) ||
++        value > std::numeric_limits<int32_t>::max() ||
++        (value != 0 && elements > std::numeric_limits<size_t>::max() / value)) {
++      return absl::DataLossError("Invalid state tensor shape.");
++    }
++    elements *= value;
++  }
++  // ByteWidth supports sub-byte types. Reserve room for its rounding as well
++  // as multiplication; NumBytes() itself does not check overflow.
++  if (elements > (std::numeric_limits<size_t>::max() - 3) /
++                     static_cast<size_t>(*width)) {
++    return absl::DataLossError("State tensor size overflows.");
++  }
++  const size_t expected = width->NumBytes(elements);
++  if (bytes != expected) {
++    return absl::DataLossError("State tensor byte count does not match its type.");
++  }
++  return expected;
++}
++
++absl::StatusOr<size_t> TransferOffset(const TensorBuffer& buffer,
++                                    size_t packed_bytes) {
++  LITERT_ASSIGN_OR_RETURN(auto type, buffer.TensorType());
++  if (type.Layout().HasStrides()) {
++    return absl::UnimplementedError(
++        "Strided state tensor layouts are unsupported.");
++  }
++  LITERT_ASSIGN_OR_RETURN(auto buffer_type, buffer.BufferType());
++  LITERT_ASSIGN_OR_RETURN(size_t offset, buffer.Offset());
++  switch (buffer_type) {
++    case TensorBufferType::kHostMemory:
++    case TensorBufferType::kAhwb:
++    case TensorBufferType::kIon:
++    case TensorBufferType::kDmaBuf:
++    case TensorBufferType::kFastRpc: {
++      // These mappings return the allocation base, including for NPU aliases.
++      LITERT_ASSIGN_OR_RETURN(size_t size, buffer.Size());
++      if (offset > size || packed_bytes > size - offset) {
++        return absl::InvalidArgumentError("State tensor exceeds its allocation.");
++      }
++      return offset;
++    }
++    default:
++      // GPU mappings perform their own packing/conversion. Physical storage
++      // size may differ from the declared dtype's packed host representation.
++      if (offset != 0) {
++        return absl::UnimplementedError("GPU state tensor offsets are unsupported.");
++      }
++      return size_t{0};
++  }
++}
++
++absl::Status UnlockAfterTransfer(TensorBuffer& buffer) {
++  auto unlocked = buffer.Unlock();
++  auto cleanup = buffer.ReleaseHostStagingMemory();
++  if (!unlocked) {
++    ErrorStatusBuilder error(unlocked);
++    if (!cleanup) {
++      error << "; staging cleanup failed: " << cleanup.Error().Message();
++    }
++    return error;
++  }
++  LITERT_RETURN_IF_ERROR(cleanup);
++  return absl::OkStatus();
++}
++
++absl::StatusOr<void*> LockForTransfer(TensorBuffer& buffer,
++                                     TensorBuffer::LockMode mode) {
++  auto data = buffer.Lock(mode);
++  if (!data) {
++    ErrorStatusBuilder error(data);
++    auto cleanup = buffer.ReleaseHostStagingMemory();
++    if (!cleanup) {
++      error << "; staging cleanup failed: " << cleanup.Error().Message();
++    }
++    return error;
++  }
++  if (*data == nullptr) {
++    ABSL_RETURN_IF_ERROR(UnlockAfterTransfer(buffer));
++    return absl::InternalError("State tensor mapping returned a null address.");
++  }
++  return *data;
++}
++
++}  // namespace
++
++absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer) {
++  LITERT_ASSIGN_OR_RETURN(auto type, buffer.TensorType());
++  LITERT_ASSIGN_OR_RETURN(size_t size, buffer.PackedSize());
++  const auto dimensions = type.Layout().Dimensions();
++  nlohmann::json descriptor = {
++      {"type", static_cast<int>(type.ElementType())},
++      {"shape", std::vector<int32_t>(dimensions.begin(), dimensions.end())},
++      {"bytes", size}};
++  ABSL_RETURN_IF_ERROR(DescriptorBytes(descriptor).status());
++  ABSL_RETURN_IF_ERROR(TransferOffset(buffer, size).status());
++  return descriptor;
++}
++
++absl::StatusOr<std::string> SerializeState(
++    const nlohmann::json& metadata, const StateTensorBuffers& buffers) {
++  if (!metadata.is_object() || buffers.size() > kMaxTensors) {
++    return absl::InvalidArgumentError("Invalid state metadata or tensor count.");
++  }
++  std::vector<std::string> names;
++  names.reserve(buffers.size());
++  for (const auto& [name, _] : buffers) names.push_back(name);
++  std::sort(names.begin(), names.end());
++  nlohmann::json tensors = nlohmann::json::array();
++  size_t payload_bytes = 0;
++  for (const auto& name : names) {
++    if (name.empty() || name.size() > kMaxNameBytes) {
++      return absl::InvalidArgumentError("Invalid state tensor name.");
++    }
++    ABSL_ASSIGN_OR_RETURN(auto descriptor, DescribeStateTensor(buffers.at(name)));
++    const size_t bytes = descriptor["bytes"].get<size_t>();
++    if (bytes > std::numeric_limits<size_t>::max() - payload_bytes) {
++      return absl::ResourceExhaustedError("Serialized state is too large.");
++    }
++    payload_bytes += bytes;
++    descriptor["name"] = name;
++    tensors.push_back(std::move(descriptor));
++  }
++  const std::string header =
++      nlohmann::json({{"version", 1},
++                      {"byte_order", ByteOrder()},
++                      {"metadata", metadata},
++                      {"tensors", std::move(tensors)}})
++          .dump();
++  if (header.size() > kMaxHeaderBytes || !BoundedJsonDepth(header)) {
++    return absl::ResourceExhaustedError("Serialized state header is too large.");
++  }
++  std::string result;
++  const size_t overhead = kPrefixBytes + header.size() + kChecksumBytes;
++  if (payload_bytes > result.max_size() - overhead) {
++    return absl::ResourceExhaustedError("Serialized state is too large.");
++  }
++  result.reserve(overhead + payload_bytes);
++  result.append(kMagic.data(), kMagic.size());
++  AppendInteger(result, header.size(), 8);
++  result += header;
++  for (const auto& name : names) {
++    const auto& source = buffers.at(name);
++    LITERT_ASSIGN_OR_RETURN(size_t bytes, source.PackedSize());
++    ABSL_ASSIGN_OR_RETURN(size_t offset, TransferOffset(source, bytes));
++    if (bytes != 0) {
++      // Duplicate only the handle, never the tensor payload.
++      LITERT_ASSIGN_OR_RETURN(auto buffer, source.Duplicate());
++      LITERT_RETURN_IF_ERROR(buffer.ReleaseHostStagingMemory());
++      ABSL_ASSIGN_OR_RETURN(
++          void* data, LockForTransfer(buffer, TensorBuffer::LockMode::kRead));
++      result.append(static_cast<const char*>(data) + offset, bytes);
++      ABSL_RETURN_IF_ERROR(UnlockAfterTransfer(buffer));
++    }
++  }
++  AppendInteger(result, static_cast<uint32_t>(absl::ComputeCrc32c(result)), 4);
++  return result;
++}
++
++absl::StatusOr<ParsedSerializedState> ParseSerializedState(
++    absl::string_view serialized_state) {
++  if (serialized_state.size() < kPrefixBytes + kChecksumBytes ||
++      serialized_state.substr(0, kMagic.size()) != kMagic) {
++    return absl::DataLossError("Invalid serialized state header.");
++  }
++  const uint64_t header_bytes = ReadInteger(serialized_state.substr(8, 8));
++  if (header_bytes > kMaxHeaderBytes ||
++      header_bytes > serialized_state.size() - kPrefixBytes - kChecksumBytes) {
++    return absl::DataLossError("Invalid serialized state header length.");
++  }
++  const size_t checksum_position = serialized_state.size() - kChecksumBytes;
++  if (ReadInteger(serialized_state.substr(checksum_position)) !=
++      static_cast<uint32_t>(
++          absl::ComputeCrc32c(serialized_state.substr(0, checksum_position)))) {
++    return absl::DataLossError("Serialized state checksum mismatch.");
++  }
++  const auto header_text = serialized_state.substr(kPrefixBytes, header_bytes);
++  if (!BoundedJsonDepth(header_text)) {
++    return absl::DataLossError("Invalid serialized state JSON depth.");
++  }
++  auto header = nlohmann::json::parse(header_text.begin(), header_text.end(),
++                                    nullptr, /*allow_exceptions=*/false);
++  if (!header.is_object() || header.size() != 4 ||
++      !header.contains("version") || !header.contains("byte_order") ||
++      !header.contains("metadata") || !header["metadata"].is_object() ||
++      !header.contains("tensors") || !header["tensors"].is_array() ||
++      header["tensors"].size() > kMaxTensors || header.dump() != header_text) {
++    return absl::DataLossError("Invalid serialized state JSON header.");
++  }
++  uint64_t version;
++  if (!UnsignedInteger(header["version"], version) || version != 1 ||
++      !header["byte_order"].is_string() || header["byte_order"] != ByteOrder()) {
++    return absl::FailedPreconditionError("Incompatible serialized state format.");
++  }
++  ParsedSerializedState result{std::move(header["metadata"]), {}};
++  size_t position = kPrefixBytes + header_bytes;
++  for (auto& tensor : header["tensors"]) {
++    if (!tensor.is_object() || tensor.size() != 4 ||
++        !tensor.contains("name") || !tensor["name"].is_string()) {
++      return absl::DataLossError("Invalid serialized state tensor name.");
++    }
++    std::string name = tensor["name"].get<std::string>();
++    if (name.empty() || name.size() > kMaxNameBytes ||
++        (!result.tensors.empty() && name <= result.tensors.back().name)) {
++      return absl::DataLossError("State tensor names are not unique and sorted.");
++    }
++    tensor.erase("name");
++    ABSL_ASSIGN_OR_RETURN(size_t bytes, DescriptorBytes(tensor));
++    if (bytes > checksum_position - position) {
++      return absl::DataLossError("Truncated serialized state tensor.");
++    }
++    result.tensors.push_back({std::move(name), std::move(tensor),
++                              serialized_state.substr(position, bytes)});
++    position += bytes;
++  }
++  if (position != checksum_position) {
++    return absl::DataLossError("Unexpected trailing serialized state bytes.");
++  }
++  return result;
++}
++
++absl::Status ValidateSerializedState(const ParsedSerializedState& state,
++                                    const StateTensorBuffers& buffers) {
++  if (state.tensors.size() != buffers.size()) {
++    return absl::InvalidArgumentError("State tensor count mismatch.");
++  }
++  absl::string_view previous_name;
++  for (const auto& tensor : state.tensors) {
++    const auto it = buffers.find(tensor.name);
++    if (it == buffers.end() || tensor.name <= previous_name) {
++      return absl::InvalidArgumentError("State tensor name mismatch.");
++    }
++    previous_name = tensor.name;
++    ABSL_ASSIGN_OR_RETURN(auto expected, DescribeStateTensor(it->second));
++    if (tensor.descriptor.dump() != expected.dump() ||
++        tensor.bytes.size() != expected["bytes"].get<size_t>()) {
++      return absl::InvalidArgumentError("State tensor descriptor mismatch.");
++    }
++  }
++  return absl::OkStatus();
++}
++
++absl::Status LoadSerializedState(const ParsedSerializedState& state,
++                                StateTensorBuffers& buffers) {
++  ABSL_RETURN_IF_ERROR(ValidateSerializedState(state, buffers));
++  // Reject providers unable to release staging before the first write.
++  for (auto& [_, buffer] : buffers) {
++    LITERT_RETURN_IF_ERROR(buffer.ReleaseHostStagingMemory());
++  }
++  for (const auto& tensor : state.tensors) {
++    auto& buffer = buffers.at(tensor.name);
++    ABSL_ASSIGN_OR_RETURN(size_t offset,
++                          TransferOffset(buffer, tensor.bytes.size()));
++    if (!tensor.bytes.empty()) {
++      ABSL_ASSIGN_OR_RETURN(
++          void* data, LockForTransfer(buffer, TensorBuffer::LockMode::kWrite));
++      std::memcpy(static_cast<char*>(data) + offset, tensor.bytes.data(),
++                  tensor.bytes.size());
++      ABSL_RETURN_IF_ERROR(UnlockAfterTransfer(buffer));
++    }
++  }
++  return absl::OkStatus();
++}
++
++}  // namespace litert::lm
+diff --git a/runtime/executor/litert/state_serialization.h b/runtime/executor/litert/state_serialization.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f1a0a3cf2c40f69e6d1f356c6ec930390f242904
+--- /dev/null
++++ b/runtime/executor/litert/state_serialization.h
+@@ -0,0 +1,72 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_SERIALIZATION_H_
++#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_SERIALIZATION_H_
++
++#include <string>
++#include <vector>
++
++#include "absl/container/flat_hash_map.h"  // from @com_google_absl
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/status/statusor.h"  // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "litert/cc/litert_tensor_buffer.h"  // from @litert
++
++namespace litert::lm {
++
++using StateTensorBuffers = absl::flat_hash_map<std::string, TensorBuffer>;
++
++struct SerializedStateTensor {
++  std::string name;
++  // The declared element type, logical shape and exact packed byte count.
++  nlohmann::json descriptor;
++  absl::string_view bytes;
++};
++
++struct ParsedSerializedState {
++  nlohmann::json metadata;
++  std::vector<SerializedStateTensor> tensors;
++};
++
++// Returns {"type": integer, "shape": [dimensions], "bytes": integer}.
++// Also validates the buffer's packed-transfer layout and offset.
++absl::StatusOr<nlohmann::json> DescribeStateTensor(const TensorBuffer& buffer);
++
++// These operations require exclusive access to the underlying buffers. The
++// format is a bounded, canonical JSON header followed by packed tensor bytes
++// in name order and a CRC32C covering the header and payload. It preserves
++// declared tensor types; a hardware buffer's storage type is not its dtype.
++absl::StatusOr<std::string> SerializeState(
++    const nlohmann::json& metadata, const StateTensorBuffers& buffers);
++
++// Checks the complete framing, checksum, descriptors and lengths. The result
++// borrows tensor bytes from serialized_state, which must outlive the result.
++absl::StatusOr<ParsedSerializedState> ParseSerializedState(
++    absl::string_view serialized_state);
++
++// Checks every descriptor before any destination buffer is written.
++absl::Status ValidateSerializedState(const ParsedSerializedState& state,
++                                     const StateTensorBuffers& buffers);
++
++// Copies into existing allocations and checks both Lock and Unlock. Malformed
++// or incompatible input is rejected before writing. A device-transfer failure
++// may leave partial contents; callers must discard that restore destination.
++absl::Status LoadSerializedState(const ParsedSerializedState& state,
++                                 StateTensorBuffers& buffers);
++
++}  // namespace litert::lm
++
++#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LITERT_STATE_SERIALIZATION_H_
+diff --git a/runtime/executor/litert/state_serialization_test.cc b/runtime/executor/litert/state_serialization_test.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..c0556bf3df05fc662eea414b006bb4ea49ae6ddf
+--- /dev/null
++++ b/runtime/executor/litert/state_serialization_test.cc
+@@ -0,0 +1,271 @@
++// Copyright 2026 The ODML Authors.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "runtime/executor/litert/state_serialization.h"
++
++#include <cstddef>
++#include <cstdint>
++#include <cstring>
++#include <limits>
++#include <optional>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include <gmock/gmock.h>
++#include <gtest/gtest.h>
++#include "absl/crc/crc32c.h"  // from @com_google_absl
++#include "absl/status/status.h"  // from @com_google_absl
++#include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
++#include "litert/cc/litert_element_type.h"  // from @litert
++#include "litert/cc/litert_environment.h"  // from @litert
++#include "litert/cc/litert_layout.h"  // from @litert
++#include "litert/cc/litert_ranked_tensor_type.h"  // from @litert
++#include "litert/cc/litert_tensor_buffer.h"  // from @litert
++#include "litert/cc/litert_tensor_buffer_types.h"  // from @litert
++#include "litert/test/matchers.h"  // from @litert
++#include "runtime/executor/litert/legacy_map_state.h"
++#include "runtime/util/test_utils.h"  // IWYU pragma: keep
++
++namespace litert::lm {
++namespace {
++
++using ::testing::status::StatusIs;
++
++// Rewrite a valid header and update the checksum so malformed-metadata tests
++// exercise parsing and validation instead of stopping at the corruption check.
++std::string ReplaceHeader(absl::string_view state,
++                          const nlohmann::json& header) {
++  uint64_t old_size = 0;
++  for (int i = 0; i < 8; ++i) {
++    old_size |= static_cast<uint64_t>(static_cast<uint8_t>(state[8 + i]))
++                << (8 * i);
++  }
++  std::string result(state.data(), 8);
++  const std::string text = header.dump();
++  for (int i = 0; i < 8; ++i) {
++    result.push_back(
++        static_cast<char>((static_cast<uint64_t>(text.size()) >> (8 * i)) & 255));
++  }
++  result += text;
++  result.append(state.data() + 16 + old_size, state.size() - 20 - old_size);
++  const uint32_t crc = static_cast<uint32_t>(absl::ComputeCrc32c(result));
++  for (int i = 0; i < 4; ++i) {
++    result.push_back(static_cast<char>((crc >> (8 * i)) & 255));
++  }
++  return result;
++}
++
++nlohmann::json Header(absl::string_view state) {
++  uint64_t size = 0;
++  for (int i = 0; i < 8; ++i) {
++    size |= static_cast<uint64_t>(static_cast<uint8_t>(state[8 + i]))
++            << (8 * i);
++  }
++  return nlohmann::json::parse(state.begin() + 16, state.begin() + 16 + size);
++}
++
++void ExpectBytes(TensorBuffer& buffer, uint8_t value) {
++  LITERT_ASSERT_OK_AND_ASSIGN(size_t bytes, buffer.PackedSize());
++  LITERT_ASSERT_OK_AND_ASSIGN(void* data,
++                              buffer.Lock(TensorBuffer::LockMode::kRead));
++  const std::string contents(static_cast<const char*>(data), bytes);
++  ASSERT_TRUE(buffer.Unlock());
++  EXPECT_EQ(contents, std::string(bytes, static_cast<char>(value)));
++}
++
++class StateSerializationTest : public ::testing::Test {
++ protected:
++  void SetUp() override {
++    LITERT_ASSERT_OK_AND_ASSIGN(
++        auto env, Environment::Create(std::vector<Environment::Option>()));
++    env_ = std::move(env);
++  }
++
++  void AddBuffer(StateTensorBuffers& buffers, const std::string& name,
++                 ElementType element_type, const Dimensions& shape,
++                 uint8_t value) {
++    const RankedTensorType type(element_type, Layout(shape));
++    LITERT_ASSERT_OK_AND_ASSIGN(size_t size, type.Bytes());
++    LITERT_ASSERT_OK_AND_ASSIGN(
++        auto buffer, TensorBuffer::CreateManaged(
++                         *env_, TensorBufferType::kHostMemory, type, size));
++    LITERT_ASSERT_OK_AND_ASSIGN(void* data,
++                                buffer.Lock(TensorBuffer::LockMode::kWrite));
++    std::memset(data, value, size);
++    ASSERT_TRUE(buffer.Unlock());
++    buffers.emplace(name, std::move(buffer));
++  }
++
++  std::optional<Environment> env_;
++};
++
++TEST_F(StateSerializationTest, RoundTripPreservesTypesAndExistingAllocations) {
++  StateTensorBuffers source, target;
++  const std::vector<ElementType> types = {
++      ElementType::Float32, ElementType::Float16, ElementType::BFloat16,
++      ElementType::Int8, ElementType::Int4, ElementType::Int2};
++  for (size_t i = 0; i < types.size(); ++i) {
++    ASSERT_NO_FATAL_FAILURE(AddBuffer(source, std::to_string(i), types[i], {5},
++                                      static_cast<uint8_t>(i + 1)));
++  }
++  // Deliberately insert the destination in the opposite order.
++  for (size_t i = types.size(); i > 0; --i) {
++    ASSERT_NO_FATAL_FAILURE(
++        AddBuffer(target, std::to_string(i - 1), types[i - 1], {5}, 0));
++  }
++  ASSERT_OK_AND_ASSIGN(auto serialized, SerializeState({{"step", 7}}, source));
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  ASSERT_EQ(parsed.tensors.size(), types.size());
++  for (size_t i = 0; i < types.size(); ++i) {
++    EXPECT_EQ(parsed.tensors[i].name, std::to_string(i));
++    EXPECT_EQ(parsed.tensors[i].descriptor["type"], static_cast<int>(types[i]));
++  }
++  const auto handle = target.at("0").Get();
++  ASSERT_OK(LoadSerializedState(parsed, target));
++  EXPECT_EQ(target.at("0").Get(), handle);
++  for (size_t i = 0; i < types.size(); ++i) {
++    ASSERT_NO_FATAL_FAILURE(
++        ExpectBytes(target.at(std::to_string(i)), static_cast<uint8_t>(i + 1)));
++  }
++  ASSERT_OK_AND_ASSIGN(auto restored, SerializeState({{"step", 7}}, target));
++  EXPECT_EQ(restored, serialized);
++}
++
++TEST_F(StateSerializationTest, ValidatesEveryDescriptorBeforeWriting) {
++  StateTensorBuffers source, target;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(source, "a", ElementType::UInt8, {4}, 1));
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(source, "z", ElementType::UInt8, {4}, 2));
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(target, "a", ElementType::UInt8, {4}, 9));
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(target, "z", ElementType::Int8, {4}, 8));
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), source));
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  EXPECT_THAT(LoadSerializedState(parsed, target),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  ASSERT_NO_FATAL_FAILURE(ExpectBytes(target.at("a"), 9));
++  ASSERT_NO_FATAL_FAILURE(ExpectBytes(target.at("z"), 8));
++}
++
++TEST_F(StateSerializationTest, RejectsCorruptAndTruncatedData) {
++  StateTensorBuffers buffers;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "kv", ElementType::Float32, {4}, 7));
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), buffers));
++  for (size_t size = 0; size < serialized.size(); ++size) {
++    EXPECT_FALSE(ParseSerializedState(absl::string_view(serialized).substr(0, size))
++                     .ok())
++        << size;
++  }
++  std::string corrupt = serialized;
++  corrupt[corrupt.size() - 5] ^= 1;
++  EXPECT_THAT(ParseSerializedState(corrupt),
++              StatusIs(absl::StatusCode::kDataLoss));
++  corrupt = serialized;
++  corrupt.append(1, '\0');
++  EXPECT_FALSE(ParseSerializedState(corrupt).ok());
++  corrupt = serialized;
++  std::memset(corrupt.data() + 8, 255, 8);
++  EXPECT_FALSE(ParseSerializedState(corrupt).ok());
++}
++
++TEST_F(StateSerializationTest, RejectsInvalidDescriptorNumbersAndShapes) {
++  StateTensorBuffers buffers;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "kv", ElementType::UInt8, {4}, 7));
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), buffers));
++  const auto header = Header(serialized);
++  const std::vector<nlohmann::json> invalid_numbers = {
++      nullptr, true, "4", 4.0, -1, std::numeric_limits<uint64_t>::max()};
++  for (const auto& value : invalid_numbers) {
++    for (const char* field : {"type", "bytes"}) {
++      auto malformed = header;
++      malformed["tensors"][0][field] = value;
++      EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, malformed)).ok())
++          << field << " = " << value;
++    }
++    auto malformed = header;
++    malformed["tensors"][0]["shape"][0] = value;
++    EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, malformed)).ok())
++        << value;
++  }
++  auto malformed = header;
++  malformed["tensors"][0]["shape"] = {
++      std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max(),
++      std::numeric_limits<int32_t>::max()};
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, malformed)).ok());
++  // These shapes and byte counts agree with each other but not the payload.
++  for (int bytes : {3, 5}) {
++    malformed = header;
++    malformed["tensors"][0]["shape"] = {bytes};
++    malformed["tensors"][0]["bytes"] = bytes;
++    EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, malformed)).ok());
++  }
++}
++
++TEST_F(StateSerializationTest, RejectsDuplicateNamesAndUnsupportedVersion) {
++  StateTensorBuffers buffers;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "a", ElementType::UInt8, {4}, 1));
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "z", ElementType::UInt8, {4}, 2));
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), buffers));
++  auto header = Header(serialized);
++  header["tensors"][1]["name"] = "a";
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header)).ok());
++  header = Header(serialized);
++  header["version"] = 2;
++  EXPECT_THAT(ParseSerializedState(ReplaceHeader(serialized, header)),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++  header = Header(serialized);
++  header["byte_order"] = "unknown";
++  EXPECT_THAT(ParseSerializedState(ReplaceHeader(serialized, header)),
++              StatusIs(absl::StatusCode::kFailedPrecondition));
++}
++
++TEST_F(StateSerializationTest, BoundsMetadataNesting) {
++  ASSERT_OK_AND_ASSIGN(auto serialized,
++                       SerializeState(nlohmann::json::object(), {}));
++  auto header = Header(serialized);
++  for (int i = 0; i < 40; ++i) {
++    header["metadata"] = {{"nested", header["metadata"]}};
++  }
++  EXPECT_FALSE(ParseSerializedState(ReplaceHeader(serialized, header)).ok());
++}
++
++TEST_F(StateSerializationTest, RejectsUnpackedStrides) {
++  const RankedTensorType type(ElementType::UInt8, Layout({2, 2}, {4, 1}));
++  LITERT_ASSERT_OK_AND_ASSIGN(
++      auto buffer, TensorBuffer::CreateManaged(
++                       *env_, TensorBufferType::kHostMemory, type, 8));
++  EXPECT_THAT(DescribeStateTensor(buffer),
++              StatusIs(absl::StatusCode::kUnimplemented));
++}
++
++TEST_F(StateSerializationTest, LegacyMapUsesTheCheckedCodec) {
++  StateTensorBuffers buffers;
++  ASSERT_NO_FATAL_FAILURE(AddBuffer(buffers, "kv", ElementType::UInt8, {4}, 7));
++  LegacyMapState state(std::move(buffers));
++  ASSERT_OK_AND_ASSIGN(auto serialized, state.Serialize());
++  ASSERT_OK(state.Clear());
++  ASSERT_OK(state.Load(serialized));
++  ASSERT_NO_FATAL_FAILURE(ExpectBytes(state.buffers().at("kv"), 7));
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  parsed.metadata["kind"] = "different";
++  EXPECT_THAT(state.Load(parsed),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++}
++
++}  // namespace
++}  // namespace litert::lm

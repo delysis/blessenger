@@ -1,0 +1,27 @@
+{
+  "audio_1": {
+    "subgraph_index": 0,
+    "inputs": {
+      "src_inputs": {
+        "shape": [
+          1,
+          1,
+          640
+        ],
+        "shape_signature": [],
+        "tensor_type": 0
+      }
+    },
+    "outputs": {
+      "features": {
+        "shape": [
+          1,
+          1,
+          3840
+        ],
+        "shape_signature": [],
+        "tensor_type": 0
+      }
+    }
+  }
+}

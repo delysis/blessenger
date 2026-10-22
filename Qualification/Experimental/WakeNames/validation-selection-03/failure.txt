@@ -1,0 +1,1 @@
+No model trained: invocation used wrong corpus path; datasets are in work/wake-name-rd. Retrying with corrected paths in a new output directory.

@@ -1,0 +1,415 @@
+diff --git a/runtime/executor/litert/BUILD b/runtime/executor/litert/BUILD
+index 23eefdc2858e174a05642de1007176d088c86476..b0b7ef71f470a3f3d39c7586dff4f136eeff4889 100644
+--- a/runtime/executor/litert/BUILD
++++ b/runtime/executor/litert/BUILD
+@@ -28,6 +28,7 @@ cc_library(
+     srcs = ["state.cc"],
+     hdrs = ["state.h"],
+     deps = [
++        ":state_serialization",
+         "@com_google_absl//absl/container:flat_hash_map",
+         "@com_google_absl//absl/memory",
+         "@com_google_absl//absl/status",
+@@ -43,6 +44,7 @@ cc_library(
+         "@litert//litert/cc:litert_ranked_tensor_type",
+         "@litert//litert/cc:litert_tensor_buffer",
+         "@litert//litert/cc:litert_tensor_buffer_types",
++        "@nlohmann_json//:json",
+         "//runtime/executor:common_utils",
+         "//runtime/executor:litert_compiled_model_executor_utils",
+         "//runtime/executor:state_interface",
+@@ -60,6 +62,7 @@ cc_test(
+     ],
+     deps = [
+         ":state",
++        ":state_serialization",
+         "@com_google_googletest//:gtest_main",
+         "@com_google_absl//absl/status",
+         "@com_google_absl//absl/strings:string_view",
+@@ -70,6 +73,7 @@ cc_test(
+         "@litert//litert/cc:litert_options",
+         "@litert//litert/cc:litert_tensor_buffer",
+         "@litert//litert/test:matchers",
++        "@nlohmann_json//:json",
+         "//runtime/components:model_resources",
+         "//runtime/components:model_resources_litert_lm",
+         "//runtime/proto:executor_metadata_cc_proto",
+diff --git a/runtime/executor/litert/CMakeLists.txt b/runtime/executor/litert/CMakeLists.txt
+index 57e985d6b4ef0b8734a6c81851822a4214267e03..42fa23ae96f82e9f04a89c22080801e36b0e7f41 100644
+--- a/runtime/executor/litert/CMakeLists.txt
++++ b/runtime/executor/litert/CMakeLists.txt
+@@ -48,6 +48,7 @@ target_include_directories(runtime_executor_litert_state
+ target_link_libraries(runtime_executor_litert_state
+   PUBLIC
+     LITERTLM_DEPS
++    LiteRTLM::Runtime::Executor::Litert::StateSerialization
+ )
+ 
+ # ==============================================================================
+diff --git a/runtime/executor/litert/state.cc b/runtime/executor/litert/state.cc
+index 353a7e1474e9471a81eb81ef036a3bfa29595ebd..a2f3c09f85412f294658c28acd3055705df1585f 100644
+--- a/runtime/executor/litert/state.cc
++++ b/runtime/executor/litert/state.cc
+@@ -33,6 +33,7 @@
+ #include "absl/strings/match.h"  // from @com_google_absl
+ #include "absl/strings/str_cat.h"  // from @com_google_absl
+ #include "absl/strings/string_view.h"  // from @com_google_absl
++#include "nlohmann/json.hpp"  // from @nlohmann_json
+ #include "litert/cc/litert_compiled_model.h"  // from @litert
+ #include "litert/cc/litert_element_type.h"  // from @litert
+ #include "litert/cc/litert_environment.h"  // from @litert
+@@ -42,6 +43,7 @@
+ #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+ #include "litert/cc/litert_tensor_buffer_types.h"  // from @litert
+ #include "runtime/executor/common_utils.h"
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/executor/litert_compiled_model_executor_utils.h"
+ #include "runtime/executor/state_interface.h"
+ #include "runtime/util/status_macros.h"
+@@ -211,8 +213,141 @@ absl::Status CopyBufferContents(TensorBuffer& dst, const TensorBuffer& src) {
+   return absl::OkStatus();
+ }
+ 
++template <typename Bank>
++absl::StatusOr<std::pair<nlohmann::json, StateTensorBuffers>> SerializationData(
++    int batch_size, int num_entries, LitertState::AllocationPolicy policy,
++    bool bank_1_is_input, const Bank& bank_1, const std::optional<Bank>& bank_2) {
++  nlohmann::json metadata = {{"kind", "litert"},
++                            {"allocation_policy", static_cast<int>(policy)},
++                            {"batch_size", batch_size},
++                            {"num_entries", num_entries},
++                            {"bank_1_is_input", bank_1_is_input},
++                            {"state_buffers", nlohmann::json::object()}};
++  StateTensorBuffers buffers;
++  auto add_bank = [&](const Bank& bank, absl::string_view prefix) -> absl::Status {
++    for (const auto& [name, state] : bank) {
++      std::string key = absl::StrCat(prefix, name);
++      LITERT_ASSIGN_OR_RETURN(auto buffer, state.buffer.Duplicate());
++      buffers.emplace(key, std::move(buffer));
++      metadata["state_buffers"][key] = {
++          {"state_type", static_cast<int>(state.type)},
++          {"dynamic_dim", state.dynamic_dim.has_value()
++                              ? nlohmann::json(*state.dynamic_dim)
++                              : nlohmann::json(nullptr)}};
++    }
++    return absl::OkStatus();
++  };
++  ABSL_RETURN_IF_ERROR(add_bank(bank_1, "1/"));
++  if (bank_2.has_value()) ABSL_RETURN_IF_ERROR(add_bank(*bank_2, "2/"));
++  return std::make_pair(std::move(metadata), std::move(buffers));
++}
++
+ }  // namespace
+ 
++absl::StatusOr<std::string> LitertState::Serialize() const {
++  ABSL_ASSIGN_OR_RETURN(
++      auto data, SerializationData(batch_size_, num_entries_, allocation_policy_,
++                                   bank_1_is_input_, bank_1_state_buffers_,
++                                   bank_2_state_buffers_));
++  return SerializeState(data.first, data.second);
++}
++
++absl::Status LitertState::ValidateLoad(const ParsedSerializedState& state,
++                                      bool allow_dynamic_resize) const {
++  const auto& metadata = state.metadata;
++  if (!metadata.is_object() || !metadata.contains("num_entries") ||
++      !metadata["num_entries"].is_number_integer() ||
++      !metadata.contains("bank_1_is_input") ||
++      !metadata["bank_1_is_input"].is_boolean() ||
++      (!bank_2_state_buffers_.has_value() &&
++       !metadata["bank_1_is_input"].get<bool>())) {
++    return absl::InvalidArgumentError("Invalid LiteRT state metadata.");
++  }
++  const auto& entries = metadata["num_entries"];
++  if ((entries.is_number_unsigned() &&
++       entries.get<uint64_t>() > std::numeric_limits<int>::max()) ||
++      (!entries.is_number_unsigned() &&
++       (entries.get<int64_t>() < 0 ||
++        entries.get<int64_t>() > std::numeric_limits<int>::max()))) {
++    return absl::InvalidArgumentError("Invalid LiteRT state capacity.");
++  }
++  const int saved_entries = entries.get<int>();
++  const bool resizing = saved_entries != num_entries_;
++  if (resizing && (!allow_dynamic_resize || saved_entries <= 0 ||
++                   allocation_policy_ != AllocationPolicy::kInplace)) {
++    return absl::InvalidArgumentError("Incompatible LiteRT state capacity.");
++  }
++  ABSL_ASSIGN_OR_RETURN(
++      auto data, SerializationData(batch_size_, saved_entries, allocation_policy_,
++                                   metadata["bank_1_is_input"].get<bool>(),
++                                   bank_1_state_buffers_, bank_2_state_buffers_));
++  if (metadata.dump() != data.first.dump()) {
++    return absl::InvalidArgumentError("Incompatible LiteRT state metadata.");
++  }
++  if (!resizing) return ValidateSerializedState(state, data.second);
++  if (state.tensors.size() != data.second.size()) {
++    return absl::InvalidArgumentError("State tensor count mismatch.");
++  }
++  bool has_dynamic_dimension = false;
++  absl::string_view previous_name;
++  for (const auto& tensor : state.tensors) {
++    const auto it = data.second.find(tensor.name);
++    if (it == data.second.end() || tensor.name <= previous_name) {
++      return absl::InvalidArgumentError("State tensor name mismatch.");
++    }
++    previous_name = tensor.name;
++    ABSL_ASSIGN_OR_RETURN(auto expected, DescribeStateTensor(it->second));
++    const auto& axis = data.first["state_buffers"][tensor.name]["dynamic_dim"];
++    if (!axis.is_null()) {
++      const int index = axis.get<int>();
++      if (index < 0 || static_cast<size_t>(index) >= expected["shape"].size() ||
++          expected["shape"][index] != num_entries_) {
++        return absl::InvalidArgumentError("Invalid dynamic state tensor axis.");
++      }
++      expected["shape"][index] = saved_entries;
++      size_t elements = 1;
++      for (const auto& dim : expected["shape"]) {
++        const size_t value = dim.get<size_t>();
++        if (value != 0 && elements > std::numeric_limits<size_t>::max() / value) {
++          return absl::InvalidArgumentError("Dynamic state tensor size overflows.");
++        }
++        elements *= value;
++      }
++      const auto width = GetByteWidth(
++          static_cast<ElementType>(expected["type"].get<int>()));
++      if (elements > (std::numeric_limits<size_t>::max() - 3) /
++                         static_cast<size_t>(*width)) {
++        return absl::InvalidArgumentError("Dynamic state tensor size overflows.");
++      }
++      expected["bytes"] = width->NumBytes(elements);
++      has_dynamic_dimension = true;
++    }
++    if (tensor.descriptor.dump() != expected.dump() ||
++        tensor.bytes.size() != expected["bytes"].get<size_t>()) {
++      return absl::InvalidArgumentError("State tensor descriptor mismatch.");
++    }
++  }
++  return has_dynamic_dimension
++             ? absl::OkStatus()
++             : absl::InvalidArgumentError("State has no dynamic dimensions.");
++}
++
++absl::Status LitertState::Load(absl::string_view serialized_state) {
++  ABSL_ASSIGN_OR_RETURN(auto state, ParseSerializedState(serialized_state));
++  return Load(state);
++}
++
++absl::Status LitertState::Load(const ParsedSerializedState& state) {
++  ABSL_RETURN_IF_ERROR(ValidateLoad(state));
++  ABSL_ASSIGN_OR_RETURN(
++      auto data, SerializationData(batch_size_, num_entries_, allocation_policy_,
++                                   bank_1_is_input_, bank_1_state_buffers_,
++                                   bank_2_state_buffers_));
++  ABSL_RETURN_IF_ERROR(LoadSerializedState(state, data.second));
++  bank_1_is_input_ = state.metadata["bank_1_is_input"].get<bool>();
++  return absl::OkStatus();
++}
++
+ absl::StatusOr<std::unique_ptr<LitertState>> LitertState::Create(
+     Environment& env, CompiledModel& compiled_model,
+     absl::string_view signature_name,
+diff --git a/runtime/executor/litert/state.h b/runtime/executor/litert/state.h
+index 6006cc06ce07bc316ce00441177c681f9f2c218f..c2f66078849c25ba0f4f8822397e726a1aa4bfd5 100644
+--- a/runtime/executor/litert/state.h
++++ b/runtime/executor/litert/state.h
+@@ -27,6 +27,7 @@
+ #include "litert/cc/litert_compiled_model.h"  // from @litert
+ #include "litert/cc/litert_environment.h"  // from @litert
+ #include "litert/cc/litert_tensor_buffer.h"  // from @litert
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/executor/state_interface.h"
+ #include "runtime/proto/executor_metadata.pb.h"
+ 
+@@ -60,13 +61,17 @@ class LitertState : public StateInterface {
+ 
+   int GetBatchSize() const override { return batch_size_; }
+ 
+-  absl::StatusOr<std::string> Serialize() const override {
+-    return absl::UnimplementedError("Not implemented");
+-  }
++  absl::StatusOr<std::string> Serialize() const override;
+ 
+-  absl::Status Load(absl::string_view serialized_state) override {
+-    return absl::UnimplementedError("Not implemented");
+-  }
++  absl::Status Load(absl::string_view serialized_state) override;
++
++  // Validate before resizing a fresh restore destination. Capacity changes are
++  // permitted only on declared dynamic dimensions with the in-place policy.
++  absl::Status ValidateLoad(const ParsedSerializedState& state,
++                            bool allow_dynamic_resize = false) const;
++
++  // Reuses a checked parse, avoiding another checksum pass over the payload.
++  absl::Status Load(const ParsedSerializedState& state);
+ 
+   absl::Status SelectAndCopyFrom(StateInterface& other,
+                                  int batch_index) override;
+diff --git a/runtime/executor/litert/state_test.cc b/runtime/executor/litert/state_test.cc
+index bee91ba6ad21ca490016b7e46b63ea759e9b36a0..9794c52fe0ca2af3ee302ee550a50369d55c203d 100644
+--- a/runtime/executor/litert/state_test.cc
++++ b/runtime/executor/litert/state_test.cc
+@@ -38,6 +38,7 @@
+ #include "litert/test/matchers.h"  // from @litert
+ #include "runtime/components/model_resources.h"
+ #include "runtime/components/model_resources_litert_lm.h"
++#include "runtime/executor/litert/state_serialization.h"
+ #include "runtime/proto/executor_metadata.pb.h"
+ #include "runtime/proto/llm_metadata.pb.h"
+ #include "runtime/util/convert_tensor_buffer.h"
+@@ -138,21 +139,6 @@ TEST_F(LitertStateTest, CanCreateKVWithClearFlagFalse) {
+   EXPECT_EQ(kv_cache_->GetNumEntries(), 128);
+ }
+ 
+-TEST_F(LitertStateTest, SerializeNotSupported) {
+-  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
+-                                  LitertState::AllocationPolicy::kInplace,
+-                                  /*batch_size=*/1));
+-  EXPECT_THAT(kv_cache_->Serialize(),
+-              StatusIs(absl::StatusCode::kUnimplemented));
+-}
+-
+-TEST_F(LitertStateTest, LoadNotSupported) {
+-  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
+-                                  LitertState::AllocationPolicy::kInplace,
+-                                  /*batch_size=*/1));
+-  EXPECT_THAT(kv_cache_->Load(""), StatusIs(absl::StatusCode::kUnimplemented));
+-}
+-
+ TEST_F(LitertStateTest, StaticKVNotResizeable) {
+   ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
+                                   LitertState::AllocationPolicy::kInplace,
+@@ -198,6 +184,134 @@ void ExpectBufferFilledWith(TensorBuffer& buffer, uint8_t value) {
+   }
+ }
+ 
++TEST_F(LitertStateTest, SerializeAndLoadKeepExistingBuffers) {
++  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
++                                  LitertState::AllocationPolicy::kInplace,
++                                  /*batch_size=*/1));
++  ASSERT_OK_AND_ASSIGN(
++      auto before,
++      kv_cache_->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++  ASSERT_FALSE(before.input_buffers.empty());
++  for (auto& [_, buffer] : before.input_buffers) {
++    ASSERT_NO_FATAL_FAILURE(FillBuffer(buffer, 7));
++  }
++  ASSERT_OK_AND_ASSIGN(auto serialized, kv_cache_->Serialize());
++  ASSERT_OK(kv_cache_->Clear());
++  ASSERT_OK(kv_cache_->Load(serialized));
++  ASSERT_OK_AND_ASSIGN(
++      auto after,
++      kv_cache_->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++  for (auto& [name, buffer] : after.input_buffers) {
++    EXPECT_EQ(buffer.Get(), before.input_buffers.at(name).Get()) << name;
++    ASSERT_NO_FATAL_FAILURE(ExpectBufferFilledWith(buffer, 7)) << name;
++  }
++}
++
++TEST_F(LitertStateTest, SerializeAndLoadPreserveBothPingPongBanksAndParity) {
++  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
++                                  LitertState::AllocationPolicy::kPingPong,
++                                  /*batch_size=*/1));
++  for (int num_steps : {1, 2}) {
++    ASSERT_OK_AND_ASSIGN(
++        auto source,
++        LitertState::Create(*env_, *compiled_model_, kDecodeSignatureRunner,
++                            /*executor_metadata=*/nullptr,
++                            LitertState::AllocationPolicy::kPingPong,
++                            /*batch_size=*/1));
++    for (int i = 0; i < num_steps; ++i) {
++      ASSERT_OK_AND_ASSIGN(
++          auto step,
++          source->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++      for (auto& [_, buffer] : step.input_buffers) {
++        ASSERT_NO_FATAL_FAILURE(FillBuffer(buffer, 3));
++      }
++      for (auto& [_, buffer] : step.output_buffers) {
++        ASSERT_NO_FATAL_FAILURE(FillBuffer(buffer, 9));
++      }
++    }
++    ASSERT_OK_AND_ASSIGN(auto serialized, source->Serialize());
++    ASSERT_OK(kv_cache_->Load(serialized));
++    ASSERT_OK_AND_ASSIGN(
++        auto next,
++        kv_cache_->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++    ASSERT_FALSE(next.input_buffers.empty());
++    ASSERT_FALSE(next.output_buffers.empty());
++    for (auto& [name, buffer] : next.input_buffers) {
++      ASSERT_NO_FATAL_FAILURE(ExpectBufferFilledWith(buffer, 9)) << name;
++    }
++    for (auto& [name, buffer] : next.output_buffers) {
++      ASSERT_NO_FATAL_FAILURE(ExpectBufferFilledWith(buffer, 3)) << name;
++    }
++  }
++}
++
++TEST_F(LitertStateTest, LoadRejectsInvalidMetadataWithoutWriting) {
++  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
++                                  LitertState::AllocationPolicy::kInplace,
++                                  /*batch_size=*/1));
++  ASSERT_OK_AND_ASSIGN(auto serialized, kv_cache_->Serialize());
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  ASSERT_OK_AND_ASSIGN(
++      auto buffers,
++      kv_cache_->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++  for (auto& [_, buffer] : buffers.input_buffers) {
++    ASSERT_NO_FATAL_FAILURE(FillBuffer(buffer, 7));
++  }
++  parsed.metadata["bank_1_is_input"] = false;
++  EXPECT_THAT(kv_cache_->Load(parsed),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  parsed.metadata["bank_1_is_input"] = true;
++  parsed.metadata["batch_size"] = 2;
++  EXPECT_THAT(kv_cache_->Load(parsed),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  for (auto& [name, buffer] : buffers.input_buffers) {
++    ASSERT_NO_FATAL_FAILURE(ExpectBufferFilledWith(buffer, 7)) << name;
++  }
++}
++
++#ifndef _WIN32
++TEST_F(LitertStateTest, DynamicLoadValidatesBeforeResize) {
++  ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestDynamicModelPath,
++                                  LitertState::AllocationPolicy::kInplace,
++                                  /*batch_size=*/1));
++  ASSERT_OK_AND_ASSIGN(
++      auto source,
++      LitertState::Create(*env_, *compiled_model_, kDecodeSignatureRunner,
++                          /*executor_metadata=*/nullptr,
++                          LitertState::AllocationPolicy::kInplace,
++                          /*batch_size=*/1));
++  ASSERT_OK(source->Resize(*compiled_model_, kDecodeSignatureRunner, 16));
++  ASSERT_OK_AND_ASSIGN(
++      auto buffers,
++      source->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++  for (auto& [_, buffer] : buffers.input_buffers) {
++    ASSERT_NO_FATAL_FAILURE(FillBuffer(buffer, 6));
++  }
++  ASSERT_OK_AND_ASSIGN(auto serialized, source->Serialize());
++  ASSERT_OK_AND_ASSIGN(auto parsed, ParseSerializedState(serialized));
++  EXPECT_THAT(kv_cache_->ValidateLoad(parsed),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  ASSERT_OK(kv_cache_->ValidateLoad(parsed, /*allow_dynamic_resize=*/true));
++  ASSERT_OK(kv_cache_->Resize(*compiled_model_, kDecodeSignatureRunner, 16));
++  ASSERT_OK(kv_cache_->Load(parsed));
++  ASSERT_OK_AND_ASSIGN(
++      auto restored,
++      kv_cache_->GetStateBuffers(*compiled_model_, kDecodeSignatureRunner));
++  for (auto& [name, buffer] : restored.input_buffers) {
++    ASSERT_NO_FATAL_FAILURE(ExpectBufferFilledWith(buffer, 6)) << name;
++  }
++  // An executor may validate a smaller checkpoint before creating a fresh
++  // allocation; Resize itself only grows, so a direct Load must still fail.
++  ASSERT_OK(kv_cache_->Resize(*compiled_model_, kDecodeSignatureRunner, 32));
++  ASSERT_OK(kv_cache_->ValidateLoad(parsed, /*allow_dynamic_resize=*/true));
++  EXPECT_THAT(kv_cache_->Load(parsed),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++  parsed.tensors[0].descriptor["type"] = -1;
++  EXPECT_THAT(kv_cache_->ValidateLoad(parsed, /*allow_dynamic_resize=*/true),
++              StatusIs(absl::StatusCode::kInvalidArgument));
++}
++#endif  // !_WIN32
++
+ TEST_F(LitertStateTest, IsHostMemoryForCpuState) {
+   ASSERT_NO_FATAL_FAILURE(SetUpKV(kTestStaticModelPath,
+                                   LitertState::AllocationPolicy::kPingPong,

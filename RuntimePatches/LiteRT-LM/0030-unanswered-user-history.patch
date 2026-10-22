@@ -1,0 +1,60 @@
+--- a/runtime/conversation/conversation.cc
++++ b/runtime/conversation/conversation.cc
+@@ -92,14 +92,17 @@
+   return absl::OkStatus();
+ }
+ 
+-absl::Status CheckCacheHistory(absl::Span<const Message> history) {
+-  if (history.empty() || history.size() % 2 != 0) {
++absl::Status CheckCacheHistory(absl::Span<const Message> history,
++                               bool require_answer = true) {
++  if (history.empty()) {
+     return absl::InvalidArgumentError("History must contain complete turns.");
+   }
+   for (size_t i = 0; i < history.size(); ++i) {
+     const auto& message = history[i];
+     if (!message.is_object() || !message.contains("role") ||
+-        message["role"] != (i % 2 == 0 ? "user" : "assistant") ||
++        (message["role"] != "user" && message["role"] != "assistant") ||
++        (message["role"] == "assistant" &&
++         (i == 0 || history[i - 1]["role"] != "user")) ||
+         !message.contains("content") || message.contains("tool_calls")) {
+       return absl::InvalidArgumentError("Invalid text/audio conversation history.");
+     }
+@@ -114,7 +117,7 @@
+       }
+       if (part["type"] == "text" && part.contains("text") &&
+           part["text"].is_string()) continue;
+-      if (i % 2 == 0 && part["type"] == "audio" &&
++      if (message["role"] == "user" && part["type"] == "audio" &&
+           part.contains("path") != part.contains("blob")) {
+         const auto& source = part[part.contains("path") ? "path" : "blob"];
+         if (source.is_string() && !source.get_ref<const std::string&>().empty()) {
+@@ -124,6 +127,9 @@
+       return absl::InvalidArgumentError("Unsupported history content part.");
+     }
+   }
++  if (require_answer && history.back()["role"] != "assistant") {
++    return absl::InvalidArgumentError("Cache history must end with an answer.");
++  }
+   return absl::OkStatus();
+ }
+ 
+@@ -1149,7 +1155,7 @@
+ 
+ absl::Status Conversation::PrefillHistorySuffix(std::vector<Message> messages) {
+   ABSL_RETURN_IF_ERROR(CheckCacheConfig(config_));
+-  ABSL_RETURN_IF_ERROR(CheckCacheHistory(messages));
++  ABSL_RETURN_IF_ERROR(CheckCacheHistory(messages, /*require_answer=*/false));
+   if (streamed_audio_) return absl::FailedPreconditionError("Audio input is open.");
+   ABSL_RETURN_IF_ERROR(session_->WaitUntilDone());
+   std::vector<Message> old;
+@@ -1158,7 +1164,7 @@
+     if (is_appending_message_ || checkpoint_message_index_.has_value()) {
+       return absl::FailedPreconditionError("Cannot replay into a pending turn.");
+     }
+-    if (!history_.empty()) ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_));
++    if (!history_.empty()) ABSL_RETURN_IF_ERROR(CheckCacheHistory(history_, /*require_answer=*/false));
+     old = history_;
+   }
+   ABSL_ASSIGN_OR_RETURN(auto inputs, GetInputDataVectorForMessages(

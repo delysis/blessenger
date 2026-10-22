@@ -1,0 +1,78 @@
+--- a/runtime/executor/llm_litert_compiled_model_executor.cc
++++ b/runtime/executor/llm_litert_compiled_model_executor.cc
+@@ -790,8 +790,11 @@
+               start_step,
+               /*steps=*/prefill_length + input_idx, attn_params.local_type,
+               token_ids_span, attn_params.sliding_window_size,
+-              prefill_signature == "verify" ? RingBufferAttentionMaskMode::kVerify
+-                                            : RingBufferAttentionMaskMode::kPrefill));
++              prefill_signature == kDecodeSignatureRunner
++                  ? RingBufferAttentionMaskMode::kDecode
++                  : prefill_signature == "verify"
++                      ? RingBufferAttentionMaskMode::kVerify
++                      : RingBufferAttentionMaskMode::kPrefill));
+         }
+       }
+       if (gpu_optimized_single_buffer_cache_) {
+--- /dev/null
++++ b/runtime/executor/attention_mask_bounds_test.cc
+@@ -0,0 +1,40 @@
++#include "runtime/executor/litert_compiled_model_executor_utils.h"
++#include <limits>
++#include <optional>
++#include <vector>
++#include "gtest/gtest.h"
++#include "litert/cc/litert_environment.h"
++#include "litert/cc/litert_layout.h"
++#include "litert/cc/litert_ranked_tensor_type.h"
++#include "litert/cc/litert_tensor_buffer.h"
++
++namespace litert::lm {
++TEST(AttentionMaskBounds, DecodeGraphAtLongHistory) {
++  auto env = Environment::Create({});
++  ASSERT_TRUE(env);
++  auto layout = Layout(Dimensions({1, 1, 1, 288}));
++  RankedTensorType type(ElementType::Float32, std::move(layout));
++  auto buffer = TensorBuffer::CreateManaged(*env, TensorBufferType::kHostMemory,
++                                            type, sizeof(float) * 288);
++  ASSERT_TRUE(buffer);
++  ASSERT_TRUE(InitializeAttentionMask(*buffer, false).ok());
++  EXPECT_FALSE(FillAttentionMask(*buffer, 512, 1,
++      proto::ATTENTION_MASK_TYPE_CAUSAL, std::nullopt, 256,
++      RingBufferAttentionMaskMode::kPrefill).ok());
++  EXPECT_FALSE(FillAttentionMask(*buffer, 0, 2,
++      proto::ATTENTION_MASK_TYPE_CAUSAL).ok());
++  EXPECT_FALSE(FillAttentionMask(*buffer, -1, 1,
++      proto::ATTENTION_MASK_TYPE_CAUSAL).ok());
++  ASSERT_TRUE(FillAttentionMask(*buffer, 512, 1,
++      proto::ATTENTION_MASK_TYPE_CAUSAL, std::nullopt, 256,
++      RingBufferAttentionMaskMode::kDecode).ok());
++  auto lock = TensorBufferScopedLock::Create(*buffer, TensorBuffer::LockMode::kRead);
++  ASSERT_TRUE(lock);
++  const float* mask = static_cast<const float*>(lock->second);
++  // Reference: the last 256 absolute positions mapped into the 288-slot ring.
++  std::vector<float> expected(288, -0.7f * std::numeric_limits<float>::max());
++  for (int position = 512 - 255; position <= 512; ++position)
++    expected[position % 288] = 0.0f;
++  for (int i = 0; i < 288; ++i) EXPECT_EQ(mask[i], expected[i]) << i;
++}
++}  // namespace litert::lm
+--- a/runtime/executor/BUILD
++++ b/runtime/executor/BUILD
+@@ -1533,3 +1533,16 @@
+         "//runtime/util:test_utils",
+     ],
+ )
++
++cc_test(
++    name = "attention_mask_bounds_test",
++    srcs = ["attention_mask_bounds_test.cc"],
++    deps = [
++        ":litert_compiled_model_executor_utils",
++        "@com_google_googletest//:gtest_main",
++        "@litert//litert/cc:litert_environment",
++        "@litert//litert/cc:litert_model_types",
++        "@litert//litert/cc:litert_ranked_tensor_type",
++        "@litert//litert/cc:litert_tensor_buffer",
++    ],
++)

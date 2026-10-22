@@ -1,0 +1,44 @@
+{
+  "revision": "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+  "url": "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b/gemma-4-E4B-it.litertlm",
+  "ranges": [
+    {
+      "file": "e4b-container-header.bin",
+      "begin": 0,
+      "end_exclusive": 16384,
+      "sha256": "d8aa4ab6a41db0063b094347d7f17fe85ff4695662e8d09f5468e931a567fb27",
+      "content_range": "bytes 0-16383/3659530240"
+    },
+    {
+      "file": "e4b-audio-prefix.bin",
+      "begin": 1012449280,
+      "end_exclusive": 1012465664,
+      "sha256": "329ca1051f966162278ceade36fa592f8ab54df91b5a069d27df8e3c50dd65a3",
+      "content_range": "bytes 1012449280-1012465663/3659530240"
+    },
+    {
+      "file": "gemma4_metadata_chunks/e4b-audio_90669056.bin",
+      "begin": 1103118336,
+      "end_exclusive": 1103134720,
+      "sha256": "335172d3592e134eb190a011f16c454fe3b227210fcd10ca9cb793f3cece64e4"
+    },
+    {
+      "file": "gemma4_metadata_chunks/e4b-audio_90767360.bin",
+      "begin": 1103216640,
+      "end_exclusive": 1103233024,
+      "sha256": "8c28d09cae7bb102ec9380471deae7a0228cce344033aeed9356dfb267af3f25"
+    },
+    {
+      "file": "gemma4_metadata_chunks/e4b-audio_94044160.bin",
+      "begin": 1106493440,
+      "end_exclusive": 1106509824,
+      "sha256": "3440ecd92946c197106fd03e7e021585024b1928c20b21fb32fa4854a81272e6"
+    },
+    {
+      "file": "gemma4_metadata_chunks/e4b-audio_94011392.bin",
+      "begin": 1106460672,
+      "end_exclusive": 1106477056,
+      "sha256": "a8c3e85027eec3a8be57b8bd3bec7cd7d760228082caf32c69b38542fd4843f8"
+    }
+  ]
+}

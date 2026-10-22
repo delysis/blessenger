@@ -1,0 +1,45 @@
+--- a/runtime/executor/litert_compiled_model_executor_utils.cc
++++ b/runtime/executor/litert_compiled_model_executor_utils.cc
+@@ -801,9 +801,21 @@
+   RET_CHECK_EQ(mask_tensor_type.Layout().Rank(), 4)
+           .SetCode(absl::StatusCode::kInvalidArgument)
+       << "Attention mask must be 4D.";
+-  int batch_size = mask_tensor_type.Layout().Dimensions()[0];
+-  int context_size = mask_tensor_type.Layout().Dimensions()[3];
++  const auto& shape = mask_tensor_type.Layout().Dimensions();
++  int batch_size = shape[0];
++  int context_size = shape[3];
++  if (batch_size <= 0 || shape[1] <= 0 || shape[2] <= 0 || context_size <= 0 ||
++      start_timestep < 0 || steps < 0 ||
++      static_cast<int64_t>(steps) > static_cast<int64_t>(shape[1]) * shape[2] ||
++      static_cast<int64_t>(start_timestep) + steps > std::numeric_limits<int>::max()) {
++    return absl::InvalidArgumentError(absl::StrCat(
++        "Invalid attention mask extent: shape=", batch_size, ",", shape[1],
++        ",", shape[2], ",", context_size, " start=", start_timestep, " steps=", steps));
++  }
+   LITERT_ASSIGN_OR_RETURN(auto mask_size, mask.PackedSize());
++  if (mask_size > std::numeric_limits<int>::max()) {
++    return absl::InvalidArgumentError("Attention mask exceeds supported indexing range.");
++  }
+   LITERT_ASSIGN_OR_RETURN(auto mask_lock_and_addr,
+                           litert::TensorBufferScopedLock::Create(
+                               mask, litert::TensorBuffer::LockMode::kWrite));
+@@ -851,6 +863,18 @@
+           sliding_window_size.value_or(context_size));
+       return absl::OkStatus();
+     }
++  }
++
++  // Ring layouts above use relative cache columns. Absolute-position masks
++  // must never use a global timestep as an index beyond their allocated row.
++  if (static_cast<int64_t>(start_timestep) + steps > context_size ||
++      (attention_mask_type == proto::ATTENTION_MASK_TYPE_VISION_BIDIRECTIONAL &&
++       token_ids.has_value() && token_ids->size() > context_size)) {
++    return absl::InvalidArgumentError(absl::StrCat(
++        "Attention mask absolute range exceeds row: shape=", batch_size, ",",
++        dims[1], ",", dims[2], ",", context_size, " start=", start_timestep,
++        " steps=", steps, " window=", sliding_window_size.value_or(-1),
++        " mode=", mode.has_value() ? static_cast<int>(*mode) : -1));
+   }
+ 
+   if (attention_mask_type == proto::ATTENTION_MASK_TYPE_VISION_BIDIRECTIONAL &&

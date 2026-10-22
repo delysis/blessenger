@@ -1,0 +1,178 @@
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsModelStore.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsModelStore.swift
+@@ -15,6 +15,7 @@
+     private let logger = AppLogger(subsystem: "com.fluidaudio.tts", category: "PocketTtsModelStore")
+ 
+     private var condStepModel: MLModel?
++    private var condPrefillSmallModel: MLModel?
+     private var condPrefillModel: MLModel?
+     private var flowlmStepModel: MLModel?
+     private var flowDecoderModel: MLModel?
+@@ -172,6 +173,15 @@
+         // Assign it to both condStepModel (legacy accessor) and condPrefillModel
+         // so the prefill fast-path runs; the per-token fallback never fires
+         // (useCondPrefill=true, text chunks <= T_max).
++        let smallURL = languageRoot.appendingPathComponent("cond_prefill_ane_small.mlmodelc")
++        if placement == .ane, FileManager.default.fileExists(atPath: smallURL.path) {
++            let small = try MLModel(contentsOf: smallURL, configuration: condConfig)
++            guard small.modelDescription.inputDescriptionsByName["conditioning"]?
++                .multiArrayConstraint?.shape.map(\.intValue) == [1, 16, 1024] else {
++                throw PocketTTSError.processingFailed("Unexpected small conditioner shape")
++            }
++            condPrefillSmallModel = small
++        }
+         condStepModel = loadedModels[0]
+         condPrefillModel = loadedModels[0]
+         flowlmStepModel = loadedModels[1]
+@@ -293,6 +303,10 @@
+             throw PocketTTSError.modelNotFound("PocketTTS cond_prefill model not loaded")
+         }
+         return model
++    }
++
++    func conditioners() throws -> PocketTtsConditioners {
++        PocketTtsConditioners(primary: try condPrefill(), small: condPrefillSmallModel)
+     }
+ 
+     /// Whether the optional one-shot prefill model is available.
+@@ -550,3 +564,14 @@
+     }
+ }
+ #endif
++
++/// Immutable model handles; inference state remains in the caller-owned KV arrays.
++struct PocketTtsConditioners: @unchecked Sendable {
++    let primary: MLModel
++    var small: MLModel? = nil
++
++    func model(for tokenCount: Int) -> MLModel {
++        if tokenCount <= 16, let small { return small }
++        return primary
++    }
++}
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer.swift
+@@ -259,7 +259,7 @@
+         let condLayerKeys = try await store.condStepLayerKeys()
+         let condPrefillLayerKeys = await store.condPrefillStepLayerKeys()
+         let useCondPrefill = hasCondPrefill && condPrefillLayerKeys != nil
+-        let condPrefillModel = useCondPrefill ? try await store.condPrefill() : condModel
++        let condPrefillModel = useCondPrefill ? try await store.conditioners() : PocketTtsConditioners(primary: condModel)
+         let flowlmLayerKeys = try await store.flowLMStepLayerKeys()
+         let mimiKeys = try await store.mimiDecoderKeys()
+         let repoDir = try await store.repoDir()
+@@ -329,7 +329,7 @@
+         let condLayerKeys = try await store.condStepLayerKeys()
+         let condPrefillLayerKeys = await store.condPrefillStepLayerKeys()
+         let useCondPrefill = hasCondPrefill && condPrefillLayerKeys != nil
+-        let condPrefillModel = useCondPrefill ? try await store.condPrefill() : condModel
++        let condPrefillModel = useCondPrefill ? try await store.conditioners() : PocketTtsConditioners(primary: condModel)
+         let flowlmLayerKeys = try await store.flowLMStepLayerKeys()
+         let mimiKeys = try await store.mimiDecoderKeys()
+         let repoDir = try await store.repoDir()
+@@ -398,7 +398,7 @@
+         let voiceData: PocketTtsVoiceData
+         let chunks: [TextChunk]
+         let condModel: MLModel
+-        let condPrefillModel: MLModel
++        let condPrefillModel: PocketTtsConditioners
+         let useCondPrefill: Bool
+         let stepModel: MLModel
+         let flowModel: MLModel
+@@ -419,7 +419,7 @@
+             voiceData: PocketTtsVoiceData,
+             chunks: [TextChunk],
+             condModel: MLModel,
+-            condPrefillModel: MLModel,
++            condPrefillModel: PocketTtsConditioners,
+             useCondPrefill: Bool,
+             stepModel: MLModel,
+             flowModel: MLModel,
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSession.swift
+@@ -57,7 +57,7 @@
+     // Models (IO placements: `.gpu` / `.ane`). All `nil` for `.aneState`
+     // sessions, which run on the multifunction state pipeline instead.
+     private let condModel: MLModel?
+-    private let condPrefillModel: MLModel?
++    private let condPrefillModel: PocketTtsConditioners?
+     private let useCondPrefill: Bool
+     private let stepModel: MLModel?
+     private let flowModel: MLModel?
+@@ -98,7 +98,7 @@
+         mimiState: PocketTtsSynthesizer.MimiState,
+         constants: PocketTtsConstantsBundle,
+         condModel: MLModel,
+-        condPrefillModel: MLModel,
++        condPrefillModel: PocketTtsConditioners,
+         useCondPrefill: Bool,
+         stepModel: MLModel,
+         flowModel: MLModel,
+@@ -305,7 +305,7 @@
+         kvState = try await PocketTtsSynthesizer.prefillKVCacheText(
+             state: kvState, textEmbeddings: textEmbeddings, model: condModel,
+             layerKeys: condLayerKeys,
+-            prefillModel: condPrefillModel ?? condModel, prefillLayerKeys: condPrefillLayerKeys,
++            prefillModel: condPrefillModel ?? PocketTtsConditioners(primary: condModel), prefillLayerKeys: condPrefillLayerKeys,
+             useFastPrefill: useCondPrefill
+         )
+ 
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift
+@@ -225,6 +225,14 @@
+     /// (see mobius traceable_cond_prefill.py — neutralizes the Trial 8 padding
+     /// corruption). Output schema is identical to `cond_step`.
+     static func runCondPrefill(
++        flatConditioning: [Float], tokenCount: Int, state: inout KVCacheState,
++        model: PocketTtsConditioners, layerKeys: PocketTtsLayerKeys
++    ) async throws {
++        try await runCondPrefill(flatConditioning: flatConditioning, tokenCount: tokenCount,
++            state: &state, model: model.model(for: tokenCount), layerKeys: layerKeys)
++    }
++
++    static func runCondPrefill(
+         flatConditioning: [Float],
+         tokenCount: Int,
+         state: inout KVCacheState,
+@@ -232,7 +240,13 @@
+         layerKeys: PocketTtsLayerKeys
+     ) async throws {
+         let dim = PocketTtsConstants.embeddingDim
+-        let tMax = PocketTtsConstants.condPrefillMaxTokens
++        guard let shape = model.modelDescription.inputDescriptionsByName["conditioning"]?
++            .multiArrayConstraint?.shape.map(\.intValue), shape.count == 3,
++            shape[0] == 1, shape[2] == dim, shape[1] > 0,
++            shape[1] <= PocketTtsConstants.condPrefillMaxTokens else {
++            throw PocketTTSError.processingFailed("Unexpected conditioner input shape")
++        }
++        let tMax = shape[1]
+         guard tokenCount > 0 else { return }
+         try validateKVCacheCapacity(
+             currentPosition: try kvCachePosition(in: state),
+@@ -341,7 +355,7 @@
+         bosBeforeVoice: [Float]?,
+         model: MLModel,
+         layerKeys: PocketTtsLayerKeys,
+-        prefillModel: MLModel,
++        prefillModel: PocketTtsConditioners,
+         prefillLayerKeys: PocketTtsLayerKeys?,
+         useFastPrefill: Bool
+     ) async throws -> KVCacheState {
+@@ -412,7 +426,7 @@
+         textEmbeddings: [[Float]],
+         model: MLModel,
+         layerKeys: PocketTtsLayerKeys,
+-        prefillModel: MLModel,
++        prefillModel: PocketTtsConditioners,
+         prefillLayerKeys: PocketTtsLayerKeys?,
+         useFastPrefill: Bool
+     ) async throws -> KVCacheState {
+@@ -558,7 +572,7 @@
+         bosBeforeVoice: [Float]?,
+         model: MLModel,
+         layerKeys: PocketTtsLayerKeys,
+-        prefillModel: MLModel,
++        prefillModel: PocketTtsConditioners,
+         prefillLayerKeys: PocketTtsLayerKeys?,
+         useFastPrefill: Bool
+     ) async throws -> KVCacheState {

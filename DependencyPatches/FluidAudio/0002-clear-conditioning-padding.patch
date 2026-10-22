@@ -1,0 +1,59 @@
+diff --git a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift
+index 803ad435..332ef5cb 100644
+--- a/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift
++++ b/Sources/FluidAudio/TTS/PocketTTS/Pipeline/PocketTtsSynthesizer+KVCache.swift
+@@ -275,10 +275,54 @@ extension PocketTtsSynthesizer {
+ 
+             try extractCacheOutputs(
+                 output, state: &state, layerKeys: layerKeys, modelLabel: "cond_prefill")
++            // The fixed-width export accumulates padded rows in a dump slot,
++            // while its position advances by valid_len. That dump slot is
++            // not context. Leaving it in the cache violates the generation
++            // export's zero-unused-slot contract and its finite attention mask
++            // is insufficient to exclude them reliably on ANE.
++            try clearUnusedKVCache(in: &state)
+             processed += n
+         }
+     }
+ 
++    /// Restore the cache invariant after a fixed-width conditioning write.
++    /// Preserve every valid K/V row; erase only slots at or beyond position.
++    private static func clearUnusedKVCache(in state: inout KVCacheState) throws {
++        let position = try kvCachePosition(in: state)
++        try validateKVCacheCapacity(currentPosition: position, additionalPositions: 0)
++        for array in state.caches + (state.vCaches ?? []) {
++            let shape = array.shape.map(\.intValue)
++            let split = shape == [1, PocketTtsConstants.kvCacheMaxLen, 16, 64]
++            let combined = shape == [2, 1, PocketTtsConstants.kvCacheMaxLen, 16, 64]
++            guard split || combined else {
++                throw PocketTTSError.processingFailed("Unexpected conditioning cache shape")
++            }
++            var stride = 1
++            for axis in shape.indices.reversed() {
++                guard shape[axis] == 1 || array.strides[axis].intValue == stride else {
++                    throw PocketTTSError.processingFailed("Noncontiguous conditioning cache")
++                }
++                stride *= shape[axis]
++            }
++            let bytesPerElement: Int
++            switch array.dataType {
++            case .float32: bytesPerElement = MemoryLayout<Float>.size
++            case .float16: bytesPerElement = MemoryLayout<UInt16>.size
++            default:
++                throw PocketTTSError.processingFailed("Unexpected conditioning cache dtype")
++            }
++            let rowElements = 16 * 64
++            let capacity = PocketTtsConstants.kvCacheMaxLen
++            let tailBytes = (capacity - position) * rowElements * bytesPerElement
++            for block in 0..<(combined ? 2 : 1) {
++                let offset = (block * capacity + position) * rowElements * bytesPerElement
++                if tailBytes > 0 {
++                    memset(array.dataPointer.advanced(by: offset), 0, tailBytes)
++                }
++            }
++        }
++    }
++
+     /// Prefill a KV cache state with voice conditioning tokens.
+     ///
+     /// Prepends a single `bos_before_voice` token to match pocket-tts 2.0.0's

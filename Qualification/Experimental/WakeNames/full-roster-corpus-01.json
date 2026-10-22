@@ -1,0 +1,84 @@
+{
+  "scope": "Local macOS speech synthesis and augmentation, no app detector installed",
+  "count": 1596,
+  "split_counts": {
+    "train": 1330,
+    "validation": 133,
+    "test": 133
+  },
+  "roster": [
+    {
+      "id": "d5815626-3b38-5085-9b62-14816c7f6bef",
+      "name": "Bessel van der Kolk",
+      "wake_name": "Bessel"
+    },
+    {
+      "id": "a9d82286-78a6-5cf4-96ca-e870242ed744",
+      "name": "Gabor Mat\u00e9",
+      "wake_name": "Gabor"
+    },
+    {
+      "id": "51f43a46-d1ab-5f92-a9b1-e08ccbd61c82",
+      "name": "Peter Levine",
+      "wake_name": "Peter"
+    },
+    {
+      "id": "d0abcf3f-5173-51e7-8e48-b4b624f581c0",
+      "name": "Judith Herman",
+      "wake_name": "Judith"
+    },
+    {
+      "id": "96e3b036-a12b-57bf-a360-242024d1a7f0",
+      "name": "Richard Schwartz",
+      "wake_name": "Richard"
+    },
+    {
+      "id": "495d6767-2f03-5720-b8e4-81dd50c61e7d",
+      "name": "Janina Fisher",
+      "wake_name": "Janina"
+    },
+    {
+      "id": "dca2acb4-27e5-5fec-a1f5-de6511cbd143",
+      "name": "Ad de Jongh",
+      "wake_name": "Ad"
+    },
+    {
+      "id": "da24df50-115f-5952-954e-1d50b3d60daf",
+      "name": "Christine Courtois",
+      "wake_name": "Christine"
+    },
+    {
+      "id": "509c840d-e850-538f-a64b-13511787e114",
+      "name": "Robert Miller (Feeling-State Addiction Protocol)",
+      "wake_name": "Robert"
+    },
+    {
+      "id": "c679f974-fe85-56a4-b20a-361b04127ef9",
+      "name": "Arnold Popky (DeTUR)",
+      "wake_name": "Arnold"
+    },
+    {
+      "id": "e5575563-7ddf-5fbd-9abc-0e7792ace012",
+      "name": "Jim Knipe",
+      "wake_name": "Jim"
+    },
+    {
+      "id": "01854df3-e08d-5d68-a5fb-2ff2d01318af",
+      "name": "Francine Shapiro",
+      "wake_name": "Francine"
+    },
+    {
+      "id": "4fcbed78-0930-5300-9c52-69d37f8d14fe",
+      "name": "Shirley Jean Schmidt (DNMS)",
+      "wake_name": "Shirley"
+    },
+    {
+      "id": "f2015b95-6dd6-53aa-84d9-d09cd3a0fc03",
+      "name": "Dolores Mosquera",
+      "wake_name": "Dolores"
+    }
+  ],
+  "manifest_sha256": "df1308f75a9dacead7814dd48a9fd23207028fc84376cfbd0ce9b76635382b3b",
+  "source_and_voice_partitions_disjoint": true,
+  "training": "Running bounded CPU feature/head evaluation"
+}

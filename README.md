@@ -13,7 +13,7 @@ are ongoing. See [current companion implementation and evidence boundaries](Clou
 
 Source, runtime patches, model-conversion patches, dependency pins, tests,
 browser runtime bindings, artwork, and build tools are included. Model weights,
-compiled native libraries/Core ML models, voice recordings, user databases,
+compiled native libraries/Core ML models, user recordings, user databases,
 credentials, and local qualification output are excluded. Nothing was deleted
 from the working installation. Some older reports link to deliberately untracked
 local evidence.
@@ -24,8 +24,12 @@ The current Swift package targets macOS 26 on Apple Silicon. Use a compatible
 Xcode installation. Build the patched runtime with `Tools/build-runtime.sh`,
 Earshot with `Tools/build-earshot.sh`, and the app with `Tools/build-app.sh`.
 See `ModelPatches/`, `Browser/PocketTTS/README.md`, and `Tools/PocketWASM/` for
-model/runtime preparation. Native and browser voice assets must be provisioned
-separately; a fresh clone alone is not a complete runnable bundle. Signing is
+model/runtime preparation. The fourteen canonical native voice clips are versioned in
+`Sources/CallGemma/Resources/Voices/`, alongside their integrity manifest. Persona
+prompts, wake names, and portraits are also versioned. Browser conditioning
+states are generated from those references. Corrected Core ML exports and other
+model assets still need preparation; a fresh clone alone is not a complete
+runnable bundle. Signing is
 configured for the existing developer account; change it for another account.
 
 For the Cloudflare companion, run `npm ci` and `node build-assets.mjs` in `Cloud/`.
@@ -144,3 +148,21 @@ Source/API provenance is in [Documentation](Documentation), runtime regression e
 The qualification harness supports `--mtp-modes off` for the actual app configuration. Its default `both` still requires both MTP modes; the explicit off scope does not qualify speculative decoding. The original handoff README is preserved under Documentation for provenance.
 
 Conversation persistence is current-format only. There are no runtime predecessor allowlists or legacy journal migrations. This development format uses `Conversations-v3`; earlier conversation directories are not imported. Current-format restart and crash recovery remain required.
+
+## Model acquisition
+
+At runtime, Gemma uses the pinned Hugging Face repository/revision/file from the
+model catalog. The HF client reuses its shared cache and downloads on a miss;
+Blessenger verifies the content size and SHA-256 before loading. PocketTTS also
+uses the shared HF cache, downloads its pinned upstream snapshot on a miss, and
+fetches missing files from partial snapshots. `HF_HUB_CACHE` and `HF_HOME` are
+honored. Repository access/license requirements still apply.
+
+The corrected PocketTTS conditioning and generation exports are a separate
+bundled dependency: `PocketConditioning16.mlmodelc`,
+`PocketConditioning256.mlmodelc`, and `PocketGeneration.mlmodelc`, verified by
+`Resources/pocket-speech-models.json`. The app installs them into its HF-cache
+namespace. They are not downloadable from the pinned upstream snapshot; do not
+replace them with its faulty transformer exports. See `ModelPatches/mobius/`.
+The cache-miss download paths above were checked in source; an empty-cache
+end-to-end build on another Mac has not yet been qualified.

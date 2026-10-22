@@ -57,3 +57,6 @@ Browser/PocketTTS/model/*
 !Browser/PocketTTS/model/*.json
 Cloud/public/
 Sources/CallGemma/Resources/runtime.json
+
+# Canonical persona references are source assets, not user recordings.
+!Sources/CallGemma/Resources/Voices/*.wav

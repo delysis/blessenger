@@ -1,0 +1,131 @@
+{
+  "description": "Canonical bundled persona voice references; excludes user recordings.",
+  "voices": [
+    {
+      "contact": "d5815626-3b38-5085-9b62-14816c7f6bef",
+      "voice": "bessel_van_der_kolk",
+      "file": "bessel_van_der_kolk.wav",
+      "sha256": "9208c2cf7bafc31896151111707b1bc638ef6728eaf7fb03ea0d9bcdb1b67562",
+      "frames": 360002,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "a9d82286-78a6-5cf4-96ca-e870242ed744",
+      "voice": "gabor_mate",
+      "file": "gabor_mate.wav",
+      "sha256": "26a87331e54fd088d1072e2459769bf9014487c641305fd229e7c4c03be21a69",
+      "frames": 336000,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "51f43a46-d1ab-5f92-a9b1-e08ccbd61c82",
+      "voice": "peter_levine",
+      "file": "peter_levine.wav",
+      "sha256": "3fb7ec47ac6332ae4da0affc38c6451baeb95325c7dd4c5442ac0d5fd2864f27",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "d0abcf3f-5173-51e7-8e48-b4b624f581c0",
+      "voice": "judith_herman",
+      "file": "judith_herman.wav",
+      "sha256": "c5fe07ea4e497fc9f53cbb39a6e65e6d2775dd67ce5917b8b3bd54ceb522cfcb",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "96e3b036-a12b-57bf-a360-242024d1a7f0",
+      "voice": "richard_schwartz",
+      "file": "richard_schwartz.wav",
+      "sha256": "ada3ac0bb14c2fef41082eff2f25b08e16dc6afe431ee3785254108fe7454188",
+      "frames": 384216,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "495d6767-2f03-5720-b8e4-81dd50c61e7d",
+      "voice": "janina_fisher",
+      "file": "janina_fisher.wav",
+      "sha256": "643b441cec1a7c50c8be49a7bbb9ba1d95d1c4278cf23ba290c594dccce38357",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "dca2acb4-27e5-5fec-a1f5-de6511cbd143",
+      "voice": "ad_de_jongh",
+      "file": "ad_de_jongh.wav",
+      "sha256": "1dbcb72426c500d12d26d4253e06a14e4da856881c2919739cde4ef50da54b7a",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "da24df50-115f-5952-954e-1d50b3d60daf",
+      "voice": "christine_courtois",
+      "file": "christine_courtois.wav",
+      "sha256": "8876c34ab380c3e02e7cf37f136321c128d8d0ce252e57bc09550d0c47fda766",
+      "frames": 380400,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "509c840d-e850-538f-a64b-13511787e114",
+      "voice": "robert_miller",
+      "file": "robert_miller.wav",
+      "sha256": "971cdc4191c80954cd70e8d4d4a790e34bb1772793f4abc85f28d4875c0715dd",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "c679f974-fe85-56a4-b20a-361b04127ef9",
+      "voice": "arnold_popky",
+      "file": "arnold_popky.wav",
+      "sha256": "7fd966995a9f60a04c8f78e3a431d5e66e8b274060f9febcd469135be571e46e",
+      "frames": 384000,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "e5575563-7ddf-5fbd-9abc-0e7792ace012",
+      "voice": "jim_knipe",
+      "file": "jim_knipe.wav",
+      "sha256": "64eada7bc353c0f482ff9cc7d78106dd9ed030f7e42a1670666554ac599d5491",
+      "frames": 336000,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "01854df3-e08d-5d68-a5fb-2ff2d01318af",
+      "voice": "francine_shapiro",
+      "file": "francine_shapiro.wav",
+      "sha256": "6391a4be7e73d0ad7a5fce7e142fb0de84e7275439958d0350093ac579af9295",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "4fcbed78-0930-5300-9c52-69d37f8d14fe",
+      "voice": "shirley_jean_schmidt",
+      "file": "shirley_jean_schmidt.wav",
+      "sha256": "9d0c9b7c04c83007840954dc3c3e85a78dd0ed883dcec93746c61c0cb528a6a5",
+      "frames": 336039,
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "contact": "f2015b95-6dd6-53aa-84d9-d09cd3a0fc03",
+      "voice": "dolores_mosquera",
+      "file": "dolores_mosquera.wav",
+      "sha256": "3d68672463425bb77c4d756fefd4b047679ce7d84668b817421e9297d7d26d63",
+      "frames": 176880,
+      "sampleRate": 24000,
+      "channels": 1
+    }
+  ]
+}

@@ -8,7 +8,9 @@ model caches, credentials, and installed app until the replacement is verified.
 ## 1. Check the machine
 
 This target requires **Apple Silicon and macOS 26 or later**, with full Xcode
-and its macOS SDK. Intel and older macOS are not supported by this target.
+and its macOS SDK. The working build uses **Xcode 27.0 (27A266a)**; use that
+version or newer for the first build. Older toolchains are unqualified. Intel
+and older macOS are not supported by this target.
 The source currently uses a 12B Gemma default; check available memory before
 promising that model on a smaller Mac. The app applies a memory-capacity policy.
 A build and model download can consume tens of GB: check free space first.

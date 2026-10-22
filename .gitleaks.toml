@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+# Pinned integrity digests are not credentials (e.g. tokenizer.json's SHA-256).
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+condition = "AND"
+paths = ['''^Tools/speech-assets\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"[^"\r\n]+": "[a-f0-9]{64}",?\s*$''']

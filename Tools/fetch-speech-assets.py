@@ -71,8 +71,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='blessenger-download-') as temp:
         archive = Path(temp) / 'speech.tar.gz'
         print('Downloading pinned speech assets:', manifest['bytes'], 'bytes', flush=True)
-        with urllib.request.urlopen(manifest['url'], timeout=120) as source, archive.open('wb') as dest:
-            shutil.copyfileobj(source, dest)
+        with archive.open('wb') as dest:
+            for index, part in enumerate(manifest['parts']):
+                print('Downloading part', index + 1, 'of', len(manifest['parts']), flush=True)
+                with urllib.request.urlopen(part['url'], timeout=120) as source:
+                    data = source.read(part['bytes'] + 1)
+                if len(data) != part['bytes'] or hashlib.sha256(data).hexdigest() != part['sha256']:
+                    raise ValueError('Speech archive part failed verification')
+                dest.write(data)
         install(ROOT, manifest, archive)
 
 if __name__ == '__main__': main()

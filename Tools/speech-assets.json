@@ -1,5 +1,4 @@
 {
-  "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz",
   "sha256": "c29c81f08bfc0d5518d49f490be133025556e56d6460f021a6eab048671ec8e5",
   "bytes": 583875581,
   "files": {
@@ -37,5 +36,357 @@
     "Sources/CallGemma/Resources/PocketGeneration.mlmodelc/coremldata.bin": "d66b7157f5463c9572f61242094e008d31b5b82c9627fc9a855717b65bbb5dc3",
     "Sources/CallGemma/Resources/PocketGeneration.mlmodelc/model.mil": "c651db8b801fd6de19b204d30ceb1b51e969bdd9ad3fa12c31d5bad243d8fba4",
     "Sources/CallGemma/Resources/PocketGeneration.mlmodelc/weights/weight.bin": "fdd40be8edecea51035dfa91beada8e74de2634eab266b85f329bf85b344d271"
-  }
+  },
+  "parts": [
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part000",
+      "bytes": 8388608,
+      "sha256": "a02e633104717705243a48e1878b105e344edadb4981e327734aea4f90140f1d"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part001",
+      "bytes": 8388608,
+      "sha256": "cb63ca4869383c19437b3078ec4d5fabaa8f2786be3ee54f883186fa62bceb7d"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part002",
+      "bytes": 8388608,
+      "sha256": "89fa409e923ecf1c6dc53e5752f185578d81e8689191ff96729134d84307c9fb"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part003",
+      "bytes": 8388608,
+      "sha256": "05aaed2975c732ecec0018e265d3a254277cf477672d8fdf199f96ebce670b95"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part004",
+      "bytes": 8388608,
+      "sha256": "5331e9e6d58a17079d4c3c2160c562fcc72e59a7ab228ea2a4e2d65a1574f619"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part005",
+      "bytes": 8388608,
+      "sha256": "138b805b032e9eb494ba91e0d33780b3fa474bd7b0f4d46a26adfa9fb0f0d869"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part006",
+      "bytes": 8388608,
+      "sha256": "3ca513476ef6b103d7052b65613bd7dc3850afd8e47d7d28b1b016ec582c6a8c"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part007",
+      "bytes": 8388608,
+      "sha256": "af5072a90137739f546c3ccca65abf2d4544e71e9b73d39054904f7b91666558"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part008",
+      "bytes": 8388608,
+      "sha256": "edaac9b642a158d63efa348addf3a8c36351c9d98dee97029f7bfa734ca959ae"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part009",
+      "bytes": 8388608,
+      "sha256": "873765abd77ecf6cecdd22204dce456e975bb20b02fc3381cba38fb8567a9dc2"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part010",
+      "bytes": 8388608,
+      "sha256": "82f15cd0345c23440be9a6d7c23f56096ceb8467dc3dab8ff45c5e0d5510ef8b"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part011",
+      "bytes": 8388608,
+      "sha256": "c8531fa53a091f06de054f40b0f8f269ec0908590714170b12bb27e738b3b8ff"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part012",
+      "bytes": 8388608,
+      "sha256": "8f53d3daca5b86ca5005fae7297e220f4bff5d75abf5da762ca28d4389cac51b"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part013",
+      "bytes": 8388608,
+      "sha256": "7aa0ffa34cf7a97534c175d8b825736d6d77c542ca0770adc068d75014182185"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part014",
+      "bytes": 8388608,
+      "sha256": "65a2ebb29c409ad64a4794c169b5ed54094cde81c90d239906c50c4e163f8bbb"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part015",
+      "bytes": 8388608,
+      "sha256": "28416ad130e0e5ade6232df6985871bf03273b087d11588f0a6a9192d5e06167"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part016",
+      "bytes": 8388608,
+      "sha256": "db4460e1b524a7ff1f3321a5092c80e8023b69f3b56fb522d33a1fc460215db0"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part017",
+      "bytes": 8388608,
+      "sha256": "b4ca5049668ec645414fbdea7ceb27f4a1edb1201fbe5ed40e6ca2aece20a847"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part018",
+      "bytes": 8388608,
+      "sha256": "4b65ce0eff95b6a1a2bb9afa0c76fd976937a452917265678f16695541d95b4e"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part019",
+      "bytes": 8388608,
+      "sha256": "6b0b2a42e64e51e66be8c0b96baf53dca67085e5fea7724b81ad4d97c3b3c16a"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part020",
+      "bytes": 8388608,
+      "sha256": "8a87eafcbfd4557246c8c5f975e11282241311217f8a67bb35fcdb279d6f6e97"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part021",
+      "bytes": 8388608,
+      "sha256": "bec118105452c22eabdff1a5c4404f8934496177576d2d60a772b827bcc768ea"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part022",
+      "bytes": 8388608,
+      "sha256": "550fdab05f6877ebe16ac85585bcfe0e49afd4f75373e20c72e3d49218514fc1"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part023",
+      "bytes": 8388608,
+      "sha256": "973e6916b1c490dc78df94caf1b8d5d98f2e870509b1cc3f678325b0e148e7db"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part024",
+      "bytes": 8388608,
+      "sha256": "500118d79966be9a56c7453b35ae614e01d871c077c6e39393dcb5aec6c90b6a"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part025",
+      "bytes": 8388608,
+      "sha256": "22bb5bb0c57d7f8ae739792263a06893d928616c168b7f396e92471d523e8b02"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part026",
+      "bytes": 8388608,
+      "sha256": "66ac68cd38dfea26b64464a55268ba13e8f44a9728840b9ba085a7466d087769"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part027",
+      "bytes": 8388608,
+      "sha256": "700eef06924778058c81af56a5040c0b0f3dce8faa5dfdfb39075df9165ccb66"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part028",
+      "bytes": 8388608,
+      "sha256": "21693fff6d3d08450b918831500bfb2231d38586c93e2c6fbbd71a74a0c40096"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part029",
+      "bytes": 8388608,
+      "sha256": "c7f14fe40921bc86bb9f2610b4222273090170dac01e2a74a0172011606ae83f"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part030",
+      "bytes": 8388608,
+      "sha256": "b0cf59d8f7d7ff44ca65d5de3a33b4fb6b76dc13ec6c93ed9765480d9542f1f5"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part031",
+      "bytes": 8388608,
+      "sha256": "fed901646e18ab3bc29230509e5c1bca33e04a23a7d67adfefef578475c5f618"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part032",
+      "bytes": 8388608,
+      "sha256": "c3a11dbb0be11b368c3d94596126e98ee44e321b083742b33ef521493429555c"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part033",
+      "bytes": 8388608,
+      "sha256": "0d14d591d74f7829fe59cca3cfc2b90cf1a581e0bc804c72d6d25b35243161db"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part034",
+      "bytes": 8388608,
+      "sha256": "004b7808f362606c8f5c56342773d8a81bc47a33a3676a991a19a75419c67bc6"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part035",
+      "bytes": 8388608,
+      "sha256": "129b8bdd69d0a12ee7254f20307752fbd19f913bd87890453c614ccca1c5c406"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part036",
+      "bytes": 8388608,
+      "sha256": "a0c0c7c1787425b9555cb071e9dda1f70fe17d2f1a149c7cc81708cd5191c6c9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part037",
+      "bytes": 8388608,
+      "sha256": "2eeacf245b8ca2b62c72554d73bc27700df0701713bf69c1742d38a6fec698d9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part038",
+      "bytes": 8388608,
+      "sha256": "bcba0c23b29517fc63a87a2185c2c5622f20cd70198a5edc33a429e0b01540fc"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part039",
+      "bytes": 8388608,
+      "sha256": "50548d1f89499723e535a82c7a95fefe2d70c4f47840fd5615af51877c69b918"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part040",
+      "bytes": 8388608,
+      "sha256": "df641bc41b2e3e636287b3a680dbb4c518b94f0ea6a185ca791ebcdba3714f08"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part041",
+      "bytes": 8388608,
+      "sha256": "66c29a0af66c03fa27001075ea80cd14b1f69733cd6b969990ab7e8c740d17ed"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part042",
+      "bytes": 8388608,
+      "sha256": "3f7d54391c395124e57cd5a9de8cdb070fb4557068100da58a5db3d806392f36"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part043",
+      "bytes": 8388608,
+      "sha256": "72e536426b93aaf2bc88809ea342a22e8e28ae54a0eb6b93e761447a60b1a903"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part044",
+      "bytes": 8388608,
+      "sha256": "2f02bec3aab8cf2445f1bfe5a52db71b542c9ce2edf6191f3e5d53804b3c468b"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part045",
+      "bytes": 8388608,
+      "sha256": "d451013d83108c001f7882cb8efa5131b5558ef155f02ebf0a042ffd333a3bf9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part046",
+      "bytes": 8388608,
+      "sha256": "4d7b63d5d898868a738d86c76c8f5322f16f1c9381365aa375b8ce60ff02be16"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part047",
+      "bytes": 8388608,
+      "sha256": "abf71cf6a7220725c43acfd34d3b0ade192e25c503cbf86ac05cab74624e882a"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part048",
+      "bytes": 8388608,
+      "sha256": "91494f2752f3099a45cd378bbc33fb75cee6ee23c68eb89b4531b010bcfaadc0"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part049",
+      "bytes": 8388608,
+      "sha256": "4d81b936dec4e778bd299c6935c68dcb843a4c1aab53f948b85536db877c2178"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part050",
+      "bytes": 8388608,
+      "sha256": "c8573d914d1256805e1662095d4420adbe236ab59fd4b9f9066176a6d55d7c80"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part051",
+      "bytes": 8388608,
+      "sha256": "c0ce76d210ede869d37a91c55805fbc00f80b59bfa1459733a878e38599f3ab5"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part052",
+      "bytes": 8388608,
+      "sha256": "7e4956e37f389107fcb8870e6718be963592595d7ad108be793480e8d3fcd401"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part053",
+      "bytes": 8388608,
+      "sha256": "e6bb51e0ef1fcd4a3dda23343c17f1cda504c922630824ed4109ea0f349db84c"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part054",
+      "bytes": 8388608,
+      "sha256": "6cd9df529c3780fc23bea76e25a1805800ebf50245a8974803a79abc4679d822"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part055",
+      "bytes": 8388608,
+      "sha256": "4736f1c500023f70483937801a2794ae9dd094824c0324c56857f6f6ffdbcacb"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part056",
+      "bytes": 8388608,
+      "sha256": "7642d37320982c8bbeca1d4eb628400e4ebe16e1a17252f190e8993b07b853fe"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part057",
+      "bytes": 8388608,
+      "sha256": "e67f9b6b566469f3490c1da0e72a7d7b1ee4b70709b031cceb268a216050cbf7"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part058",
+      "bytes": 8388608,
+      "sha256": "03f6042ebbfc18cb23b9619dce01a334a4c4bdf30e0ec4d42b34dc34b15c450c"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part059",
+      "bytes": 8388608,
+      "sha256": "13b0351614a21b7f3aaf5917a6ecb06e7934cd34b839e8ccb0ee49d9043807f9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part060",
+      "bytes": 8388608,
+      "sha256": "623b00bd0938d4d3a01eb4d3462c37970f470510a672c41f1c7b70ad24e473d9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part061",
+      "bytes": 8388608,
+      "sha256": "cbf9faff5bc7ababc98389435e9892dd85188a6d6f00c2450ca835c4e8cd77fc"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part062",
+      "bytes": 8388608,
+      "sha256": "a02f91bd0322e9be80634e307b5e33a999fa9dbe6d595837a25ae813b9c867d8"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part063",
+      "bytes": 8388608,
+      "sha256": "5e4bfeecbaa1387bf9130789c16f05042b9d420c9892a39e756312b1714c5c41"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part064",
+      "bytes": 8388608,
+      "sha256": "424cd554ebdacb522c68ab17dc79b7945d37da4414995e6c56449db30ad36f73"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part065",
+      "bytes": 8388608,
+      "sha256": "a82c6337614e0a18796ebb2789b147a5460f21a5e43328b4f802225128793080"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part066",
+      "bytes": 8388608,
+      "sha256": "9067fa4add011261743422dca99ed77e33b375842159efa442109519b9303ea9"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part067",
+      "bytes": 8388608,
+      "sha256": "426f8e06d07b96cea18ebcec80705d4cc0c6abc3eeaa362702a4c0052eaccf30"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part068",
+      "bytes": 8388608,
+      "sha256": "e0aa3f618c98097130708136702b7a2a6880206815d3ceff472c24b08b0b5ed5"
+    },
+    {
+      "url": "https://github.com/delysis/blessenger/releases/download/speech-assets-v1/blessenger-speech-assets-v1.tar.gz.part069",
+      "bytes": 5061629,
+      "sha256": "ad628f0b62106aacbe279be2393702d8afa8a511bba676735be5ddd5ef0ed685"
+    }
+  ]
 }

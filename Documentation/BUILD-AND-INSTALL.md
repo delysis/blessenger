@@ -47,7 +47,8 @@ bash Tools/bootstrap-mac.sh
 The bootstrap does the following, stopping on the first failure:
 
 1. Downloads the immutable `speech-assets-v1` GitHub release archive and checks
-   its pinned size, SHA-256, complete file inventory, and each file's SHA-256.
+   each small download part, reassembles the archive, then checks its pinned
+   size, SHA-256, complete file inventory, and each file's SHA-256.
 2. Installs the corrected native PocketTTS exports and browser model/voice states.
    Existing matching files are reused. Conflicting local files are not replaced.
 3. Fetches exact upstream LiteRT/LiteRT-LM revisions, applies the repository's
@@ -144,3 +145,13 @@ HTTPS is required for iPhone browser microphone access. Local HTTP alone is not
 a microphone solution; never tell her to bypass a certificate warning.
 Browser-local TTS/VAD and offline Gemma fallback remain under development; do not
 promise them as a replacement for the connected Mac yet.
+
+## Maintainer validation for this handoff
+
+A fresh Git checkout was populated using this exact speech archive and the
+existing built native runtime/Earshot prerequisites. `Tools/build-app.sh` then
+resolved dependencies, applied patches, completed the Release build, verified
+the signature, and installed a separate app successfully on the maintainer Mac.
+The native prerequisites were reused for this check, not rebuilt from scratch.
+This proves source/resource packaging and installation here, not cold bootstrap
+or acoustic performance on her machine; perform section 5 there.

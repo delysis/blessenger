@@ -82,5 +82,21 @@
     "test_scored": false,
     "app_enabled": false,
     "next": "Improve training voice and acoustic coverage before more classifier capacity"
+  },
+  "native_phonetic_head_06": {
+    "receipt": "phonetic-head-06.json",
+    "backend": "Pinned Wav2Vec aligner, CPU-only; native Swift/Accelerate char-ngram logistic head",
+    "feature_median_seconds": 0.061,
+    "training_seconds": 0.091,
+    "validation_correct": 103,
+    "validation_positive": 112,
+    "validation_wrong": 0,
+    "test_correct": 85,
+    "test_positive": 112,
+    "test_wrong_names": 0,
+    "test_false_activations": 3,
+    "test_negatives": 21,
+    "accepted": false,
+    "next": "Automatic corpus generation with contact voices; stronger negative speech coverage and held-out natural speech before routing integration"
   }
 }

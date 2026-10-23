@@ -1,0 +1,19 @@
+{
+  "appEnabled" : false,
+  "scope" : "Native CPU phonetic decoding and Swift logistic head; synthetic held-out voices only. No microphone, streaming-prefix or speaker-echo acceptance.",
+  "test" : {
+    "correctNames" : 85,
+    "falseActivations" : 3,
+    "missedNames" : 27,
+    "negatives" : 21,
+    "wrongNames" : 0
+  },
+  "trainingSeconds" : 0.09056496620178223,
+  "validation" : {
+    "correctNames" : 103,
+    "falseActivations" : 0,
+    "missedNames" : 9,
+    "negatives" : 21,
+    "wrongNames" : 0
+  }
+}

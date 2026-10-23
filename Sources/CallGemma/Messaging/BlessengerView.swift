@@ -94,6 +94,10 @@ struct BlessengerView: View {
                 } catch { model.error = error.localizedDescription }
             }
         }
+        .sheet(isPresented: Binding(get: { controller.inCall }, set: { _ in })) {
+            NativeCallSheet(controller: controller)
+                .interactiveDismissDisabled()
+        }
         .sheet(isPresented: $newContact) {
             ContactEditor(contact: Persona(name: "", prompt: PromptChoice.everyday.text)) { contact in
                 Task { await model.save(contact) }
@@ -706,58 +710,111 @@ private struct ContactEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State var contact: Persona
     let save: (Persona) -> Void
+    @StateObject private var voice = VoiceSampleEditorModel()
     @State private var preview: AVAudioPlayer?
-    @State private var recording = false
+    @State private var photo = false
+    @State private var choosingVoice = false
+    @State private var saving = false
+
+    private var voiceURL: URL? {
+        guard let name = contact.voice else { return nil }
+        return name.hasPrefix("/") ? URL(fileURLWithPath: name) : BlessengerResources.voiceURL(name)
+    }
     var body: some View {
-        NavigationStack {
-            Form {
-                HStack {
-                    ContactAvatar(value: contact.avatar, size: 48)
-                    TextField("Name", text: $contact.name)
-                }
-                ScrollView(.horizontal) {
-                    HStack {
-                        ForEach(0..<14) { index in
-                            Button { contact.avatar = "portrait:\(index)" } label: {
-                                ContactAvatar(value: "portrait:\(index)", size: 36)
-                                    .overlay(Circle().stroke(contact.avatar == "portrait:\(index)" ? Color.accentColor : .clear, lineWidth: 2))
-                            }.buttonStyle(.plain).accessibilityLabel("Portrait \(index + 1)")
+        VStack(spacing: 20) {
+            HStack(spacing: 20) {
+                Button { photo = true } label: {
+                    ContactAvatar(value: contact.avatar, size: 76)
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "camera.fill").font(.system(size: 11))
+                                .padding(7).glassEffect(.regular, in: Circle())
                         }
+                }
+                .buttonStyle(.plain).help("Change photo").accessibilityLabel("Change photo")
+                .popover(isPresented: $photo, arrowEdge: .leading) { ContactPhotoEditor(current: contact.avatar) { contact.avatar = $0 } }
+                VStack(spacing: 10) {
+                    TextField("Name", text: $contact.name).font(.title2.weight(.medium))
+                    TextField("Wake name", text: $contact.wakeName).accessibilityLabel("Wake name").help("Name used to address this contact in group calls")
+                }.textFieldStyle(.plain).multilineTextAlignment(.leading)
+            }
+            TextEditor(text: $contact.prompt)
+                .font(.body).scrollContentBackground(.hidden)
+                .padding(10).frame(height: 240)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityLabel("System prompt")
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    TextField("Voice name", text: $voice.name).textFieldStyle(.plain)
+                        .accessibilityLabel("Voice name")
+                    Button {
+                        if voice.source != nil { Task { await voice.preview() } }
+                        else if let voiceURL { preview = try? AVAudioPlayer(contentsOf: voiceURL); preview?.play() }
+                    } label: { Image(systemName: voice.playing ? "stop.fill" : "play.fill") }
+                        .help("Preview voice").accessibilityLabel("Preview voice")
+                        .disabled((voice.source == nil && voiceURL == nil) || voice.recording || voice.busy)
+                    Button { choosingVoice = true } label: { Image(systemName: "folder") }
+                        .help("Import voice sample").accessibilityLabel("Import voice sample")
+                        .disabled(voice.recording || voice.busy)
+                    Button { Task { if voice.recording { await voice.finishRecording() } else { await voice.record() } } } label: {
+                        Image(systemName: voice.recording ? "stop.fill" : "mic.fill")
+                            .foregroundStyle(voice.recording ? Color.red : Color.primary)
+                    }.help(voice.recording ? "Stop recording" : "Record voice sample")
+                        .accessibilityLabel(voice.recording ? "Stop recording" : "Record voice sample")
+                        .disabled(voice.busy)
+                }.buttonStyle(.glass).buttonBorderShape(.circle)
+                if voice.recording { Text(voice.elapsed, format: .number.precision(.fractionLength(1))).monospacedDigit() }
+                if voice.source != nil && !voice.recording {
+                    Slider(value: Binding(get: { voice.start }, set: { voice.moveStart($0) }), in: 0...max(0.001, voice.duration - 1))
+                        .accessibilityLabel("Voice sample start").help("Select the beginning of the sample")
+                    Slider(value: $voice.end, in: voice.endLower...voice.endUpper)
+                        .accessibilityLabel("Voice sample end").help("Select the end of the sample")
+                    HStack {
+                        Text("\(voice.start, specifier: "%.1f") – \(voice.end, specifier: "%.1f") s")
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        Spacer()
+                        Button { voice.close(); voice.source = nil } label: { Image(systemName: "xmark.circle") }
+                            .help("Discard new voice sample").accessibilityLabel("Discard new voice sample")
                     }
                 }
-                TextEditor(text: $contact.prompt).frame(minHeight: 130).accessibilityLabel("System prompt")
-                Picker("Voice", selection: $contact.voice) {
-                    Text("Default").tag(nil as String?)
-                    if let custom = contact.voice, custom.hasPrefix("/") { Text("Custom").tag(Optional(custom)) }
-                    ForEach(BlessengerResources.voiceNames, id: \.self) { name in Text(BlessengerResources.label(name)).tag(Optional(name)) }
-                }
-                HStack {
-                    Button {
-                        if let name = contact.voice, let url = name.hasPrefix("/") ? URL(fileURLWithPath: name) : BlessengerResources.voiceURL(name) {
-                            preview = try? AVAudioPlayer(contentsOf: url); preview?.play()
-                        }
-                    } label: { Image(systemName: "play.fill") }.accessibilityLabel("Preview voice").disabled(contact.voice == nil)
-                    Button { recording = true } label: { Image(systemName: "waveform.badge.plus") }.accessibilityLabel("Import or record voice")
-                }
-                TextField("Wake name", text: $contact.wakeName)
             }
-            .formStyle(.grouped)
-            .navigationTitle(contact.name.isEmpty ? "Add Contact" : contact.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save(contact); dismiss() }
-                        .disabled(contact.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || contact.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }.frame(minWidth: 360, minHeight: 380)
-        .onDisappear { preview?.stop() }
-        .sheet(isPresented: $recording) {
-            VoiceSampleEditor(initialURL: nil) { url, _ in
-                // VoiceSampleEditor returns an app-owned trimmed recording.
-                contact.voice = url.path
+            HStack {
+                Button("Cancel") { dismiss() }.buttonStyle(.glass).keyboardShortcut(.cancelAction)
+                Spacer()
+                if saving || voice.busy { ProgressView().controlSize(.small) }
+                Button("Save") { Task { await commit() } }.buttonStyle(.glassProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(saving || voice.busy || voice.recording || (voice.source != nil && !voice.valid) || contact.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || contact.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+        .padding(24).frame(width: 480)
+        .presentationBackground(.regularMaterial)
+        .interactiveDismissDisabled(saving || voice.recording)
+        .onAppear { voice.name = contact.voiceLabel ?? contact.voice.map { $0.hasPrefix("/") ? "Custom" : BlessengerResources.label($0) } ?? "" }
+        .onDisappear { preview?.stop(); voice.close() }
+        .fileImporter(isPresented: $choosingVoice, allowedContentTypes: [.audio]) { result in
+            do { let url = try result.get(); Task { await voice.load(url) } }
+            catch { voice.error = error.localizedDescription }
+        }
+        .alert("Voice", isPresented: Binding(get: { voice.error != nil }, set: { if !$0 { voice.error = nil } })) {
+            Button("OK") { voice.error = nil }
+        } message: { Text(voice.error ?? "") }
+    }
+    private func commit() async {
+        saving = true
+        defer { saving = false }
+        do {
+            if voice.source != nil {
+                let sample = try await voice.export()
+                defer { try? FileManager.default.removeItem(at: sample) }
+                let directory = AppQualificationEnvironment.messaging.appending(path: "Voices")
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                let destination = directory.appending(path: UUID().uuidString + ".wav")
+                try FileManager.default.copyItem(at: sample, to: destination)
+                contact.voice = destination.path
+            }
+            contact.voiceLabel = voice.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            save(contact); dismiss()
+        } catch { voice.error = error.localizedDescription }
     }
 }
 
@@ -786,10 +843,20 @@ struct ContactAvatar: View {
                 .resizable().scaledToFit()
                 .frame(width: size, height: size)
                 .clipShape(Circle()).accessibilityHidden(true)
+        } else if value.hasPrefix("/"), let image = localPhoto {
+            image.resizable().scaledToFill().frame(width: size, height: size)
+                .clipShape(Circle()).accessibilityHidden(true)
         } else {
             Image(systemName: "person.crop.circle.fill").resizable()
                 .frame(width: size, height: size).foregroundStyle(.tint).accessibilityHidden(true)
         }
+    }
+    private var localPhoto: Image? {
+        #if os(macOS)
+        return NSImage(contentsOfFile: value).map { Image(nsImage: $0) }
+        #else
+        return UIImage(contentsOfFile: value).map { Image(uiImage: $0) }
+        #endif
     }
 }
 
@@ -965,5 +1032,86 @@ private struct CallDiagnosticsView: View {
             if let notice = controller.notice { Text(notice) }
             Button("Done", action: dismiss)
         }.padding().frame(minWidth: 320).textSelection(.enabled)
+    }
+}
+
+/// Presentation observes call state; dismissing a sheet never owns audio teardown.
+private struct NativeCallSheet: View {
+    @ObservedObject var controller: CallController
+    private var active: Persona? {
+        controller.callParticipants.first { $0.id == controller.activeCallParticipant }
+            ?? controller.callParticipants.first
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 24)
+            if let active {
+                ContactAvatar(value: active.avatar, size: 120)
+                    .shadow(color: .black.opacity(0.25), radius: 18, y: 8)
+                    .padding(.bottom, 22)
+                Text(active.name)
+                    .font(.system(size: 26, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+            HStack(spacing: 6) {
+                if controller.dialing {
+                    Text("Calling…")
+                } else if let connected = controller.callConnectedAt {
+                    Image(systemName: "phone.fill").font(.system(size: 11))
+                    Text(connected, style: .timer).monospacedDigit().fixedSize()
+                }
+            }
+            .font(.system(size: 15)).foregroundStyle(.secondary)
+            .frame(height: 22).padding(.top, 8)
+            if controller.callParticipants.count > 1 {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 16) {
+                        ForEach(controller.callParticipants) { contact in
+                            Button { controller.requestCallParticipant(contact.id) } label: {
+                                VStack(spacing: 6) {
+                                    ContactAvatar(value: contact.avatar, size: 40)
+                                        .overlay(Circle().stroke(contact.id == controller.activeCallParticipant ? Color.white : .clear, lineWidth: 2).padding(-3))
+                                    Text(contact.name.components(separatedBy: " ").first ?? contact.name)
+                                        .font(.caption).lineLimit(1)
+                                }.padding(5)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Speak to " + contact.name)
+                            .help("Choose the recipient of your next spoken turn")
+                        }
+                    }.padding(.horizontal, 16).padding(.vertical, 8)
+                }
+                .scrollIndicators(.hidden)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 24)
+            }
+            Spacer(minLength: 32)
+            HStack(spacing: 32) {
+                Button { controller.toggleMicrophoneMute() } label: {
+                    Image(systemName: controller.microphoneMuted ? "mic.slash.fill" : "mic.fill")
+                        .font(.system(size: 23, weight: .medium))
+                        .foregroundStyle(controller.microphoneMuted ? Color.white : Color.primary)
+                        .frame(width: 58, height: 58)
+                }
+                .buttonStyle(.plain)
+                .background(controller.microphoneMuted ? Color.accentColor : Color.clear, in: Circle())
+                .glassEffect(.regular.interactive(), in: Circle())
+                .help(controller.microphoneMuted ? "Unmute microphone" : "Mute microphone")
+                .accessibilityLabel(controller.microphoneMuted ? "Unmute microphone" : "Mute microphone")
+                .accessibilityValue(controller.microphoneMuted ? "Muted" : "Unmuted")
+                Button { if controller.inCall { controller.toggleCall() } } label: {
+                    Image(systemName: "phone.down.fill")
+                        .font(.system(size: 25, weight: .medium))
+                        .foregroundStyle(.white).frame(width: 58, height: 58)
+                }
+                .buttonStyle(.glassProminent).buttonBorderShape(.circle).tint(.red)
+                .help("End call").accessibilityLabel("End call")
+                .keyboardShortcut(.cancelAction)
+            }.padding(.bottom, 36)
+        }
+        .frame(width: 360, height: controller.callParticipants.count > 1 ? 470 : 410)
+        .presentationBackground(.regularMaterial)
     }
 }

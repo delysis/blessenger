@@ -7,6 +7,7 @@ struct Persona: Codable, Identifiable, Equatable, Sendable {
     var avatar = "person.crop.circle.fill"
     var prompt: String
     var voice: String?
+    var voiceLabel: String?
     var wakeName = ""
 }
 

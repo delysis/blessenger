@@ -91,7 +91,7 @@ enum AppQualificationBridge {
         #endif
         case "status":
             return ["ready": controller.ready, "inCall": controller.inCall, "dialing": controller.dialing,
-                    "busy": controller.busy, "status": controller.status, "notice": controller.notice ?? "",
+                    "busy": controller.busy, "microphoneMuted": controller.microphoneMuted, "status": controller.status, "notice": controller.notice ?? "",
                     "audio": controller.audioDiagnostics, "selected": model.selected?.uuidString ?? "",
                     "playingNote": controller.playingVoiceNote?.uuidString ?? "",
                     "notePosition": controller.voiceNotePosition, "noteDuration": controller.voiceNoteDuration,
@@ -129,6 +129,7 @@ enum AppQualificationBridge {
             let initial = command.id ?? contact.id
             guard participants.contains(where: { $0.id == initial }) else { throw CheckpointError.invalidMetadata }
             controller.dial(participants: participants, initialSpeaker: initial, memoryStore: model.store)
+        case "mute": controller.toggleMicrophoneMute()
         case "hangup":
             if controller.inCall { controller.toggleCall() }
         case "participant":

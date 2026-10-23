@@ -427,6 +427,10 @@ final class CallAudio {
 
     private var remote: RemoteCallTransport?
     var isRemote: Bool { remote != nil }
+    // Keep the device clock and AEC running while muted. Silence goes through
+    // the ordinary endpoint path, so an open input is completed rather than
+    // abandoned and unmuting cannot replay buffered microphone speech.
+    var microphoneMuted = false
     func useRemote(_ transport: RemoteCallTransport) throws {
         guard engine == nil, !starting, events == nil, remote == nil else {
             throw CallAudioError.unavailable("Audio is already in use.")
@@ -725,6 +729,7 @@ final class CallAudio {
     }
 
     func stop() {
+        microphoneMuted = false
         if let session = acousticSession, let root = AppQualificationEnvironment.root {
             acousticSession = nil
             let input = acousticInput, output = acousticOutput
@@ -1005,7 +1010,7 @@ final class CallAudio {
         if suppressCapture || awaitingPickup { resetUtterance(); return }
         let consumeStart = LatencyTrace.now()
         defer { AudioTrace.latency.duration("capture.consume", since: consumeStart) }
-        pendingInput.append(contentsOf: samples)
+        pendingInput.append(contentsOf: microphoneMuted ? [Float](repeating: 0, count: samples.count) : samples)
         while pendingInput.count >= StreamingVAD.chunkSize {
             let chunk = Array(pendingInput.prefix(StreamingVAD.chunkSize))
             pendingInput.removeFirst(StreamingVAD.chunkSize)

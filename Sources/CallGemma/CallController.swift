@@ -30,6 +30,13 @@ final class CallController: ObservableObject, MessageInference {
     @Published private(set) var inCall = false
     @Published private(set) var busy = false
     @Published private(set) var status = "Ready"
+    @Published private(set) var callConnectedAt: Date?
+    @Published private(set) var microphoneMuted = false
+    func toggleMicrophoneMute() {
+        guard inCall else { return }
+        microphoneMuted.toggle()
+        audio.microphoneMuted = microphoneMuted
+    }
     @Published private(set) var dialing = false
     private let ringback = CallRingback()
     private var pendingGreeting = false
@@ -661,6 +668,9 @@ final class CallController: ObservableObject, MessageInference {
         }
         let id = UUID()
         callID = id
+        callConnectedAt = nil
+        microphoneMuted = false
+        audio.microphoneMuted = false
         inCall = true
         dialing = true
         status = "Calling"
@@ -691,6 +701,7 @@ final class CallController: ObservableObject, MessageInference {
             guard let self, self.inCall, self.callID == id else { return }
             self.ringback.stop()
             self.dialing = false
+            self.callConnectedAt = Date()
             self.status = "Speaking"
             AudioTrace.latency.mark("call.pickup")
         }

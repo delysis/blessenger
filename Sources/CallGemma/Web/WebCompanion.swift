@@ -247,11 +247,23 @@ final class WebCompanion {
                     }, "generating": model.generating.map(\.uuidString), "ready": controller.ready, "inCall": controller.inCall])
             }
             if request.method == "GET", request.path.hasPrefix("/avatar/"),
-               let id = UUID(uuidString: String(request.path.dropFirst(8))), let contact = model.state.contacts.first(where: { $0.id == id }),
-               contact.avatar.hasPrefix("portrait:"), let index = Int(contact.avatar.dropFirst(9)), (0..<14).contains(index),
-               let image = BlessengerResources.bundle.image(forResource: "contact-portrait-\(index)"),
-               let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) {
-                return CompanionResponse(type: "image/png", body: png)
+               let id = UUID(uuidString: String(request.path.dropFirst(8))), let contact = model.state.contacts.first(where: { $0.id == id }) {
+                if contact.avatar.hasPrefix("portrait:"), let index = Int(contact.avatar.dropFirst(9)), (0..<14).contains(index),
+                   let image = BlessengerResources.bundle.image(forResource: "contact-portrait-\(index)"),
+                   let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) {
+                    return CompanionResponse(type: "image/png", body: png)
+                }
+                // Only serve app-owned imported photos, never arbitrary paths
+                // from an edited contact record or a symlink outside the library.
+                let photos = AppQualificationEnvironment.messaging.appending(path: "ContactPhotos").resolvingSymlinksInPath()
+                let file = URL(fileURLWithPath: contact.avatar).resolvingSymlinksInPath()
+                if contact.avatar.hasPrefix("/"), file.deletingLastPathComponent() == photos, file.pathExtension == "png" {
+                    let data = try await Task.detached {
+                        guard (try file.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max) <= 2_000_000 else { throw GemmaError(message: "Invalid contact photo.") }
+                        return try Data(contentsOf: file)
+                    }.value
+                    return CompanionResponse(type: "image/png", body: data)
+                }
             }
             if request.method == "GET", request.path.hasPrefix("/attachment/"),
                let id = UUID(uuidString: String(request.path.dropFirst(12))),

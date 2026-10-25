@@ -8,7 +8,9 @@ final class MessagingModel: ObservableObject {
     @Published var error: String?
     @Published private(set) var generating: Set<UUID> = []
     let store: MessageStore
+    private let directory: URL
     init(directory: URL = URL.applicationSupportDirectory.appending(path: "Blessenger")) {
+        self.directory = directory
         store = MessageStore(url: directory.appending(path: "messages.sqlite"))
     }
     func installBundledContacts() async {
@@ -24,7 +26,12 @@ final class MessagingModel: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
     func load() async {
-        do { state = try await store.snapshot() }
+        do {
+            state = try await store.snapshot()
+            if ProcessInfo.processInfo.environment["CALL_GEMMA_TEST_HOST"] != "1" {
+                WakeNameEnrollment.shared.update(state.contacts)
+            }
+        }
         catch { self.error = error.localizedDescription }
     }
     func save(_ contact: Persona) async {
@@ -33,7 +40,7 @@ final class MessagingModel: ObservableObject {
             var saved = contact
             if let path = contact.voice, path.hasPrefix("/") {
                 let source = URL(fileURLWithPath: path)
-                let destination = URL.applicationSupportDirectory.appending(path: "Blessenger/Media/Voices/" + contact.id.uuidString + "/" + source.lastPathComponent)
+                let destination = directory.appending(path: "Media/Voices/" + contact.id.uuidString + "/" + source.lastPathComponent)
                 if source != destination {
                     try await Task.detached(priority: .userInitiated) {
                         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)

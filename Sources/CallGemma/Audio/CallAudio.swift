@@ -340,7 +340,11 @@ private actor PreparedAudioEngine {
             AudioTrace.latency.duration("call.hardware_start", since: start)
             try Task.checkCancellation()
             let playerStart = LatencyTrace.now()
-            current.player.play()
+            if #available(macOS 27, iOS 27, *) {
+                try current.player.playAudio()
+            } else {
+                current.player.play()
+            }
             AudioTrace.latency.duration("call.player_start", since: playerStart)
             return current
         } catch { relay.bind(nil); release(); throw error }
@@ -561,9 +565,14 @@ final class CallAudio {
         }
     }
 
+    var qualificationRemainingFrames: Int { max(0, (captureOverride?.count ?? 0) - replayOffset) }
+
     func qualificationInject(_ samples: [Float], referenceEnd: Int? = nil) throws {
+        guard qualificationRemainingFrames == 0 else {
+            throw CallAudioError.unavailable("The previous audio fixture is still entering capture.")
+        }
         guard AppQualificationEnvironment.usesSyntheticInput, engine != nil,
-              replayOffset >= (captureOverride?.count ?? 0), samples.count <= 480_000,
+              samples.count <= 480_000,
               samples.allSatisfy(\.isFinite) else { throw CallAudioError.captureOverrun }
         if let referenceEnd, !(0..<samples.count).contains(referenceEnd) { throw CallAudioError.invalidVoice }
         captureSpeechEnds = referenceEnd.map { [$0] } ?? []

@@ -1,0 +1,58 @@
+import XCTest
+@testable import CallGemma
+
+final class WakeNameRoutingTests: XCTestCase {
+    func testUnsupportedSpeechCannotUseAnOverconfidentHead() throws {
+        let original = try WakeNameClassifier.train([
+            .init(text: "FRANCINE", label: "name"), .init(text: "FRAN SENE", label: "name"),
+            .init(text: "THANK YOU", label: "other"), .init(text: "PLEASE CONTINUE", label: "other")])
+        var weights = [Float](repeating: 0, count: original.weights.count)
+        let row = try XCTUnwrap(original.labels.firstIndex(of: "name"))
+        weights[(row + 1) * (original.vocabulary.count + 1) - 1] = 100
+        let head = WakeNameClassifier(vocabulary: original.vocabulary, idf: original.idf,
+            labels: original.labels, weights: weights, margin: original.margin, prototypes: original.prototypes)
+        XCTAssertEqual(try head.prediction("FRANCIN").label, "name")
+        XCTAssertEqual(try head.prediction("MY FRIEND CALLED THIS MORNING").label, "other")
+        XCTAssertEqual(try head.prediction("THE WEATHER WILL BE BETTER TOMORROW").label, "other")
+    }
+    func testExactGroupAddressWorksWithoutAnEnrolledHead() throws {
+        let peter = UUID(), gabor = UUID()
+        let names = [WakeNameModel.Name(id: peter, name: "Peter"), .init(id: gabor, name: "Gabor")]
+        let roster: Set<UUID> = [peter, gabor]
+        XCTAssertEqual(try WakeNameModel.recipient("Gabor can you answer", names: names, roster: roster, classifier: nil), gabor)
+        XCTAssertNil(try WakeNameModel.recipient("the gate is open", names: names, roster: roster, classifier: nil))
+        XCTAssertNil(try WakeNameModel.recipient("Peter and Gabor", names: names, roster: roster, classifier: nil))
+    }
+    private func model() throws -> WakeNameModel {
+        let head = try WakeNameClassifier.train([
+            .init(text: "PETER", label: "peter"), .init(text: "HEY PETER", label: "peter"),
+            .init(text: "HELLO THERE", label: "other"), .init(text: "THE HEATER IS RUNNING", label: "other")])
+        return WakeNameModel(fingerprint: "test", names: [.init(id: UUID(), name: "Peter"), .init(id: UUID(), name: "Ad de Jongh")], classifier: head, accepted: true)
+    }
+    func testCompleteNamesCannotSelectOutsideRosterOrResolveAmbiguousNames() throws {
+        let model = try model(), peter = model.names[0].id, ad = model.names[1].id
+        XCTAssertEqual(try model.recipient("HEY PETER", roster: [peter]), peter)
+        XCTAssertNil(try model.recipient("HEY PETER", roster: [ad]))
+        XCTAssertNil(try model.recipient("PETER AND AD DE JONGH", roster: [peter, ad]))
+        XCTAssertNil(try model.recipient("THE HEATER IS RUNNING", roster: [peter, ad]))
+        XCTAssertNil(try model.recipient("ADD SOME WATER", roster: [peter, ad]))
+        XCTAssertEqual(try model.recipient("AD DE JONGH", roster: [ad]), ad)
+    }
+}
+
+extension WakeNameRoutingTests {
+    @MainActor func testPausePreventsQueuedEnrollmentFromStarting() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let enrollment = WakeNameEnrollment(directory: directory)
+        let contact = Persona(name: "Test", prompt: "Test", wakeName: "Test")
+        enrollment.update([contact])
+        await enrollment.pause()
+        XCTAssertEqual(enrollment.state, .queued)
+        XCTAssertNil(enrollment.model)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+        enrollment.resume()
+        await enrollment.pause()
+        XCTAssertNil(enrollment.model)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+    }
+}

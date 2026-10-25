@@ -29,9 +29,17 @@ final class WakeCorpusQualificationTests: XCTestCase {
         let contacts = try JSONDecoder().decode([Persona].self, from: Data(contentsOf: contactsURL))
         // Partition conditioning sources BEFORE synthesizing or augmenting. Each
         // voice speaks every label, so speaker identity cannot predict the name.
-        let partitions = [("peter_levine", "train"), ("gabor_mate", "train"),
+        let challenge = ProcessInfo.processInfo.environment["CALL_GEMMA_WAKE_CHALLENGE"] == "1"
+        let partitions = challenge ? [("judith_herman", "test"), ("ad_de_jongh", "test")] : [("peter_levine", "train"), ("gabor_mate", "train"),
                           ("francine_shapiro", "validation"), ("judith_herman", "test")]
-        let negatives = ["Hello there.", "Thank you.", "Please continue.", "What do you think?",
+        let negatives = challenge ? ["I left my keys upstairs.", "The tea has gone cold.", "She smiled when I told her.",
+            "We were discussing her childhood.", "I worry about getting it wrong.", "Could you speak more slowly?",
+            "The ferry leaves at seven.", "My brother moved last year.", "This feels uncomfortable.",
+            "I disagree with that interpretation.", "The rain has stopped.", "My shoulders feel tense.",
+            "What should I notice first?", "I think I need some sleep.", "How does that fit together?",
+            "We have been working on boundaries.", "It reminds me of school.", "The road was closed.",
+            "I feel a little less anxious.", "I was afraid of being judged.", "My sister is on the telephone.",
+            "That is difficult to explain.", "I would rather wait until tomorrow.", "There was nobody in the room."] : ["Hello there.", "Thank you.", "Please continue.", "What do you think?",
             "I understand.", "Can you explain?", "Tell me more.", "Let me think.",
             "That makes sense.", "I am still here.", "A little better.", "Please repeat that.",
             "The vessel is empty.", "The heater is running.", "The gate is open.",

@@ -61,8 +61,8 @@ final class CallController: ObservableObject, MessageInference {
     private var profileDirectory: URL?
     private var profilePrompt: String?
     private var textSession: String?
-    private var textBusy = false
-    private var noteRecording: VoiceNoteRecording?
+    @Published private var textBusy = false
+    @Published private var noteRecording: VoiceNoteRecording?
     private var noteCaptureTask: Task<Void, Error>?
     @Published private(set) var playingVoiceNote: UUID?
     private var notePlaybackTask: Task<Void, Never>?
@@ -96,15 +96,19 @@ final class CallController: ObservableObject, MessageInference {
         let prefill: StreamingAudioInput?
         let handoff: Task<Void, Error>?
         var participant: UUID? = nil
+        var manualSelection = false
     }
     private var pendingUtterances: [PendingCallUtterance] = []
     private var speculativeEndpoint: SpeculativeEndpoint?
     private var responseEndpoint: SpeculativeEndpoint?
-    private var activeInput: (id: UUID, stream: StreamingAudioInput?, handoff: Task<Void, Error>?, participant: UUID?)?
+    private var activeInput: (id: UUID, stream: StreamingAudioInput?, handoff: Task<Void, Error>?, participant: UUID?, manualSelection: Bool)?
     private var responseInput: StreamingAudioInput?
     private var callRoster: CallRoster?
     private var sharedCallHistory: SharedCallHistory?
     private var requestedCallParticipant: UUID?
+    private let wakePhonetics = WakePhonetics()
+    private var callWakeModel: WakeNameModel?
+    private var wakeTasks: [UUID: Task<String, Error>] = [:]
     private var participantTasks: [UUID: Task<Void, Error>] = [:]
     @Published private(set) var activeCallParticipant: UUID?
     var callParticipants: [Persona] { callRoster?.participants ?? [] }
@@ -316,6 +320,7 @@ final class CallController: ObservableObject, MessageInference {
     }
 
     var qualificationPendingTurns: Int { pendingUtterances.count }
+    var qualificationRemainingFrames: Int { audio.qualificationRemainingFrames }
     var qualificationParticipantHandoffs: Int { participantTasks.count }
     var qualificationCallID: String { inCall ? callID.uuidString : "" }
     var qualificationResponding: Bool { responseTask != nil }
@@ -414,6 +419,8 @@ final class CallController: ObservableObject, MessageInference {
     }
 
     private func configureCallContact(_ contact: Persona, model: PreparedModel) async throws {
+        await WakeNameEnrollment.shared.pause(reason: "configuration")
+        defer { WakeNameEnrollment.shared.resume(reason: "configuration") }
         profileDirectory = directory.appending(path: "Contacts/" + contact.id.uuidString + "/Calls")
         profilePrompt = contact.prompt
         textSession = nil
@@ -427,12 +434,14 @@ final class CallController: ObservableObject, MessageInference {
         ready = true
     }
 
+    var wakeTrainingShouldPause: Bool { busy || inCall || textBusy || noteRecording != nil || playingVoiceNote != nil || isShuttingDown }
     var acceptsTextWork: Bool { !inCall && !textBusy && !isShuttingDown && noteRecording == nil && playingVoiceNote == nil }
 
     func startVoiceNoteRecording() async throws {
         guard acceptsTextWork else { throw GemmaError(message: "Audio is already in use.") }
         let recording = VoiceNoteRecording()
         noteRecording = recording
+        await WakeNameEnrollment.shared.pause(reason: "recording")
         do {
             let events = try await audio.start(recording: recording)
             noteCaptureTask = Task { for try await _ in events {} }
@@ -453,6 +462,7 @@ final class CallController: ObservableObject, MessageInference {
             try await noteCaptureTask?.value
             let file = try await recording.finish()
             noteRecording = nil
+            WakeNameEnrollment.shared.resume(reason: "recording")
             noteCaptureTask = nil
             return file
         } catch { await cancelVoiceNoteRecording(); throw error }
@@ -467,6 +477,7 @@ final class CallController: ObservableObject, MessageInference {
         await recording.cancel()
         noteCaptureTask = nil
         noteRecording = nil
+        WakeNameEnrollment.shared.resume(reason: "recording")
     }
 
     func toggleVoiceNote(_ message: ChatMessage, contact: Persona? = nil) {
@@ -489,6 +500,8 @@ final class CallController: ObservableObject, MessageInference {
         voiceNotePosition = 0; voiceNoteDuration = 0; voiceNotePaused = false
         notePCM = []; noteCursor = 0; noteSeek = nil; noteProduced = false
         notePlaybackTask = Task {
+            await WakeNameEnrollment.shared.pause(reason: "playback")
+            defer { WakeNameEnrollment.shared.resume(reason: "playback") }
             var producer: Task<Void, Error>?
             do {
                 if let attachment = message.attachments.first(where: { $0.kind == .audio }) {
@@ -591,6 +604,7 @@ final class CallController: ObservableObject, MessageInference {
             throw GemmaError(message: "Finish the active call or reply first.")
         }
         textBusy = true
+        await WakeNameEnrollment.shared.pause(reason: "text")
         if setupTask == nil, !ready { prepare(allowAvailableModel: true) }
         await setupTask?.value
         await configurationTask?.value
@@ -616,7 +630,7 @@ final class CallController: ObservableObject, MessageInference {
     }
 
     func persistTextReply(history: ConversationHistory) async throws {
-        defer { textBusy = false }
+        defer { textBusy = false; WakeNameEnrollment.shared.resume(reason: "text") }
         guard let files = textTranscript else { throw GemmaError(message: "No text conversation is active.") }
         do {
             let nativeJSON = try await runtime.history()
@@ -632,7 +646,7 @@ final class CallController: ObservableObject, MessageInference {
         } catch { textSession = nil; textHistory = nil; throw error }
     }
 
-    func abandonTextReply() { textSession = nil; textHistory = nil; textBusy = false }
+    func abandonTextReply() { textSession = nil; textHistory = nil; textBusy = false; WakeNameEnrollment.shared.resume(reason: "text") }
 
 
 
@@ -678,6 +692,7 @@ final class CallController: ObservableObject, MessageInference {
         if !audio.isRemote { ringback.start() }
         let pendingConfiguration = configurationTask
         callTask = Task {
+            await WakeNameEnrollment.shared.pause()
             await previous?.value
             guard inCall, callID == id, !Task.isCancelled else { return }
             if !ready, setupTask == nil { prepare(allowAvailableModel: true) }
@@ -687,6 +702,7 @@ final class CallController: ObservableObject, MessageInference {
             guard inCall, callID == id, !Task.isCancelled else { return }
             guard ready else {
                 inCall = false; dialing = false; ringback.stop(); callTask = nil
+                WakeNameEnrollment.shared.resume()
                 if audio.isRemote { audio.stop() }
                 return
             }
@@ -696,6 +712,7 @@ final class CallController: ObservableObject, MessageInference {
     }
 
     private func startCall(id: UUID) async {
+        callWakeModel = WakeNameEnrollment.shared.model
         audio.awaitPickup()
         audio.onFirstSpeech = { [weak self] in
             guard let self, self.inCall, self.callID == id else { return }
@@ -742,7 +759,7 @@ final class CallController: ObservableObject, MessageInference {
                                 // A prior endpoint is still waiting for recovery. Retain
                                 // this utterance, but do not open a competing native input.
                                 if !pendingUtterances.isEmpty {
-                                    activeInput = (inputID, nil, nil, requestedCallParticipant)
+                                    activeInput = (inputID, nil, nil, requestedCallParticipant, requestedCallParticipant != nil)
                                     requestedCallParticipant = nil
                                     continue
                                 }
@@ -767,7 +784,7 @@ final class CallController: ObservableObject, MessageInference {
                                     await response?.value
                                     try await handoff?.value
                                 }
-                                activeInput = (inputID, stream, handoff, nil)
+                                activeInput = (inputID, stream, handoff, nil, selected != nil)
                                 needsRecovery = true
                             }
                             guard activeInput?.id == inputID else { throw CheckpointError.invalidMetadata }
@@ -786,7 +803,8 @@ final class CallController: ObservableObject, MessageInference {
                             try enqueueUtterance(PendingCallUtterance(samples: samples, endpointNS: endpointNS, gate: gate,
                                 prefill: activeInput?.id == candidate ? activeInput?.stream : nil,
                                 handoff: activeInput?.id == candidate ? activeInput?.handoff : nil,
-                                participant: activeInput?.id == candidate ? activeInput?.participant : nil))
+                                participant: activeInput?.id == candidate ? activeInput?.participant : nil,
+                                manualSelection: activeInput?.id == candidate && activeInput?.manualSelection == true))
                             if responseTask != nil && !savingResponse { interruptResponse() }
                             launchPendingResponse()
                         case .confirmed(let candidate):
@@ -802,7 +820,8 @@ final class CallController: ObservableObject, MessageInference {
                         case .utterance(let samples, let endpointNS):
                             AudioTrace.signposter.emitEvent("Utterance complete")
                             try enqueueUtterance(PendingCallUtterance(samples: samples, endpointNS: endpointNS, gate: nil,
-                                prefill: activeInput?.stream, handoff: activeInput?.handoff, participant: activeInput?.participant))
+                                prefill: activeInput?.stream, handoff: activeInput?.handoff, participant: activeInput?.participant,
+                                manualSelection: activeInput?.manualSelection == true))
                             if responseTask != nil && !savingResponse { interruptResponse() }
                             launchPendingResponse()
                         }
@@ -873,6 +892,7 @@ final class CallController: ObservableObject, MessageInference {
                 }
             }
             var failureStage = "journal admission"
+            var prefill = utterance.prefill
             do {
                 AudioTrace.latency.mark(greeting ? "call.greeting" : "speech.endpoint_estimate", turn: id, at: utterance.endpointNS)
                 AudioTrace.latency.mark("turn.start", turn: id)
@@ -882,6 +902,39 @@ final class CallController: ObservableObject, MessageInference {
                     try await activateCallParticipant(participant, call: currentCall)
                 }
                 try await utterance.handoff?.value
+                if !greeting, !utterance.manualSelection, callParticipants.count > 1, utterance.participant == nil,
+                   utterance.handoff == nil {
+                    let started = LatencyTrace.now()
+                    let wakeID = UUID()
+                    let decoder = wakePhonetics
+                    let selection = Task { try await decoder.decode(utterance.samples) }
+                    wakeTasks[wakeID] = selection
+                    let decoded = (try? await selection.value) ?? ""
+                    wakeTasks.removeValue(forKey: wakeID)
+                    // A later speech start cancels the reply, not already
+                    // confirmed user input. Hang-up separately cancels this task.
+                    if utterance.gate?.inputConfirmed == false { try Task.checkCancellation() }
+                    guard inCall, callID == currentCall else { throw CancellationError() }
+                    let wakeNames = callParticipants.map { WakeNameModel.Name(id: $0.id, name: $0.wakeName) }
+                    if let recipient = try WakeNameModel.recipient(decoded, names: wakeNames,
+                        roster: Set(callParticipants.map(\.id)), classifier: callWakeModel?.classifier),
+                       recipient != activeCallParticipant {
+                        // Stop and join the old speculative input before replacing
+                        // its context. The retained complete PCM is admitted once to
+                        // the addressed participant; it is never lost or fed twice.
+                        await prefill?.cancel()
+                        prefill = nil
+                        let handoffID = UUID()
+                        let handoff = Task {
+                            defer { self.participantTasks.removeValue(forKey: handoffID) }
+                            try await self.activateCallParticipant(recipient, call: currentCall)
+                        }
+                        participantTasks[handoffID] = handoff
+                        try await handoff.value
+                        AudioTrace.latency.mark("wake.handoff", turn: id)
+                    }
+                    AudioTrace.latency.duration("wake.selection", since: started)
+                }
                 // A confirmed user input must reach the journal even if a new
                 // utterance has already cancelled its proposed response.
                 if greeting || utterance.gate?.inputConfirmed == false { try Task.checkCancellation() }
@@ -911,7 +964,7 @@ final class CallController: ObservableObject, MessageInference {
                     })
                 failureStage = "runtime turn admission"
                 let beginStart = LatencyTrace.now()
-                if let prefill = utterance.prefill {
+                if let prefill {
                     try await prefill.finish(expectedSamples: utterance.samples.count)
                 } else if let message = try await runtime.beginTurn() { notice = message }
                 try Task.checkCancellation()
@@ -1021,6 +1074,10 @@ final class CallController: ObservableObject, MessageInference {
         }
         busy = true
         requestedCallParticipant = nil
+        callWakeModel = nil
+        let selections = Array(wakeTasks.values)
+        for selection in selections { selection.cancel() }
+        wakeTasks.removeAll()
         let handoffs = Array(participantTasks.values)
         for handoff in handoffs { handoff.cancel() }
         pendingGreeting = false
@@ -1039,6 +1096,7 @@ final class CallController: ObservableObject, MessageInference {
         for pending in pendingInputs { await pending.prefill?.cancel() }
         activeInput = nil
         responseInput = nil
+        for selection in selections { _ = await selection.result }
         for handoff in handoffs { _ = await handoff.result }
         participantTasks.removeAll()
         activeCallParticipant = nil
@@ -1061,6 +1119,7 @@ final class CallController: ObservableObject, MessageInference {
             if !inCall { status = "Ready" }
         } catch { ready = false; if !inCall { status = "Call ended" }; notice = error.localizedDescription }
         busy = false
+        if !isShuttingDown, !inCall { WakeNameEnrollment.shared.resume() }
     }
 
     private func openJournal(model: PreparedModel) async throws {

@@ -100,12 +100,25 @@ enum AppQualificationBridge {
                     "outputMuted": AutomatedAudioOutput.volume == 0,
                     "endpoint": CallAudio.qualificationEndpointSettings,
                     "pendingTurns": controller.qualificationPendingTurns,
+                    "fixtureRemainingFrames": controller.qualificationRemainingFrames,
                     "participantHandoffs": controller.qualificationParticipantHandoffs,
                     "callID": controller.qualificationCallID,
                     "responding": controller.qualificationResponding,
                     "recovering": controller.qualificationRecovering,
                     "completedTurns": controller.qualificationCompletedTurns,
                     "jobs": jobs]
+        case "wake_status":
+            return ["status": WakeNameEnrollment.shared.help,
+                    "ready": WakeNameEnrollment.shared.model != nil,
+                    "fingerprint": WakeNameEnrollment.shared.model?.fingerprint ?? ""]
+        case "wake_retry": WakeNameEnrollment.shared.retry()
+        case "wake_pause": await WakeNameEnrollment.shared.pause()
+        case "wake_resume": WakeNameEnrollment.shared.resume()
+        case "set_wake_name":
+            guard let id = command.id, let text = command.text,
+                  var contact = model.state.contacts.first(where: { $0.id == id }) else { throw CheckpointError.invalidMetadata }
+            contact.wakeName = text
+            await model.save(contact)
         case "contacts":
             return ["contacts": model.state.contacts.map { ["id": $0.id.uuidString, "name": $0.name] }]
         case "create_chat":

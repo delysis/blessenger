@@ -24,6 +24,7 @@ struct BlessengerView: View {
     @State private var editing: Persona?
     @State private var newContact = false
     @State private var diagnostics = false
+    @State private var showingCall = false
     @State private var editingMembers = false
     @State private var draft = ""
     @State private var draftSelection: TextSelection?
@@ -54,6 +55,7 @@ struct BlessengerView: View {
     var body: some View {
         shell
         .task {
+            if controller.wakeTrainingShouldPause { await WakeNameEnrollment.shared.pause(reason: "activity") }
             await model.installBundledContacts(); await model.load()
             #if os(macOS)
             WebCompanion.shared.start(model: model, controller: controller)
@@ -61,10 +63,14 @@ struct BlessengerView: View {
             await model.resumePending(controller: controller)
             await AppQualificationBridge.run(controller: controller, model: model)
         }
+        .onChange(of: controller.wakeTrainingShouldPause) { _, occupied in
+            Task { if occupied { await WakeNameEnrollment.shared.pause(reason: "activity") } else { WakeNameEnrollment.shared.resume(reason: "activity") } }
+        }
         .focusedSceneValue(\.showDiagnostics, { diagnostics = true })
         .focusedSceneValue(\.createContact, { newContact = true })
         .focusedSceneValue(\.createConversation, { beginComposition() })
         .onChange(of: controller.inCall) { _, active in
+            showingCall = active
             if !active { Task { await model.resumePending(controller: controller) } }
         }
         .onChange(of: controller.playingVoiceNote) { _, playing in
@@ -94,9 +100,8 @@ struct BlessengerView: View {
                 } catch { model.error = error.localizedDescription }
             }
         }
-        .sheet(isPresented: Binding(get: { controller.inCall }, set: { _ in })) {
+        .sheet(isPresented: $showingCall) {
             NativeCallSheet(controller: controller)
-                .interactiveDismissDisabled()
         }
         .sheet(isPresented: $newContact) {
             ContactEditor(contact: Persona(name: "", prompt: PromptChoice.everyday.text)) { contact in
@@ -312,7 +317,7 @@ struct BlessengerView: View {
     }
 
     private func call() {
-        if controller.inCall { controller.toggleCall() }
+        if controller.inCall { showingCall = true }
         else if let thread, let contact = ConversationRouting.initialResponder(in: thread, state: model.state) {
             let participants = thread.participants.compactMap { id in model.state.contacts.first { $0.id == id } }
             controller.dial(participants: participants, initialSpeaker: contact.id, memoryStore: model.store)
@@ -321,12 +326,12 @@ struct BlessengerView: View {
 
     private var callButton: some View {
                     Button(action: call) {
-                        Image(systemName: controller.inCall ? "phone.down.fill" : "phone.fill")
-                            .foregroundStyle(controller.inCall ? .red : thread == nil ? .gray : .green)
+                        Image(systemName: controller.inCall ? "phone.badge.waveform.fill" : "phone.fill")
+                            .foregroundStyle(controller.inCall ? .green : thread == nil ? .gray : .green)
                     }
-                    .disabled(thread == nil || !model.generating.isEmpty)
-                    .help(controller.inCall ? "End call" : "Call")
-                    .accessibilityLabel(controller.inCall ? "End call" : "Call")
+                    .disabled(!controller.inCall && (thread == nil || !model.generating.isEmpty))
+                    .help(controller.inCall ? "Show call" : "Call")
+                    .accessibilityLabel(controller.inCall ? "Show call" : "Call")
     }
 
     @ViewBuilder private var compositionHeader: some View {
@@ -711,6 +716,7 @@ private struct ContactEditor: View {
     @State var contact: Persona
     let save: (Persona) -> Void
     @StateObject private var voice = VoiceSampleEditorModel()
+    @ObservedObject private var wakeNames = WakeNameEnrollment.shared
     @State private var preview: AVAudioPlayer?
     @State private var photo = false
     @State private var choosingVoice = false
@@ -734,7 +740,16 @@ private struct ContactEditor: View {
                 .popover(isPresented: $photo, arrowEdge: .leading) { ContactPhotoEditor(current: contact.avatar) { contact.avatar = $0 } }
                 VStack(spacing: 10) {
                     TextField("Name", text: $contact.name).font(.title2.weight(.medium))
-                    TextField("Wake name", text: $contact.wakeName).accessibilityLabel("Wake name").help("Name used to address this contact in group calls")
+                    HStack {
+                        TextField("Wake name", text: $contact.wakeName).accessibilityLabel("Wake name").help("Name used to address this contact in group calls")
+                        switch wakeNames.state {
+                        case .training, .queued: ProgressView().controlSize(.mini).help(wakeNames.help).accessibilityLabel(wakeNames.help)
+                        case .ready: Image(systemName: "checkmark.circle").foregroundStyle(.secondary).help(wakeNames.help).accessibilityLabel(wakeNames.help)
+                        case .rejected: Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary).help(wakeNames.help).accessibilityLabel(wakeNames.help)
+                        case .failed: Button { wakeNames.retry() } label: { Image(systemName: "arrow.clockwise.circle") }.buttonStyle(.plain).help(wakeNames.help).accessibilityLabel(wakeNames.help)
+                        case .idle: EmptyView()
+                        }
+                    }
                 }.textFieldStyle(.plain).multilineTextAlignment(.leading)
             }
             TextEditor(text: $contact.prompt)
@@ -790,7 +805,8 @@ private struct ContactEditor: View {
         .presentationBackground(.regularMaterial)
         .interactiveDismissDisabled(saving || voice.recording)
         .onAppear { voice.name = contact.voiceLabel ?? contact.voice.map { $0.hasPrefix("/") ? "Custom" : BlessengerResources.label($0) } ?? "" }
-        .onDisappear { preview?.stop(); voice.close() }
+        .task { await wakeNames.pause(reason: "contact-editor") }
+        .onDisappear { preview?.stop(); voice.close(); wakeNames.resume(reason: "contact-editor") }
         .fileImporter(isPresented: $choosingVoice, allowedContentTypes: [.audio]) { result in
             do { let url = try result.get(); Task { await voice.load(url) } }
             catch { voice.error = error.localizedDescription }
@@ -1038,6 +1054,8 @@ private struct CallDiagnosticsView: View {
 /// Presentation observes call state; dismissing a sheet never owns audio teardown.
 private struct NativeCallSheet: View {
     @ObservedObject var controller: CallController
+    @Environment(\.dismiss) private var dismiss
+    private var group: Bool { controller.callParticipants.count > 1 }
     private var active: Persona? {
         controller.callParticipants.first { $0.id == controller.activeCallParticipant }
             ?? controller.callParticipants.first
@@ -1046,7 +1064,12 @@ private struct NativeCallSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
-            if let active {
+            if group {
+                Text(controller.callParticipants.map(\.name).joined(separator: ", "))
+                    .font(.title2.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+            } else if let active {
                 ContactAvatar(value: active.avatar, size: 120)
                     .shadow(color: .black.opacity(0.25), radius: 18, y: 8)
                     .padding(.bottom, 22)
@@ -1065,27 +1088,32 @@ private struct NativeCallSheet: View {
             }
             .font(.system(size: 15)).foregroundStyle(.secondary)
             .frame(height: 22).padding(.top, 8)
-            if controller.callParticipants.count > 1 {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 16) {
+            if group {
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 20),
+                                             count: min(3, controller.callParticipants.count)), spacing: 20) {
                         ForEach(controller.callParticipants) { contact in
+                            let selected = contact.id == controller.activeCallParticipant
                             Button { controller.requestCallParticipant(contact.id) } label: {
-                                VStack(spacing: 6) {
-                                    ContactAvatar(value: contact.avatar, size: 40)
-                                        .overlay(Circle().stroke(contact.id == controller.activeCallParticipant ? Color.white : .clear, lineWidth: 2).padding(-3))
-                                    Text(contact.name.components(separatedBy: " ").first ?? contact.name)
-                                        .font(.caption).lineLimit(1)
-                                }.padding(5)
+                                VStack(spacing: 10) {
+                                    ContactAvatar(value: contact.avatar, size: 80)
+                                        .overlay(Circle().stroke(selected ? Color.accentColor : .clear, lineWidth: 3).padding(-5))
+                                    Text(ConversationRouting.displayLabel(contact, contacts: controller.callParticipants))
+                                        .font(.headline).lineLimit(2)
+                                    Image(systemName: selected && controller.status == "Speaking" ? "waveform" : "speaker.wave.2")
+                                        .foregroundStyle(.secondary)
+                                        .opacity(selected && controller.status == "Speaking" ? 1 : 0)
+                                }.frame(maxWidth: .infinity).padding(8)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Speak to " + contact.name)
+                            .accessibilityValue(selected ? "Selected" : "")
                             .help("Choose the recipient of your next spoken turn")
                         }
-                    }.padding(.horizontal, 16).padding(.vertical, 8)
+                    }.padding(20)
                 }
                 .scrollIndicators(.hidden)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 24)
+                .padding(.top, 16)
             }
             Spacer(minLength: 32)
             HStack(spacing: 32) {
@@ -1108,10 +1136,15 @@ private struct NativeCallSheet: View {
                 }
                 .buttonStyle(.glassProminent).buttonBorderShape(.circle).tint(.red)
                 .help("End call").accessibilityLabel("End call")
-                .keyboardShortcut(.cancelAction)
-            }.padding(.bottom, 36)
+            }.padding(.bottom, 28)
         }
-        .frame(width: 360, height: controller.callParticipants.count > 1 ? 470 : 410)
+        .frame(width: group ? 420 : 360, height: group ? 400 : 410)
+        .overlay(alignment: .topLeading) {
+            Button { dismiss() } label: { Image(systemName: "chevron.down").frame(width: 28, height: 28) }
+                .buttonStyle(.glass).buttonBorderShape(.circle)
+                .help("Minimize call").accessibilityLabel("Minimize call")
+                .keyboardShortcut(.cancelAction).padding(12)
+        }
         .presentationBackground(.regularMaterial)
     }
 }

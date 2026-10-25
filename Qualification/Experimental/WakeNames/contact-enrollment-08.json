@@ -1,0 +1,125 @@
+{
+  "scope": "Native on-device enrollment experiments; no automatic group-call or human speaker acceptance.",
+  "experiments": [
+    {
+      "name": "catalog-training-01",
+      "sha256": "b6876301b59710b30cd61ff66ff1f6a4f7ce26baf192d34372f3b155b44e7ca3",
+      "validation": {
+        "clips": 1020,
+        "correct": 104,
+        "falseActivations": 0,
+        "negatives": 48,
+        "positives": 112,
+        "wrong": 0
+      },
+      "accepted": false
+    },
+    {
+      "name": "catalog-training-02",
+      "sha256": "5e368e8d20c2c9fa797b5699d62b8f8fcef0d42fcac569b3d25e3936459a9b2f",
+      "validation": {
+        "clips": 1020,
+        "correct": 104,
+        "falseActivations": 0,
+        "negatives": 48,
+        "positives": 112,
+        "wrong": 0
+      },
+      "accepted": false
+    },
+    {
+      "name": "catalog-training-03",
+      "sha256": "57bd11b88fd39459fc546087845cdfff31ee7c1b3847a6cdec6b83551b1e4a04",
+      "validation": {
+        "clips": 1020,
+        "correct": 107,
+        "falseActivations": 0,
+        "negatives": 48,
+        "positives": 112,
+        "wrong": 1
+      },
+      "accepted": false
+    },
+    {
+      "run": "catalog-training-04",
+      "receipt": {
+        "clips": 1020,
+        "correct": 110,
+        "falseActivations": 2,
+        "negatives": 48,
+        "positives": 112,
+        "wrong": 0
+      },
+      "accepted": false
+    },
+    {
+      "run": "catalog-training-05",
+      "receipt": {
+        "clips": 1020,
+        "correct": 110,
+        "falseActivations": 0,
+        "negatives": 48,
+        "positives": 112,
+        "wrong": 0
+      },
+      "accepted": true
+    }
+  ],
+  "independent_test": {
+    "clips": 0,
+    "correct": 105,
+    "falseActivations": 2,
+    "negatives": 48,
+    "positives": 112,
+    "wrong": 0
+  },
+  "retained_post_aec": {
+    "detections": [],
+    "scope": "Retained post-AEC capture; not a new live speaker check",
+    "seconds": 5.898625,
+    "windows": 6
+  },
+  "candidate_selection": "v6 requires edit-distance support from original acoustic training examples in addition to softmax margin. Native validation: 110/112, no wrong names, no false activations. Unfamiliar-voice test: 106/112, no wrong names, no false activations; below the 95% target.",
+  "remaining": [
+    "Six unfamiliar-voice misses (106/112; zero wrong names and ordinary-speech false activations)",
+    "Physical-speaker interruption and one retained post-AEC window selecting Peter; ambient speech uncontrolled",
+    "Underlying no-IO-cycle hardware startup condition; newer error-returning playback API now used",
+    "Minimize/reopen UI interaction still blocked by locked Mac"
+  ],
+  "latest_independent_test": {
+    "clips": 160,
+    "correct": 106,
+    "falseActivations": 0,
+    "negatives": 48,
+    "positives": 112,
+    "wrong": 0
+  },
+  "latest_retained_microphone": {
+    "detections": [
+      "9.0:51F43A46-D1AB-5F92-A9B1-E08CCBD61C82"
+    ],
+    "scope": "Post-AEC recording from automated physical-speaker attempt. Ambient speech was uncontrolled; one routing activation, not evidence of echo cancellation acceptance.",
+    "seconds": 23.4773125,
+    "windows": 41
+  },
+  "native_checks": {
+    "wakeRoutingTests": 4,
+    "repeatedPhysicalGraph": "Three calls passed after using error-returning playback start API",
+    "failurePreserved": "Earlier full run crashed in deprecated play() with player did not see an IO cycle. No claim that the underlying device startup failure is fixed."
+  },
+  "actual_app": {
+    "passed": true,
+    "checks": [
+      "Validated approximate enrollment loaded",
+      "12B group greeting completed",
+      "Correct recipient after Could you speak more slowly?",
+      "Correct recipient after Hey Gabor.",
+      "Correct recipient after Hey Peter.",
+      "Named interruption completed and call stayed connected",
+      "Explicit hang-up released the call",
+      "Repeated group call and reverse handoff completed"
+    ],
+    "error": null,
+    "scope": "Actual packaged 12B app, held-out synthetic speaker at device rate, muted output; no physical echo or human barge-in claim"
+  }
+}

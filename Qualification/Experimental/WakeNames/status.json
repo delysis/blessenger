@@ -98,5 +98,16 @@
     "test_negatives": 21,
     "accepted": false,
     "next": "Automatic corpus generation with contact voices; stronger negative speech coverage and held-out natural speech before routing integration"
+  },
+  "contact_voice_corpus_07": {
+    "receipt": "contact-voices-07.json",
+    "generation": "Native repaired PocketTTS, silent local synthesis, conditioning PCM hashes split before synthesis",
+    "test_correct": 48,
+    "test_positive": 56,
+    "test_wrong_names": 0,
+    "test_false_activations": 0,
+    "test_negatives": 24,
+    "app_enabled": false,
+    "remaining": "Unseen negative phrases, natural speech, streaming and post-AEC false activation checks; automatic app enrollment not integrated"
   }
 }

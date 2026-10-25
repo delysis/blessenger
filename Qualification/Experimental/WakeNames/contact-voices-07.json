@@ -1,0 +1,37 @@
+{
+  "appEnabled": false,
+  "scope": "Native CPU phonetic decoding and Swift logistic head; synthetic held-out voices only. No microphone, streaming-prefix or speaker-echo acceptance.",
+  "test": {
+    "correctNames": 48,
+    "falseActivations": 0,
+    "missedNames": 8,
+    "negatives": 24,
+    "wrongNames": 0
+  },
+  "trainingSeconds": 0.0667039155960083,
+  "validation": {
+    "correctNames": 54,
+    "falseActivations": 0,
+    "missedNames": 2,
+    "negatives": 24,
+    "wrongNames": 0
+  },
+  "corpus": {
+    "clips": 320,
+    "trainingVoices": [
+      "peter_levine",
+      "gabor_mate"
+    ],
+    "validationVoice": "francine_shapiro",
+    "testVoice": "judith_herman",
+    "generationSeconds": 44.11,
+    "negativePhraseOverlap": true
+  },
+  "decision": "Not enabled: eight missed names, overlapping phrase inventory, no natural speech or post-AEC qualification",
+  "reproducibility": {
+    "runs": 2,
+    "identicalPCMClips": 320,
+    "completeClipsPerRun": 320
+  },
+  "featureMedianMilliseconds": 18.81
+}

@@ -26,7 +26,33 @@ from this baseline and never reads the held-out test unless explicitly selected.
 The training tool accepts `TRAIN_VALIDATION_JSON TEST_JSON NEW_OUTPUT_DIRECTORY`.
 Its model remains local; only aggregate receipts belong in the repository.
 
-The current corpus uses system synthetic voices. Automatic generation from the
-contact voices is the requested next step, not a completed capability. Keep
+The original corpus used system synthetic voices. The contact-voice experiment
+below adds native synthesis; automatic app enrollment remains unfinished. Keep
 training and model preparation out of capture, generation, and playback. No
 trained head may be connected to live routing based solely on this experiment.
+
+## Contact-voice corpus
+
+`WakeCorpusQualificationTests/testGenerateContactVoiceCorpus` generates silent
+16 kHz WAVs through the repaired native PocketTTS exports. It uses bundled
+contacts only, never private user contact storage. Each conditioning voice says
+all 14 names and the same 24 non-name phrases. Peter and Gabor train; Francine
+validates; Judith is held out. Conditioning PCM hashes are checked for overlap,
+seeds and source hashes are retained, and partial corpora have no COMPLETE marker.
+There is no microphone or audio playback graph.
+
+After a normal signed `xcodebuild build-for-testing`, run:
+
+```sh
+python3 Tools/WakeNames/generate-contact-corpus.py \
+  /path/to/Build/Products/CallGemma_macosx27.0-arm64.xctestrun \
+  /path/to/new-evidence-directory
+```
+
+The first corpus generated 320 clips in 44.110 seconds. With the unchanged
+classifier and margin, held-out Judith speech scored 48/56 names, eight misses,
+zero wrong names and zero false activations in 24 negatives. See
+`Qualification/Experimental/WakeNames/contact-voices-07.json`. The negative
+phrases overlap training: this measures voice generalization, not unseen-language
+false activation. This candidate remains disabled. Automatic enrollment in the
+contact editor, unseen speech, post-AEC playback and live routing are unfinished.

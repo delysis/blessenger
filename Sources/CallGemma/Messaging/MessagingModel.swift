@@ -20,7 +20,7 @@ final class MessagingModel: ObservableObject {
                 try JSONDecoder().decode([Persona].self, from: Data(contentsOf: url))
             }.value
             try await store.installBundledContacts(contacts)
-            try await store.consolidateDirectChats()
+            try await store.consolidateChats()
         } catch { self.error = error.localizedDescription }
     }
     func load() async {

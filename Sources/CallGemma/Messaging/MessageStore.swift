@@ -269,8 +269,13 @@ actor MessageStore {
         let state = try snapshot()
         let existing = Set(state.contacts.map(\.id))
         let newContacts = contacts.filter { !existing.contains($0.id) }
-        guard !newContacts.isEmpty else { return }
+        let wakeUpdates = state.contacts.compactMap { old -> Persona? in
+            guard old.wakeName == "Ad", contacts.contains(where: { $0.id == old.id && $0.wakeName == "Ad de Jongh" }) else { return nil }
+            var updated = old; updated.wakeName = "Ad de Jongh"; return updated
+        }
+        guard !newContacts.isEmpty || !wakeUpdates.isEmpty else { return }
         try transaction {
+            for contact in wakeUpdates { try write(contact, kind: "contact", id: contact.id) }
             for (index, contact) in newContacts.enumerated() {
                 try write(contact, kind: "contact", id: contact.id)
                 // Empty direct chats make the supplied roster available in the sidebar.
@@ -295,12 +300,16 @@ actor MessageStore {
         }
         try transaction { try write(thread, kind: "thread", id: thread.id) }
     }
-    /// Resolve direct-chat identity inside the storage actor, including callers
+    /// Resolve conversation identity inside the storage actor, including callers
     /// whose presentation snapshot is stale. Names are not identities.
     func createChat(_ proposed: ChatThread) throws -> UUID {
-        if proposed.participants.count == 1, let contact = proposed.participants.first,
-           let existing = try snapshot().threads.first(where: {
-               $0.deleted != true && $0.participants == [contact]
+        let participants = Set(proposed.participants)
+        guard !participants.isEmpty, participants.count == proposed.participants.count,
+              try participants.allSatisfy({ try read(Persona.self, kind: "contact", id: $0) != nil }) else {
+            throw GemmaError(message: "A conversation needs valid, distinct contacts.")
+        }
+        if let existing = try snapshot().threads.first(where: {
+               $0.deleted != true && Set($0.participants) == participants
            }) {
             return existing.id
         }
@@ -308,18 +317,18 @@ actor MessageStore {
         return proposed.id
     }
 
-    /// Repair earlier duplicate direct chats without discarding messages or work.
+    /// Repair duplicate participant sets without discarding messages or work.
     /// Tombstones and durable move events retain the original identities.
-    func consolidateDirectChats() throws {
+    func consolidateChats() throws {
         let state = try snapshot(includeDeletedMessages: true)
         let groups = Dictionary(grouping: state.threads.filter {
-            $0.deleted != true && $0.participants.count == 1
-        }, by: { $0.participants[0] })
+            $0.deleted != true && !$0.participants.isEmpty
+        }, by: { Set($0.participants) })
         let duplicates = groups.filter { $0.value.count > 1 }
         guard !duplicates.isEmpty else { return }
         try transaction {
-            for (contact, threads) in duplicates {
-                var canonical = threads.first(where: { $0.id == contact })
+            for (participants, threads) in duplicates {
+                var canonical = threads.first(where: { participants.count == 1 && participants.contains($0.id) })
                     ?? threads.min(by: { $0.id.uuidString < $1.id.uuidString })!
                 let others = threads.filter { $0.id != canonical.id }
                 let oldIDs = Set(others.map(\.id))

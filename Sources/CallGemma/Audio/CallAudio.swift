@@ -347,6 +347,9 @@ private actor PreparedAudioEngine {
     }
     func stopWhenIdle() {
         relay.bind(nil)
+        // A drained player still owns its timeline. Reset it before rebuilding
+        // VoiceProcessingIO so the next call cannot schedule onto that old clock.
+        configured?.player.stop()
         // Stopping render resources alone does not remove system ducking.
         configured?.engine.stop()
         do {

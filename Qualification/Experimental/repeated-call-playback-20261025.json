@@ -1,0 +1,25 @@
+{
+  "issue": "Playback stalls after a fully drained call when VoiceProcessingIO is reused",
+  "cause": "Player timeline was not reset when idle teardown stopped and reconfigured the engine; queued-buffer cancellation reset only nonempty playback.",
+  "fix": "Stop AVAudioPlayerNode before stopping the engine in serialized idle teardown.",
+  "before": {
+    "physicalGraphTest": "Failed at zero-based trial 1 (second call), playback drain deadline",
+    "packaged12BApp": "Repeated greeting stuck Speaking with queued PCM; repeated without training running"
+  },
+  "after": {
+    "physicalGraphTest": "Three consecutive starts deliver all 1920 frames and drain",
+    "packaged12BApp": {
+      "passed": true,
+      "checks": [
+        "Rejected enrollment cannot enable automatic routing",
+        "12B group greeting completed",
+        "Manual group handoff admitted complete speech and finished a reply",
+        "Hang-up released group call",
+        "Repeated pickup and hang-up, no duplicate group"
+      ],
+      "scope": "Actual packaged 12B app with synthetic input and muted output. Automatic name routing rejected; manual group path only. Mac locked, no visual/acoustic acceptance."
+    },
+    "repeatedGreetings": true
+  },
+  "limits": "Synthetic capture and muted output in packaged app. No listening or speaker-echo acceptance."
+}

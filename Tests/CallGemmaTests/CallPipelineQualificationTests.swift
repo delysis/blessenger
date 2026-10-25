@@ -263,3 +263,40 @@ final class AudioPrewarmQualificationTests: XCTestCase {
         try JSONSerialization.data(withJSONObject: receipt, options: [.prettyPrinted, .sortedKeys]).write(to: url)
     }
 }
+
+extension CallPipelineQualificationTests {
+    @MainActor func testRepeatedCallsDeliverPlaybackAfterGraphReuse() async throws {
+        guard ProcessInfo.processInfo.environment["CALL_GEMMA_AUDIO_QUALIFICATION"] != nil else {
+            throw XCTSkip("Opt-in physical audio graph qualification")
+        }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else { throw XCTSkip("Microphone permission unavailable") }
+        let audio = CallAudio(captureOverride: [])
+        do {
+            for trial in 0..<3 {
+                let stream = try await audio.start()
+                let consumer = Task { for try await _ in stream {} }
+                let segment = UUID()
+                audio.beginPlaybackResponse(UUID())
+                try audio.beginPlaybackSegment(segment, text: "Playback after graph reuse")
+                try await audio.play([Float](repeating: 0, count: 1920), firstFrameOfSentence: true, segment: segment)
+                try audio.finishPlaybackSegment(segment)
+                let playback = Task { @MainActor in try await audio.drainPlayback() }
+                let deadline = Task { @MainActor in
+                    try await Task.sleep(for: .seconds(3))
+                    playback.cancel()
+                }
+                do { try await playback.value; deadline.cancel() }
+                catch {
+                    deadline.cancel()
+                    throw CallAudioError.unavailable("Playback did not drain after graph reuse, trial \(trial): \(error)")
+                }
+                XCTAssertEqual(audio.playbackPosition(), 1920, "Capture alone does not establish playback health")
+                audio.stop()
+                await audio.settleAudio()
+                consumer.cancel()
+                _ = await consumer.result
+            }
+        } catch { await audio.shutdownAudio(); throw error }
+        await audio.shutdownAudio()
+    }
+}

@@ -39,7 +39,17 @@ struct SharedCallHistory: Sendable {
               let start = offsets[outgoing] else { throw CheckpointError.invalidMetadata }
         let history = try ConversationHistory(json: TranscriptFiles(directory: source).load()?.historyJSON ?? "[]")
         guard start <= history.messages.count else { throw CheckpointError.invalidMetadata }
-        entries += history.messages.dropFirst(start).map { Entry(speaker: outgoing, message: $0) }
+        for data in history.messages.dropFirst(start) {
+            let message = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let parts = message?["content"] as? [[String: Any]]
+            let marker = parts?.first?["text"] as? String
+            // Call setup and imported context are control records, not speech.
+            // In particular, do not tell the incoming persona that the outgoing
+            // persona's roster identity is "you" by replaying its pickup event.
+            if message?["role"] as? String == "user",
+               marker == HeardTurnJournal.incomingCallMarker || marker == Self.marker { continue }
+            entries.append(Entry(speaker: outgoing, message: data))
+        }
         offsets[outgoing] = history.messages.count
         let unseen = entries.dropFirst(delivered[incoming] ?? 0).filter { $0.speaker != incoming }
         if !unseen.isEmpty {

@@ -42,6 +42,27 @@ final class RelationshipMemoryTests: XCTestCase {
         XCTAssertEqual(try ConversationHistory(json: XCTUnwrap(bf.load()).historyJSON), bh)
     }
 
+    func testSharedCallDoesNotReplayPickupInstructionsAsSpeech() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let a = UUID(), b = UUID()
+        let af = TranscriptFiles(directory: root.appending(path: "a"))
+        let bf = TranscriptFiles(directory: root.appending(path: "b"))
+        var shared = try SharedCallHistory(call: UUID(), participants: [
+            .init(contact: a, name: "Peter", transcriptDirectory: af.directory),
+            .init(contact: b, name: "Gabor", transcriptDirectory: bf.directory)])
+        let setup = try JSONSerialization.data(withJSONObject: ["role": "user", "content": [
+            ["type": "text", "text": HeardTurnJournal.incomingCallMarker],
+            ["type": "text", "text": "PRIVATE_PICKUP_INSTRUCTION"]]])
+        let h = try ConversationHistory(json: "[]").appending(userJSON: String(decoding: setup, as: UTF8.self), heardText: "Hello from Peter")
+        try af.commit(history: h, turn: UUID())
+        try shared.handoff(from: a, to: b)
+        let imported = try XCTUnwrap(bf.load()).historyJSON
+        XCTAssertTrue(imported.contains("Hello from Peter"))
+        XCTAssertFalse(imported.contains("PRIVATE_PICKUP_INSTRUCTION"))
+        XCTAssertFalse(imported.contains(HeardTurnJournal.incomingCallMarker))
+    }
+
     @MainActor
     func testMicrophoneTelemetryDoesNotInvalidateMessagingScreen() {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)

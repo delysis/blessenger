@@ -322,6 +322,7 @@ final class CallController: ObservableObject, MessageInference {
     var qualificationPendingTurns: Int { pendingUtterances.count }
     var qualificationRemainingFrames: Int { audio.qualificationRemainingFrames }
     var qualificationParticipantHandoffs: Int { participantTasks.count }
+    var qualificationCallWakeFingerprint: String { callWakeModel?.fingerprint ?? "" }
     var qualificationCallID: String { inCall ? callID.uuidString : "" }
     var qualificationResponding: Bool { responseTask != nil }
     var qualificationRecovering: Bool { interruptionTask != nil }

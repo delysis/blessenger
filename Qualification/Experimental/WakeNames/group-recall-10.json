@@ -1,0 +1,201 @@
+{
+  "scope": "Packaged 12B automated group recall, not physical-speaker acceptance",
+  "priorAttempts": [
+    {
+      "run": "group-recall-v8-11",
+      "passed": false,
+      "limitation": "Called before enrollment was loaded; no frozen wake fingerprint was checked. Later exact Peter mention overrode Gabor address.",
+      "preserved": true
+    },
+    {
+      "run": "group-recall-v8-12",
+      "passed": false,
+      "limitation": "Gabor request stayed with Peter in exact-name fallback. Same-person recall was explicitly rejected as group evidence.",
+      "preserved": true
+    },
+    {
+      "run": "group-recall-v8-13",
+      "passed": true,
+      "scope": "Manual participant selection isolated shared memory. Peter chose Axolotl; Gabor recalled Axolotl. Not automatic-name acceptance."
+    }
+  ],
+  "namedRecall": {
+    "passed": true,
+    "error": null,
+    "checks": [
+      "Packaged 12B call froze the accepted wake model",
+      "Gabor recalled the animal Peter actually chose",
+      "Peter recalled the instrument Gabor actually chose",
+      "Hang-up completed; reverse roster reused the group",
+      "No failed turn hidden by later recovery"
+    ],
+    "answers": [
+      {
+        "contact": "51F43A46-D1AB-5F92-A9B1-E08CCBD61C82",
+        "fixture": "animal-choice.wav",
+        "reply": "Axolotl."
+      },
+      {
+        "contact": "A9D82286-78A6-5CF4-96CA-E870242ED744",
+        "fixture": "animal-recall.wav",
+        "reply": "Peter chose an axolotl. It's a fascinating creature that spends much of its life in a state of perpetual regeneration."
+      },
+      {
+        "contact": "A9D82286-78A6-5CF4-96CA-E870242ED744",
+        "fixture": "instrument-choice.wav",
+        "reply": "Theremin"
+      },
+      {
+        "contact": "51F43A46-D1AB-5F92-A9B1-E08CCBD61C82",
+        "fixture": "instrument-recall.wav",
+        "reply": "He chose the theremin. It's a very unique instrument because it's played without any physical contact."
+      }
+    ],
+    "fixtures": [
+      {
+        "key": "animal-choice",
+        "text": "Peter, choose one unusual animal. Say only its name.",
+        "sha256": "f444c80dd2ca7034dd876eaf1970fd2b5886e61aaa22ba89d211bdbcc0240ab3"
+      },
+      {
+        "key": "animal-recall",
+        "text": "Gabor, what animal did Peter just choose?",
+        "sha256": "2f69e94b6c5123ef070c936e0aa770515225f1ca7a44fe78bda06cdbb210414f"
+      },
+      {
+        "key": "instrument-choice",
+        "text": "Gabor, choose one unusual musical instrument. Say only its name.",
+        "sha256": "48f44fca12443872fecdbb50a33a7dbb7a50db3bb9875250b518c43435ec41f5"
+      },
+      {
+        "key": "instrument-recall",
+        "text": "Peter, what musical instrument did Gabor just choose?",
+        "sha256": "9532cca0a7b97e05fca54d3d1a0485bb4f64a49a0004beba2a1bd3c4d347028e"
+      }
+    ],
+    "scope": "Packaged 12B app; unfamiliar synthesized speech, muted output. No physical echo acceptance."
+  },
+  "retainedUnfamiliarDecodes": {
+    "correct": 107,
+    "positives": 112,
+    "wrong": 0,
+    "falseActivations": 0,
+    "negatives": 48,
+    "misses": 5
+  },
+  "decoderComparison": [
+    {
+      "model": "Wav2VecAligner.mlpackage",
+      "file": "group-recall-repeat.wav",
+      "decode": "GABORE WHAT ANIMAL WAS JUST CHOSEN",
+      "seconds": 0.07472591602709144
+    },
+    {
+      "model": "Wav2VecAligner.mlpackage",
+      "file": "group-recall-gabor.wav",
+      "decode": "GABORE WHAT ANIMAL DID PETER JUST CHOOSE REPEAT HIS CHOICE NOT A NEW ANIMAL",
+      "seconds": 0.06635500001721084
+    },
+    {
+      "model": "Wav2VecAlignerInt8.mlpackage",
+      "file": "group-recall-repeat.wav",
+      "decode": "GABORE WHAT ANIMAL WAS JUST CHOSEN",
+      "seconds": 0.058173959027044475
+    },
+    {
+      "model": "Wav2VecAlignerInt8.mlpackage",
+      "file": "group-recall-gabor.wav",
+      "decode": "GABORE WHAT ANIMAL DID PETER JUST CHOOSE REPEAT HIS CHOICE NOT A NEW ANIMAL",
+      "seconds": 0.06217845797073096
+    }
+  ],
+  "remaining": [
+    "Five unfamiliar-voice misses remain",
+    "No new physical speaker echo or human barge-in acceptance"
+  ],
+  "sameFrameRevocation": {
+    "run": "group-recall-v9-14",
+    "observed": true,
+    "revokedToCompletedNS": 14125,
+    "failedTurns": 0,
+    "scope": "Actual packaged app with synthetic input exercised same-frame revocation/completion after the repair."
+  },
+  "nativeTests": {
+    "executed": 18,
+    "skipped": 1,
+    "failures": 0,
+    "includes": "Immediate pause loads accepted cached wake model before debounce"
+  },
+  "finalBuildRecall": {
+    "passed": true,
+    "error": null,
+    "checks": [
+      "Packaged 12B call froze the accepted wake model",
+      "Gabor recalled the animal Peter actually chose",
+      "Peter recalled the instrument Gabor actually chose",
+      "Hang-up completed; reverse roster reused the group",
+      "No failed turn hidden by later recovery"
+    ],
+    "answers": [
+      {
+        "contact": "51F43A46-D1AB-5F92-A9B1-E08CCBD61C82",
+        "fixture": "animal-choice.wav",
+        "reply": "Axolotl."
+      },
+      {
+        "contact": "A9D82286-78A6-5CF4-96CA-E870242ED744",
+        "fixture": "animal-recall.wav",
+        "reply": "Peter chose an axolotl."
+      },
+      {
+        "contact": "A9D82286-78A6-5CF4-96CA-E870242ED744",
+        "fixture": "instrument-choice.wav",
+        "reply": "Theremin."
+      },
+      {
+        "contact": "51F43A46-D1AB-5F92-A9B1-E08CCBD61C82",
+        "fixture": "instrument-recall.wav",
+        "reply": "He chose the theremin."
+      }
+    ],
+    "fixtures": [
+      {
+        "key": "animal-choice",
+        "text": "Peter, choose one unusual animal. Say only its name.",
+        "sha256": "f444c80dd2ca7034dd876eaf1970fd2b5886e61aaa22ba89d211bdbcc0240ab3"
+      },
+      {
+        "key": "animal-recall",
+        "text": "Gabor, what animal did Peter just choose?",
+        "sha256": "2f69e94b6c5123ef070c936e0aa770515225f1ca7a44fe78bda06cdbb210414f"
+      },
+      {
+        "key": "instrument-choice",
+        "text": "Gabor, choose one unusual musical instrument. Say only its name.",
+        "sha256": "48f44fca12443872fecdbb50a33a7dbb7a50db3bb9875250b518c43435ec41f5"
+      },
+      {
+        "key": "instrument-recall",
+        "text": "Peter, what musical instrument did Gabor just choose?",
+        "sha256": "9532cca0a7b97e05fca54d3d1a0485bb4f64a49a0004beba2a1bd3c4d347028e"
+      }
+    ],
+    "scope": "Packaged 12B app; unfamiliar synthesized speech, muted output. No physical echo acceptance."
+  },
+  "finalBuildRepeatedHandoffs": {
+    "passed": true,
+    "checks": [
+      "Validated approximate enrollment loaded",
+      "12B group greeting completed",
+      "Correct recipient after Could you speak more slowly?",
+      "Correct recipient after Hey Gabor.",
+      "Correct recipient after Hey Peter.",
+      "Named interruption completed and call stayed connected",
+      "Explicit hang-up released the call",
+      "Repeated group call and reverse handoff completed"
+    ],
+    "error": null,
+    "scope": "Actual packaged 12B app, held-out synthetic speaker at device rate, muted output; no physical echo or human barge-in claim"
+  },
+  "finalBuildFailedTurns": 0
+}

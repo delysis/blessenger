@@ -75,7 +75,23 @@ final class WakeNameEnrollment: ObservableObject {
         // A contact edit or resume may schedule a new revision during the join.
         guard revision == token else { return }
         task = nil; worker = nil
-        if model == nil, !contacts.isEmpty { state = .queued }
+        if model == nil, !contacts.isEmpty {
+            // Dialing can beat the coalescing delay. Pausing training must not
+            // discard an already accepted on-disk head for this exact catalog.
+            // Only load here: a cache miss never trains or delays pickup for TTS.
+            let inputs = contacts, directory = directory
+            let cached = await Task.detached(priority: .userInitiated) { () -> WakeNameModel? in
+                guard let identity = try? WakeNameTraining.fingerprint(inputs),
+                      let data = try? Data(contentsOf: directory.appending(path: identity + ".json")),
+                      let result = try? JSONDecoder().decode(WakeNameTraining.Result.self, from: data),
+                      result.model.fingerprint == identity, result.model.accepted,
+                      result.receipt.accepted else { return nil }
+                return result.model
+            }.value
+            guard revision == token, suspended else { return }
+            model = cached
+            state = cached == nil ? .queued : .ready
+        }
     }
     func resume(reason: String = "call") {
         guard suspensionReasons.remove(reason) != nil else { return }

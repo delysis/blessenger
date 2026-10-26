@@ -11,6 +11,10 @@ final class WakeNameRoutingTests: XCTestCase {
             .init(text: "THE GARDEN IS QUIET", label: "other")])
         let model = WakeNameModel(fingerprint: "test", names: [.init(id: gabor, name: "Gabor"), .init(id: peter, name: "Peter")], classifier: head, accepted: true)
         XCTAssertEqual(try model.recipient("GABBER ARE YOU THERE", roster: [gabor, peter]), gabor)
+        XCTAssertEqual(try model.recipient("GABBER WHAT DID PETER SAY", roster: [gabor, peter]), gabor)
+        XCTAssertEqual(try model.recipient("HEY PEETER WHAT DID GABOR SAY", roster: [gabor, peter]), peter)
+        XCTAssertNil(try model.recipient("GABBER AND PETER", roster: [gabor, peter]))
+        XCTAssertNil(try model.recipient("GABBER WHAT DID PETER SAY", roster: [peter]))
         XCTAssertNil(try model.recipient("THE GARDEN IS QUIET", roster: [gabor, peter]))
         XCTAssertNil(try model.recipient("GABBER AND PEETER", roster: [gabor, peter]))
         XCTAssertNil(try model.recipient("GABBER ARE YOU THERE", roster: [peter]))
@@ -54,6 +58,25 @@ final class WakeNameRoutingTests: XCTestCase {
 }
 
 extension WakeNameRoutingTests {
+    @MainActor func testImmediatePauseLoadsAcceptedCacheBeforeDebounce() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let contact = Persona(name: "Peter", prompt: "Test", wakeName: "Peter")
+        let identity = try WakeNameTraining.fingerprint([contact])
+        let classifier = try WakeNameClassifier.train([
+            .init(text: "PETER", label: contact.id.uuidString), .init(text: "HEY PETER", label: contact.id.uuidString),
+            .init(text: "HELLO", label: "other"), .init(text: "PLEASE CONTINUE", label: "other")])
+        let model = WakeNameModel(fingerprint: identity, names: [.init(id: contact.id, name: "Peter")], classifier: classifier, accepted: true)
+        let result = WakeNameTraining.Result(model: model, receipt: .init(positives: 1, correct: 1, negatives: 24))
+        try JSONEncoder().encode(result).write(to: directory.appending(path: identity + ".json"))
+        let enrollment = WakeNameEnrollment(directory: directory)
+        enrollment.update([contact])
+        await enrollment.pause()
+        XCTAssertEqual(enrollment.model?.fingerprint, identity)
+        XCTAssertEqual(enrollment.state, .ready)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appending(path: "Features").path))
+    }
     @MainActor func testPausePreventsQueuedEnrollmentFromStarting() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         let enrollment = WakeNameEnrollment(directory: directory)

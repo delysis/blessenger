@@ -102,6 +102,7 @@ enum AppQualificationBridge {
                     "pendingTurns": controller.qualificationPendingTurns,
                     "fixtureRemainingFrames": controller.qualificationRemainingFrames,
                     "participantHandoffs": controller.qualificationParticipantHandoffs,
+                    "callWakeFingerprint": controller.qualificationCallWakeFingerprint,
                     "callID": controller.qualificationCallID,
                     "responding": controller.qualificationResponding,
                     "recovering": controller.qualificationRecovering,

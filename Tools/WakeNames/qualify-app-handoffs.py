@@ -75,7 +75,8 @@ try:
     thread = cmd('create_chat', contacts=[peter, gabor])['id']
     cmd('call', id=peter)
     owned_call = wait(lambda s: s['inCall'])['callID']
-    idle()
+    started = idle()
+    assert started['callWakeFingerprint'] == wake['fingerprint'], 'Call did not freeze the qualified wake model'
     checks.append('12B group greeting completed')
     for text, expected in [('Could you speak more slowly?', peter), ('Hey Gabor.', gabor), ('Hey Peter.', peter)]:
         before = idle()['completedTurns']

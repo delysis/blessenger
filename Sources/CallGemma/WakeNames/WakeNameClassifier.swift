@@ -37,10 +37,12 @@ struct WakeNameClassifier: Codable, Sendable {
         return counts
     }
 
-    private static func resembles(_ text: String, _ prototype: String) -> Bool {
+    private static func resembles(_ text: String, _ prototype: String, searching: Bool) -> Bool {
         let a = Array(text), b = Array(prototype)
         guard !a.isEmpty, !b.isEmpty else { return false }
-        let limit = max(a.count, b.count) / 2
+        // Searching multiple spans creates more false-match opportunities than
+        // scoring a complete address. Require closer prototype support there.
+        let limit = max(a.count, b.count) / (searching ? 4 : 2)
         guard abs(a.count - b.count) <= limit else { return false }
         var previous = Array(0...b.count)
         for (i, character) in a.enumerated() {
@@ -64,7 +66,7 @@ struct WakeNameClassifier: Codable, Sendable {
         return result
     }
 
-    func prediction(_ text: String) throws -> (label: String, margin: Float) {
+    func prediction(_ text: String, searching: Bool = false) throws -> (label: String, margin: Float) {
         guard text.utf8.count <= 1_024,
               vocabulary.count == idf.count, Set(vocabulary).count == vocabulary.count,
               labels.count >= 2, labels.contains("other"),
@@ -86,7 +88,7 @@ struct WakeNameClassifier: Codable, Sendable {
         // name. Require acoustic-text proximity to an original training example;
         // otherwise arbitrary long phrases can confidently select a contact.
         let supported = label == "other" || (prototypes[label] ?? []).contains {
-            Self.resembles(Self.normalized(text), $0)
+            Self.resembles(Self.normalized(text), $0, searching: searching)
         }
         return (separation >= margin && supported ? label : "other", separation)
     }
@@ -97,8 +99,8 @@ struct WakeNameClassifier: Codable, Sendable {
         guard examples.count >= 4, examples.count <= 4_000,
               examples.allSatisfy({ !$0.text.isEmpty && $0.text.utf8.count <= 1_024 }),
               margin.isFinite, (0...1).contains(margin) else { throw Failure.invalidCorpus }
-        // CTC often omits a letter in short, unfamiliar names. Teach the head
-        // deletion tolerance on training rows only, including negative speech;
+        // CTC omits, substitutes, or swaps letters in unfamiliar names. Teach
+        // that tolerance on training rows only, including negative speech;
         // never create variants from validation or held-out voices.
         let originals = examples
         var examples = originals
@@ -107,7 +109,10 @@ struct WakeNameClassifier: Codable, Sendable {
             guard characters.count > 3 else { continue }
             for variant in 0..<3 {
                 var damaged = characters
-                damaged.remove(at: (index * 13 + variant * 7) % characters.count)
+                let position = (index * 13 + variant * 7) % characters.count
+                if variant == 0 { damaged.remove(at: position) }
+                else if variant == 1 { damaged[position] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")[(index * 11 + position) % 26] }
+                else if position + 1 < damaged.count { damaged.swapAt(position, position + 1) }
                 examples.append(Example(text: String(damaged), label: example.label))
             }
         }

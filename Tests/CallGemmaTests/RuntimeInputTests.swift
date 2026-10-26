@@ -10,7 +10,10 @@ struct RuntimeInputTests {
         let object = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any])
         #expect(object["role"] as? String == "user")
         let content = try #require(object["content"] as? [[String: String]])
-        #expect(content == [["type": "audio", "path": file.path]])
+        #expect(content.filter { $0["type"] == "audio" } == [["type": "audio", "path": file.path]])
+        #expect(content.count == 2)
+        #expect(content.first?["type"] == "text")
+        #expect(content.first?["text"]?.hasPrefix("[Phone call]") == true)
     }
 
     @Test func waveIsSixteenBitMonoWithClippedFiniteSamples() throws {

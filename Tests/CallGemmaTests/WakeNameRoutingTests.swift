@@ -2,6 +2,19 @@ import XCTest
 @testable import CallGemma
 
 final class WakeNameRoutingTests: XCTestCase {
+    func testApproximateNameWithinAQuestionAndAmbiguousNames() throws {
+        let gabor = UUID(), peter = UUID()
+        let head = try WakeNameClassifier.train([
+            .init(text: "GABOR", label: gabor.uuidString), .init(text: "GABBER", label: gabor.uuidString),
+            .init(text: "PETER", label: peter.uuidString), .init(text: "PEETER", label: peter.uuidString),
+            .init(text: "PLEASE CONTINUE", label: "other"), .init(text: "HOW ARE YOU", label: "other"),
+            .init(text: "THE GARDEN IS QUIET", label: "other")])
+        let model = WakeNameModel(fingerprint: "test", names: [.init(id: gabor, name: "Gabor"), .init(id: peter, name: "Peter")], classifier: head, accepted: true)
+        XCTAssertEqual(try model.recipient("GABBER ARE YOU THERE", roster: [gabor, peter]), gabor)
+        XCTAssertNil(try model.recipient("THE GARDEN IS QUIET", roster: [gabor, peter]))
+        XCTAssertNil(try model.recipient("GABBER AND PEETER", roster: [gabor, peter]))
+        XCTAssertNil(try model.recipient("GABBER ARE YOU THERE", roster: [peter]))
+    }
     func testUnsupportedSpeechCannotUseAnOverconfidentHead() throws {
         let original = try WakeNameClassifier.train([
             .init(text: "FRANCINE", label: "name"), .init(text: "FRAN SENE", label: "name"),

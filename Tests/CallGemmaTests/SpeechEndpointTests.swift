@@ -47,6 +47,24 @@ struct SpeechEndpointTests {
 }
 
 struct SpeculativeEndpointTests {
+    @Test func revokedCandidateAtCompletionRestartsWithCompletePCM() throws {
+        var detector = SpeechEndpoint(silenceSamples: 1_536, silenceThreshold: 0.3, speculationThreshold: 0.5)
+        var buffer = UtteranceBuffer(minimumSamples: 1)
+        let start = detector.process(probability: 0.9, frames: 256)
+        _ = buffer.append(Array(repeating: 1, count: 256), start: start.start)
+        for _ in 0..<5 {
+            _ = detector.process(probability: 0.1, frames: 256)
+            _ = buffer.append(Array(repeating: 0, count: 256))
+        }
+        let event = detector.process(probability: 0.2, frames: 256)
+        #expect(event.resumed && event.end != nil)
+        let result = buffer.append(Array(repeating: 0, count: 256), end: event.end)
+        let completed = try #require(result)
+        #expect(buffer.snapshot() == nil)
+        #expect(buffer.streamingSnapshot(completed: completed) == completed.samples)
+        #expect(completed.samples == Array(repeating: Float(1), count: 256))
+    }
+
     @Test func firstLowFrameStartsSpeculationWithoutEndingCapture() {
         var detector = SpeechEndpoint(silenceSamples: 1_536)
         _ = detector.process(probability: 0.9, frames: 256)

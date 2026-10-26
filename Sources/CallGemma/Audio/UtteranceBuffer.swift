@@ -40,6 +40,12 @@ struct UtteranceBuffer {
         return nil
     }
 
+    /// Completion clears the retained speech range. A revoked speculative
+    /// stream must still be restartable on that same frame, from the exact PCM.
+    func streamingSnapshot(completed: Completed?) -> [Float]? {
+        completed?.samples ?? snapshot()
+    }
+
     func snapshot() -> [Float]? {
         guard let speechStart, receivedSamples - speechStart >= minimumSamples else { return nil }
         return Array(samples[(speechStart - firstSample)..<min(samples.count, speechStart - firstSample + maximumSamples)])

@@ -1,0 +1,56 @@
+{
+  "scope": "Follow-up to contact-enrollment-08; preserves prior failures. Human speaker verification is limited to the tested run.",
+  "enrollment": {
+    "fingerprint": "6357c129f83d3a4467962a9a865009348d5718985a17cbc2de5dffdfd6f26fbe",
+    "version": 7,
+    "validation": {
+      "correct": 111,
+      "positives": 112,
+      "wrong": 0,
+      "falseActivations": 0,
+      "negatives": 48
+    },
+    "unfamiliarRetainedDecodes": {
+      "correct": 107,
+      "positives": 112,
+      "wrong": 0,
+      "falseActivations": 0,
+      "negatives": 48,
+      "scope": "Reclassification of retained held-out decoder output, not fresh microphone acceptance"
+    }
+  },
+  "speakerRun": {
+    "call": "09DABE32-E4DA-408A-A9E3-0D971A14A939",
+    "model": "gemma-4-12B-it",
+    "syntheticInput": false,
+    "outputMuted": false,
+    "humanReport": "Both parties answered in distinct voices; no false cutoffs. Participants claimed they could not hear each other.",
+    "overallPassed": false,
+    "failure": "One turn failed during runtime turn admission; speculative revocation and utterance completion occurred on the same capture frame.",
+    "contextFinding": "Durable transcripts contained other participants replies, attributed by UUID only. No named group roster."
+  },
+  "candidateRepairs": [
+    "Names and current-speaker identity in group context, preserving UUID routing and quoted heard replies.",
+    "A completed utterance supplies restart PCM when revocation clears the speculative stream on the same frame."
+  ],
+  "remaining": [
+    "Verify cross-participant recall in actual app on speaker.",
+    "Verify same-frame revocation repair through actual app.",
+    "Five unfamiliar-voice wake misses remain.",
+    "No claim that one clean speaker run explains historical self-interruption."
+  ],
+  "checks": {
+    "nativeXCTest": {
+      "executed": 16,
+      "skipped": 1,
+      "failures": 0
+    },
+    "portableSwift": {
+      "tests": 52,
+      "failures": 0,
+      "includes": "Same-frame speculative revocation/completion restart PCM regression"
+    },
+    "build": "Signed macOS Release build-for-testing passed",
+    "scope": "Component checks; revised shared context and stream repair await actual-app speaker acceptance"
+  }
+}

@@ -108,7 +108,7 @@ final class CallController: ObservableObject, MessageInference {
     private var requestedCallParticipant: UUID?
     private let wakePhonetics = WakePhonetics()
     private var callWakeModel: WakeNameModel?
-    private var wakeTasks: [UUID: Task<String, Error>] = [:]
+    private var wakeTasks: [UUID: Task<UUID?, Error>] = [:]
     private var participantTasks: [UUID: Task<Void, Error>] = [:]
     @Published private(set) var activeCallParticipant: UUID?
     var callParticipants: [Persona] { callRoster?.participants ?? [] }
@@ -740,6 +740,11 @@ final class CallController: ObservableObject, MessageInference {
                 callChatContext = try await store.chatContextForCall(contact: contact)
                 guard inCall, callID == id, !Task.isCancelled else { return }
             }
+            if let shared = sharedCallHistory, let participant = activeCallParticipant {
+                let previous = try JSONSerialization.jsonObject(with: Data(callChatContext.utf8)) as? [[String: Any]] ?? []
+                callChatContext = String(decoding: try JSONSerialization.data(withJSONObject:
+                    shared.context(for: participant) + previous, options: [.sortedKeys]), as: UTF8.self)
+            }
             let events = try await audio.start()
             try Task.checkCancellation()
             guard !isShuttingDown, callID == id else { audio.stop(); return }
@@ -907,17 +912,18 @@ final class CallController: ObservableObject, MessageInference {
                     let started = LatencyTrace.now()
                     let wakeID = UUID()
                     let decoder = wakePhonetics
-                    let selection = Task { try await decoder.decode(utterance.samples) }
+                    let wakeNames = callParticipants.map { WakeNameModel.Name(id: $0.id, name: $0.wakeName) }
+                    let classifier = callWakeModel?.classifier
+                    let selection = Task { try await decoder.recipient(utterance.samples,
+                        names: wakeNames, classifier: classifier, diagnosticID: id) }
                     wakeTasks[wakeID] = selection
-                    let decoded = (try? await selection.value) ?? ""
+                    let recipient = try? await selection.value
                     wakeTasks.removeValue(forKey: wakeID)
                     // A later speech start cancels the reply, not already
                     // confirmed user input. Hang-up separately cancels this task.
                     if utterance.gate?.inputConfirmed == false { try Task.checkCancellation() }
                     guard inCall, callID == currentCall else { throw CancellationError() }
-                    let wakeNames = callParticipants.map { WakeNameModel.Name(id: $0.id, name: $0.wakeName) }
-                    if let recipient = try WakeNameModel.recipient(decoded, names: wakeNames,
-                        roster: Set(callParticipants.map(\.id)), classifier: callWakeModel?.classifier),
+                    if let recipient,
                        recipient != activeCallParticipant {
                         // Stop and join the old speculative input before replacing
                         // its context. The retained complete PCM is admitted once to

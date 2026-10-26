@@ -43,7 +43,7 @@ enum WakeNameTraining {
         "They live a few miles away.", "Could we try something different?"]
 
     static func fingerprint(_ contacts: [Persona]) throws -> String {
-        try fingerprint(contacts, version: "wake-v6|")
+        try fingerprint(contacts, version: "wake-v7|")
     }
 
     private static func fingerprint(_ contacts: [Persona], version: String) throws -> String {

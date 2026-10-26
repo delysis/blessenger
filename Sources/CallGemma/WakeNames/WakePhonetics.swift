@@ -5,6 +5,20 @@ import Foundation
 actor WakePhonetics {
     private var model: MLModel?
     private var compiled: URL?
+    func recipient(_ samples: [Float], names: [WakeNameModel.Name], classifier: WakeNameClassifier?,
+                   diagnosticID: UUID) async throws -> UUID? {
+        let decoded = try await decode(samples)
+        try Task.checkCancellation()
+        let recipient = try WakeNameModel.recipient(decoded, names: names,
+            roster: Set(names.map(\.id)), classifier: classifier)
+        if let root = AppQualificationEnvironment.root {
+            let directory = root.appending(path: "WakeRouting")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let record = ["decoded": decoded, "recipient": recipient?.uuidString ?? ""]
+            try JSONEncoder().encode(record).write(to: directory.appending(path: diagnosticID.uuidString + ".json"), options: .atomic)
+        }
+        return recipient
+    }
     func prepare() async throws {
         guard model == nil else { return }
         let config = MLModelConfiguration(); config.computeUnits = .cpuOnly

@@ -31,10 +31,20 @@ struct WakeNameModel: Codable, Sendable {
         if matches.count == 1 { return roster.contains(matches[0].id) ? matches[0].id : nil }
         if matches.count > 1 { return nil }
         guard let classifier else { return nil }
-        let predicted = try classifier.prediction(decoded).label
-        guard let id = UUID(uuidString: predicted), roster.contains(id),
-              let name = names.first(where: { $0.id == id }), Self.words(name.name).joined().count >= 3 else { return nil }
-        return id
+        var candidates = Set<UUID>()
+        let whole = try classifier.prediction(decoded).label
+        if let id = UUID(uuidString: whole), roster.contains(id), names.contains(where: { $0.id == id }) { candidates.insert(id) }
+        let width = max(3, names.map { Self.words($0.name).count }.max() ?? 1)
+        for start in words.indices {
+            for count in 1...min(width, words.count - start) {
+                let phrase = words[start..<(start + count)].joined(separator: " ")
+                let predicted = try classifier.prediction(phrase, searching: true).label
+                if let id = UUID(uuidString: predicted), roster.contains(id), names.contains(where: { $0.id == id }) {
+                    candidates.insert(id)
+                }
+            }
+        }
+        return candidates.count == 1 ? candidates.first : nil
     }
     static func words(_ text: String) -> [String] {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US")).lowercased().split(whereSeparator: { !$0.isLetter }).map(String.init)

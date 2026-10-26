@@ -12,8 +12,8 @@ final class RelationshipMemoryTests: XCTestCase {
         let old = try ConversationHistory(json: "[]").appending(userJSON: #"{"role":"user","content":[{"type":"text","text":"Private earlier call"}]}"#, heardText: "Private reply")
         try af.commit(history: old, turn: nil)
         var shared = try SharedCallHistory(call: call, participants: [
-            CallMemoryParticipant(contact: a, transcriptDirectory: af.directory),
-            CallMemoryParticipant(contact: b, transcriptDirectory: bf.directory)])
+            CallMemoryParticipant(contact: a, name: "Peter Levine", transcriptDirectory: af.directory),
+            CallMemoryParticipant(contact: b, name: "Gabor Maté", transcriptDirectory: bf.directory)])
         let audio = #"{"role":"user","content":[{"type":"audio","path":"/owned/current-call.wav"}]}"#
         let ah = try old.appending(userJSON: audio, heardText: "A actually heard")
         try af.commit(history: ah, turn: UUID())
@@ -22,6 +22,10 @@ final class RelationshipMemoryTests: XCTestCase {
         XCTAssertEqual(imported.messages.count, 1)
         XCTAssertFalse(imported.endsWithAssistant)
         XCTAssertTrue(imported.json.contains(a.uuidString))
+        XCTAssertTrue(imported.json.contains("Peter Levine"))
+        XCTAssertTrue(imported.json.contains("Gabor Maté"))
+        let context = try shared.context(for: b)
+        XCTAssertTrue((context.first?["text"] as? String)?.contains("Gabor Maté") == true)
         XCTAssertTrue(imported.json.contains("A actually heard"))
         XCTAssertFalse(imported.json.contains("Private"))
         let bs = CallMemorySource(id: UUID(), contact: b, transcriptDirectory: bf.directory, firstMessage: 0)

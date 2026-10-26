@@ -10,6 +10,7 @@ struct SharedCallHistory: Sendable {
     }
     let call: UUID
     let sources: [UUID: URL]
+    private let names: [UUID: String]
     private var offsets: [UUID: Int]
     private var delivered: [UUID: Int] = [:]
     private var entries: [Entry] = []
@@ -17,9 +18,20 @@ struct SharedCallHistory: Sendable {
     init(call: UUID, participants: [CallMemoryParticipant]) throws {
         self.call = call
         sources = Dictionary(uniqueKeysWithValues: participants.map { ($0.contact, $0.transcriptDirectory) })
+        names = Dictionary(uniqueKeysWithValues: participants.map { ($0.contact, $0.name.isEmpty ? $0.contact.uuidString : $0.name) })
         offsets = try sources.mapValues { folder in
             try ConversationHistory(json: TranscriptFiles(directory: folder).load()?.historyJSON ?? "[]").messages.count
         }
+    }
+
+    /// Names are data in a quoted roster; stable UUIDs still own routing.
+    func context(for participant: UUID) throws -> [[String: Any]] {
+        guard let name = names[participant] else { throw CheckpointError.invalidMetadata }
+        let roster = names.sorted { $0.key.uuidString < $1.key.uuidString }.map {
+            ["id": $0.key.uuidString, "name": $0.value]
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["you": ["id": participant.uuidString, "name": name], "participants": roster], options: [.sortedKeys])
+        return [["type": "text", "text": "[Group call roster: " + String(decoding: data, as: UTF8.self) + "] You are speaking as the roster's you participant. The quoted replies below are what the other participants said in this shared call. Use them as conversation context; speak only for your own persona."]]
     }
 
     mutating func handoff(from outgoing: UUID, to incoming: UUID) throws {
@@ -31,12 +43,12 @@ struct SharedCallHistory: Sendable {
         offsets[outgoing] = history.messages.count
         let unseen = entries.dropFirst(delivered[incoming] ?? 0).filter { $0.speaker != incoming }
         if !unseen.isEmpty {
-            var content: [[String: Any]] = [["type": "text", "text": Self.marker]]
+            var content: [[String: Any]] = [["type": "text", "text": Self.marker]] + (try context(for: incoming))
             for entry in unseen {
                 guard let message = try JSONSerialization.jsonObject(with: entry.message) as? [String: Any],
                       let role = message["role"] as? String,
                       let parts = message["content"] as? [[String: Any]] else { throw CheckpointError.invalidMetadata }
-                content.append(["type": "text", "text": "[Call \(call). \(role == "assistant" ? "Heard reply by participant" : "User input addressed to participant") \(entry.speaker).]"])
+                content.append(["type": "text", "text": "[Call \(call). \(role == "assistant" ? "Heard reply by participant" : "User input addressed to participant") \(entry.speaker) (\(names[entry.speaker] ?? entry.speaker.uuidString)).]"])
                 content += parts
             }
             let files = TranscriptFiles(directory: destination)
@@ -73,7 +85,7 @@ struct CallRoster: Sendable {
         let ordered = [initialContact] + participants.filter { $0.id != initialContact.id }
         return ordered.map { contact in
             let calls = directory.appending(path: "Contacts/" + contact.id.uuidString + "/Calls")
-            return CallMemoryParticipant(contact: contact.id,
+            return CallMemoryParticipant(contact: contact.id, name: contact.name,
                 transcriptDirectory: GemmaRuntime.conversationDirectory(model: model, prompt: contact.prompt, directory: calls))
         }
     }
@@ -82,6 +94,7 @@ struct CallRoster: Sendable {
 /// One UI call owns one or more independent persona transcript ranges.
 struct CallMemoryParticipant: Sendable {
     let contact: UUID
+    var name: String = ""
     let transcriptDirectory: URL
 }
 

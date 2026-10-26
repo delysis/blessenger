@@ -1076,7 +1076,7 @@ final class CallAudio {
                         inputSamplesSent += count
                     }
                 }
-                else if let snapshot = utterance.snapshot() {
+                else if let snapshot = utterance.streamingSnapshot(completed: completed) {
                     let input = UUID()
                     inputID = input
                     inputSamplesSent = snapshot.count
